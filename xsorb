@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Created on Fri 6 Feb 2023
+
+@author: Enrico Pedretti
+@author: Paolo Restuccia
+
+Python script based on Pymatgen and ASE to build adatom adsorption on slabs calculated with Quantum ESPRESSO
+
+
+# @Brief summary of the program:
+# -Reads slab from file (many types supported, e.g. pwi/pwo, .xyz, .cif, POSCAR ...). The slab is assumed to be already relaxed.
+
+# -Reads molecule from file. You must provide the indices of the two atoms that will define the x axis direction
+#    It is also possible to select only a subset of the atoms by specifying the indices in the file. This can be useful to create fragments.
+
+# -Finds all adsorption sites on the surface, optionally saves a .png with the identified sites. Legend: red=ontop, green=bridge, blue=hollow.
+#    Note that the program identifies as bridge also the 4-fold hollow sites, since it uses a Delaunay triangulation and so this kind of site
+#    falls in the middle of the edge of one of the triangles. If too many sites are identified, try to adjust (increase) the 
+#    two threshold parameters 'symm_reduce' and 'near_reduce' in the sites_find_args dictionary.
+
+# -Generates all the desired orientations of the molecule after translating to the origin the selected atom of the molecule, 
+#    which will be later placed above the slab adsorption sites. NOTE: the selected atom index must be the one in the input file,
+#    even if only a subset of the molecule is selected. The rotations are performed in the following order:
+#    1) rotations along x axis ("screw", if the molecule is already along the x axis)
+#    2) rotations along y axis ("verticality": 0 = molecule horizontal, 90 = molecule vertical)
+#    3) rotations along z axis (rotations in the horizontal plane)
+#    
+#    Optionally saves a .png with all the orientations viewed from the top view.
+
+# -Generates slabs for all orientations placing the selected atom above all adsorption sites. Each configuration is labeled by an integer index.
+#    In order to identify the labels, a table is written into a .csv containing label, site_type, xrot_angle, yrot_angle, z_rot_angle, x_site, y_site
+
+# -Optionally writes the .pwi for all the generated configurations, fixing the selected atoms
+
+# -Optionally writes the POSCAR files for visualization (so you can open them with VESTA, which sometimes can be more handy than xcrysden)
+
+# -Optionally runs directly the ESPRESSO calculations: first a SCF calculation is done (in series) for all the generated configurations,
+#    writing a .csv file with all the energies, then the config corresponding to the energy minimum is also relaxed.
+
+"""
+import json
+#Import statements#####################################################################
+import numpy as np
+#from pymatgen.analysis.adsorption import *
+from pymatgen.io import ase
+from ase.io import read, write
+import os, sys
+#import matplotlib as mpl
+#
+import input
+from espresso_mod import Espresso_mod
+from slab import Slab, adsorb_both_surfaces
+from molecule import Molecule
+from io_utils import get_energies, get_z, launch_jobscripts
+#
+########################################################################################
+
+
+#preset variables:######################################################################
+#output paths
+pwi_prefix               = 'input'  #prefix: the files will be named pwi_filenames_i.pwi with i=1,2,...
+labels_filename          = 'scf_site_labels.csv'
+prerelax_labels_filename = 'prerelax_site_labels.csv'
+energies_filename        = 'scf_energies.csv'
+#########################################################################################
+
+
+#TODO: write function to remove some adsites from list, and also from the label
+#      probably better if remove by label instead of by index
+#TODO: option to fix entire layers
+#TODO: check/rewrite explanation at the beginning, write commands in --h
+#TODO: test slab with dopant
+#TODO: possibly add a z_max if the relaxation brings the molecule too far (?)
+
+
+#user settings variables################################################################
+script_settings_dict, espresso_settings_dict = input.read_input_file("settings.in")
+
+
+#check for existence of the four blocks
+blocks = ['INPUT','STRUCTURE','CALCULATION','PSEUDO']
+for block in blocks:
+    if block not in script_settings_dict:
+        raise RuntimeError("'"+block+"'block not found in settings.in.")
+
+#check existence of mandatory variables in blocks
+mandatory_flags_list = [
+    ['slab_filename','molecule_filename', 'jobscript'], 
+    ['selected_atom_index', 'screw_rot_angles', 'vert_angles', 'hor_angles'], 
+    ['kpoints', 'kpoints_offset']
+    ]
+for block in script_settings_dict:
+    i = -1
+    if   block=='INPUT': i=0
+    elif block=='STRUCTURE': i=1
+    elif block=='CALCULATION': i=2
+    elif block=='PSEUDO': continue
+    for flag in mandatory_flags_list[i]:
+        if flag not in script_settings_dict[block]:
+            raise RuntimeError("'"+flag + "' not found in settings.in.")
+
+if 'molecule_axis_atoms' in script_settings_dict['STRUCTURE'] and 'axis_vector' in script_settings_dict['STRUCTURE']:
+    raise RuntimeError("You can specify the molecule axis either by 'molecule_axis_atoms' or 'axis_vector', not both.")
+if 'fixed_indices_slab' in script_settings_dict['STRUCTURE'] and 'fixed_layers_slab' in script_settings_dict['STRUCTURE']:
+    raise RuntimeError("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")            
+
+#set non-specified flags to default.
+print
+
+optional_flags_list = {
+    'symm_reduce'              : 0.01,
+    'near_reduce'              : 0.01,
+    'slab_repeat'              : '1 1 1',
+    'mol_atoms'                : ' ',
+    'molecule_axis_atoms'      : ' ',
+    'axis_vector'              : ' ',
+    'selected_atom_distance'   : 2.0,
+    'min_distance'             : 1.0,
+    'no_screw_rot_vert'        : '0',
+    'fixed_indices_slab'       : ' ',
+    'fixed_layers_slab'        : ' ',
+    'fixed_indices_mol'        : ' ',
+    'fix_slab_xyz'             : '0 0 1',
+    'fix_mol_xyz'              : '0 0 1',
+}
+for flag in optional_flags_list:
+    if flag not in script_settings_dict['STRUCTURE']:
+        script_settings_dict['STRUCTURE'].update({flag : optional_flags_list[flag]})
+
+
+#&INPUT:
+slab_filename          = script_settings_dict['INPUT']['slab_filename']
+molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
+jobscript              = script_settings_dict['INPUT']['jobscript']
+
+#&STRUCTURE
+symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
+near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
+slab_repeat            = np.array(script_settings_dict['STRUCTURE']['slab_repeat'].split(), dtype=int).tolist()
+
+mol_atoms              = np.array(script_settings_dict['STRUCTURE']['mol_atoms'].split(), dtype=int).tolist()
+molecule_axis_atoms    = np.array(script_settings_dict['STRUCTURE']['molecule_axis_atoms'].split(), dtype=int).tolist()
+axis_vector            = np.array(script_settings_dict['STRUCTURE']['axis_vector'].split(), dtype=float).tolist()
+selected_atom_index    = int(script_settings_dict['STRUCTURE']['selected_atom_index'])
+selected_atom_distance = float(script_settings_dict['STRUCTURE']['selected_atom_distance'])
+min_distance           = float(script_settings_dict['STRUCTURE']['min_distance'])           
+screw_rot_angles       = np.array(script_settings_dict['STRUCTURE']['screw_rot_angles'].split(), dtype=float).tolist()
+vert_angles            = np.array(script_settings_dict['STRUCTURE']['vert_angles'].split(), dtype=float).tolist()  
+hor_angles             = np.array(script_settings_dict['STRUCTURE']['hor_angles'].split(), dtype=float).tolist()          
+no_screw_rot_vert      = bool(int(script_settings_dict['STRUCTURE']['no_screw_rot_vert']))
+
+fixed_indices_slab     = np.array(script_settings_dict['STRUCTURE']['fixed_indices_slab'].split(), dtype=int).tolist()
+fixed_layers_slab      = np.array(script_settings_dict['STRUCTURE']['fixed_layers_slab'].split(), dtype=int).tolist()
+fixed_indices_mol      = np.array(script_settings_dict['STRUCTURE']['fixed_indices_mol'].split(), dtype=int).tolist()
+fix_slab_xyz           = np.array(script_settings_dict['STRUCTURE']['fix_slab_xyz'].split(), dtype=int).tolist() 
+fix_mol_xyz            = np.array(script_settings_dict['STRUCTURE']['fix_mol_xyz'].split(), dtype=int).tolist()
+
+
+
+#&CALCULATION
+kpoints                = np.array(script_settings_dict['CALCULATION']['kpoints'].split(), dtype=int).tolist()
+kpoints_offset         = np.array(script_settings_dict['CALCULATION']['kpoints_offset'].split(), dtype=int).tolist()
+
+#&PSEUDO
+pseudopotentials       = script_settings_dict['PSEUDO']
+
+#Espresso &SYSTEM (correction to bugs in ase function to write pwis)
+starting_mag = []
+vdwg2_london_c6 = []
+vdwg2_london_rvdw = []
+keys_to_be_removed = []
+for i, species in enumerate(pseudopotentials):
+    for key in espresso_settings_dict['SYSTEM']:
+        if 'starting_magnetization' in key:
+            if i == int(key.split('(')[1].split(')')[0]):
+                starting_mag.append(espresso_settings_dict['SYSTEM'][key])
+                keys_to_be_removed.append(key)
+        if 'london_c6' in key:
+            if i == int(key.split('(')[1].split(')')[0]):
+                vdwg2_london_c6.append(espresso_settings_dict['SYSTEM'][key])
+                keys_to_be_removed.append(key)
+        if 'london_rvdw' in key:
+            if i == int(key.split('(')[1].split(')')[0]):
+                vdwg2_london_rvdw.append(espresso_settings_dict['SYSTEM'][key])
+                keys_to_be_removed.append(key)
+    if(len(starting_mag) < i): starting_mag.append(None)
+    if(len(vdwg2_london_c6) < i): vdwg2_london_c6.append(None)
+    if(len(vdwg2_london_rvdw) < i): vdwg2_london_rvdw.append(None)
+
+for key in keys_to_be_removed:
+    espresso_settings_dict['SYSTEM'].pop(key)
+
+sites_find_args = {
+    "distance":selected_atom_distance, 
+    'symm_reduce':symm_reduce, 
+    'near_reduce':near_reduce, 
+    'no_obtuse_hollow':True}
+############################################################################################################
+
+
+def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
+    #BEGIN STRUCTURES GENERATION ############################################################################
+
+    #Slab import from file
+    print('\nLoading slab...')
+    slab = Slab(slab_filename)
+    print('Slab loaded.')
+
+    #sga = SpacegroupAnalyzer(slab.slab_pymat)
+    #sops = sga.get_point_group_operations(cartesian=True)
+    #for sop in sops:
+    #    if sop.rotation_matrix[2][2] == 1.:
+    #        print(sop.rotation_matrix)
+
+
+    #Molecule import from file
+    print('Loading molecule...')
+    mol = Molecule(molecule_filename, molecule_axis_atoms, axis_vector, mol_atoms)
+    print('Molecule loaded.')
+
+
+    #Find adsorption sites and labels (site type and x,y coords.)
+    print('Finding adsorption sites...')
+    adsites, adsites_labels = slab.find_adsorption_sites(*sites_find_args.values(), save_image=SAVEFIG)
+    print('Adsorption sites found.')
+
+
+    if os.path.isfile(pwi_prefix+'_prerelax_0.pwo'): #if the pre-relaxed files are present, read distance from there, else use the user-defined value
+        i = 0
+        distances_from_surf = []
+        while(True):
+            if os.path.isfile(pwi_prefix+'_prerelax_{0}.pwo'.format(i)):
+                atom_index = selected_atom_index + len(slab.slab_pymat.sites)
+                distances_from_surf.append(get_z(pwi_prefix+'_prerelax_{0}.pwo'.format(i)), atom_index)
+                i = i+1
+            else: break
+    else:
+        distances_from_surf = len(screw_rot_angles)*[selected_atom_distance]
+
+
+    #Generate all the configs for the various molecular rotations and a list of labels
+    print('Generating molecular configurations...')
+    all_mol_configs_pymat, configs_labels = mol.generate_molecule_rotations(
+        atom_index=selected_atom_index,  
+        vert_rotations=vert_angles,
+        screw_rotations=screw_rot_angles, 
+        horiz_rotations=hor_angles, 
+        no_vert_rotx=no_screw_rot_vert,
+        distance_from_surf=distances_from_surf, 
+        min_distance=min_distance, 
+        save_image=SAVEFIG
+        )
+    print('All molecular configurations generated.')
+
+
+    #Adsorption of molecule on all adsorption sites for all molecule orientations  
+    print('Generating adsorption structures...')
+    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites['all'], repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
+    all_mol_on_slab_configs_pymat = sum(all_mol_on_slab_configs_pymat, []) #flatten the 2D array
+    if(False): all_mol_on_slab_configs_pymat = adsorb_both_surfaces(all_mol_on_slab_configs_pymat) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
+    all_mol_on_slab_configs_ase = [ase.AseAtomsAdaptor.get_atoms(config) for config in all_mol_on_slab_configs_pymat]
+    full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
+    print('All slab+adsorbate cells generated.')
+
+        
+    print('Writing pwi(s)...')
+    csvfile=open(labels_filename, 'w')
+    csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
+
+    espresso_settings_dict['CONTROL'].update({'calculation' : 'scf'})
+
+    
+    pwi_names = []
+
+    for i in np.arange(len(all_mol_on_slab_configs_ase)):
+        name_file = pwi_prefix+'_'+str(i)
+        pwi_names.append(name_file+'.pwi')
+        calc = Espresso_mod(pseudopotentials=pseudopotentials, 
+                    input_data=espresso_settings_dict,
+                    label=name_file,
+                    kpts=kpoints,koffset=kpoints_offset)
+        if(fixed_layers_slab): 
+            fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
+        else: fixed_slab = fixed_indices_slab
+        calc.set_fixed_atoms(fixed_slab, fixed_indices_mol, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites), fix_slab_xyz, fix_mol_xyz)
+        calc.set_starting_magnetizations(starting_mag)
+        calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
+        calc.write_input(all_mol_on_slab_configs_ase[i])
+        if(WRITE_XSF): write(name_file+'.xsf', all_mol_on_slab_configs_ase[i])
+
+        csvfile.write(str(i)+','+full_labels[i]+'\n')
+
+    csvfile.close()
+
+    print('All pwi(s) written.')
+    #END OF STRUCTURE GENERATIONS #########################################################################################
+    
+    if SCF_RUN:
+        launch_jobscripts(jobscript=jobscript, pwi_list=pwi_names, outdirs='scf_outdirs')
+
+
+def pre_relax(WRITE_XSF : bool =False):
+    
+   #BEGIN OF STRUCTURES GENERATION ############################################################################
+
+    #Slab import from file
+    print('\nLoading slab...')
+    slab = Slab(slab_filename)
+    print('Slab loaded.')
+
+    #sga = SpacegroupAnalyzer(slab.slab_pymat)
+    #sops = sga.get_point_group_operations(cartesian=True)
+    #for sop in sops:
+    #    if sop.rotation_matrix[2][2] == 1.:
+    #        print(sop.rotation_matrix)
+
+
+    #Molecule import from file
+    print('Loading molecule...')
+    mol = Molecule(molecule_filename, molecule_axis_atoms, axis_vector, mol_atoms)
+    print('Molecule loaded.')
+
+
+    #Find adsorption sites and labels (site type and x,y coords.)
+    print('Finding adsorption sites...')
+    adsites, adsites_labels = slab.find_adsorption_sites(*sites_find_args.values(), save_image=False)
+    print('Adsorption sites found.')
+
+
+    #Generate all the configs for the various molecular rotations and a list of labels
+    print('Generating molecular configurations...')
+    all_mol_configs_pymat, configs_labels = mol.generate_molecule_rotations(
+        atom_index=selected_atom_index,  
+        vert_rotations=vert_angles,
+        screw_rotations=screw_rot_angles, 
+        horiz_rotations=[0], 
+        no_vert_rotx=no_screw_rot_vert,
+        distance_from_surf=selected_atom_distance, 
+        min_distance=min_distance, 
+        save_image=False
+        )
+    print('All molecular configurations generated.')
+
+
+    #generate_adsorption_structures
+    #Adsorption of molecule only on a hollow site for z relaxation
+    print('Generating adsorption structures...')
+    # TODO: anziché prenderne uno a caso prendere quello con maggior coordination number.  
+    adsites_labels = [[ads for ads in adsites_labels if 'hollow' in ads][0]]
+    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=[adsites['hollow'][0]], repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
+    all_mol_on_slab_configs_pymat = sum(all_mol_on_slab_configs_pymat, []) #flatten the 2D array
+    if(False): all_mol_on_slab_configs_pymat = adsorb_both_surfaces(all_mol_on_slab_configs_pymat) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
+    all_mol_on_slab_configs_ase = [ase.AseAtomsAdaptor.get_atoms(config) for config in all_mol_on_slab_configs_pymat]
+
+    full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
+    print('Slab+adsorbate cells for the hollow sites generated.')
+
+        
+    csvfile=open(prerelax_labels_filename, 'w')
+    csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
+
+    espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
+    espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
+
+    pwi_names = []
+    for i in np.arange(len(all_mol_on_slab_configs_ase)):
+        name_file = pwi_prefix+'_prerelax_'+str(i)
+        pwi_names.append(name_file+'.pwi')
+        calc = Espresso_mod(pseudopotentials=pseudopotentials, 
+                    input_data=espresso_settings_dict,
+                    label=name_file,
+                    kpts=kpoints,koffset=kpoints_offset)
+
+        #all_slab_fixed = list(range(len(slab.slab_pymat.sites)))
+        #all_mol_fixed = np.array(list(range(len(mol.mol_pymat.sites)))) + len(slab.slab_pymat.sites)
+        calc.set_fixed_atoms([-1], [-1], len(slab.slab_pymat.sites), len(mol.mol_pymat.sites) , [0, 0, 0], [0, 0, 1])
+        calc.set_starting_magnetizations(starting_mag)
+        calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
+        calc.write_input(all_mol_on_slab_configs_ase[i]) 
+        if(WRITE_XSF): write(name_file+'.xsf', all_mol_on_slab_configs_ase[i])      
+
+        csvfile.write(str(i)+','+full_labels[i]+'\n')
+
+    csvfile.close()
+
+    launch_jobscripts(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerel_outdirs')
+
+
+def final_relax(threshold : float = None):
+
+    slab = Slab(slab_filename)
+    mol  = Molecule(molecule_filename, molecule_axis_atoms, axis_vector, mol_atoms)
+    
+    energies = get_energies(labels_filename, energies_filename)
+    if None in energies:
+        raise RuntimeError('Not all the calculations have (yet) produced a final energy. Cannot run the final calculation.')
+    
+    e_min = min(energies)
+    i_minimum = energies.index(e_min)
+    calcs = []
+    if threshold is not None:
+        for i, energy in enumerate(energies):
+            if energy - e_min <= threshold:
+                calcs.append(i)
+    else: calcs = [i_minimum]
+
+
+    espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
+    espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
+
+    pwi_names = []
+    for i in calcs:       
+        struct_ase = read(pwi_prefix+'_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
+
+        fixed_indices_molecule = len(read(slab_filename)) + np.array(fixed_indices_mol)
+
+        pwi_name = pwi_prefix+'_finalrelax_'+str(i)
+        pwi_names.append(pwi_names+'.pwi')
+        calc = Espresso_mod(pseudopotentials=pseudopotentials, 
+                    input_data=espresso_settings_dict,
+                    label=pwi_name,
+                    kpts=kpoints,koffset=kpoints_offset)
+        if(fixed_layers_slab): fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
+        else: fixed_slab = fixed_indices_slab
+        calc.set_fixed_atoms(
+            fixed_slab, 
+            fixed_indices_molecule, 
+            len(slab.slab_pymat.sites), 
+            len(mol.mol_pymat.sites),
+            fix_slab_xyz, fix_mol_xyz)
+        calc.set_starting_magnetizations(starting_mag)
+        calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
+        calc.write_input(struct_ase)
+
+    launch_jobscripts(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrel_outdirs')
+
+
+def main():
+
+    #mpl.use('Agg') #silent mode
+    #mpl.rcParams['font.size'] = 13
+
+    if(len(sys.argv) == 1):
+        print('You need to specify at least one option. Quitting.')
+        return 1
+
+    if('--h' in sys.argv or '--help' in sys.argv):
+        print('TODO: help')
+
+    SAVEFIG   = True
+    WRITE_XSF = False
+    if('--nofig' in sys.argv): SAVEFIG = False
+    if('--xsf' in sys.argv): WRITE_XSF = True
+    
+    if('-g' in sys.argv or '-s' in sys.argv):
+        generate(SCF_RUN= '-s' in sys.argv, SAVEFIG=SAVEFIG, WRITE_XSF=WRITE_XSF)
+    elif('-r' in sys.argv):
+        pre_relax()
+    elif('-e' in sys.argv):
+        get_energies(labels_filename, energies_filename)
+    elif('-f' in sys.argv):
+        threshold = None
+        if('--t' in sys.argv):
+            if(len(sys.argv)> sys.argv.index('--t')+1):
+                threshold = sys.argv[sys.argv.index('--t')+1]
+                if not input._is_number(threshold):
+                    print('The value after --t must be a number. Quitting.')
+                    return 1                
+            else:
+                print('You need to specify a value after --t. Quitting.')
+                return 1
+        final_relax(threshold)
+    elif('-fe' in sys.argv): #read final energies
+        pass
+
+
+if __name__ == '__main__':
+    sys.exit(main())
