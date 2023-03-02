@@ -12,7 +12,7 @@ import os, shutil
 import glob
 from natsort import natsorted
 
-TEST = True #do not actually launch the jobs, simply prints the command
+TEST = False #do not actually launch the jobs, simply prints the command
 
 
 def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : str = 'output'):

@@ -483,7 +483,7 @@ def main():
         print('You need to specify at least one option. Quitting.')
         return 1
 
-    if('--h' in sys.argv or '--help' in sys.argv):
+    if('--h' in sys.argv or '--help' or '-h' in sys.argv):
         print('TODO: help')
         return 0
 
