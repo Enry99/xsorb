@@ -59,145 +59,181 @@ from io_utils import get_energies, get_z, launch_jobscripts
 ########################################################################################
 
 
-#preset variables:######################################################################
-#output paths
-pwi_prefix               = 'input'  #prefix: the files will be named pwi_filenames_i.pwi with i=1,2,...
-labels_filename          = 'scf_site_labels.csv'
-prerelax_labels_filename = 'prerelax_site_labels.csv'
-energies_filename        = 'scf_energies.csv'
-#########################################################################################
+
+def init():
+    global pwi_prefix
+    global labels_filename
+    global prerelax_labels_filename
+    global energies_filename
+    global script_settings_dict
+    global espresso_settings_dict
+    global slab_filename
+    global molecule_filename
+    global jobscript
+    global symm_reduce
+    global near_reduce
+    global slab_repeat
+    global mol_atoms
+    global molecule_axis_atoms
+    global axis_vector
+    global selected_atom_index
+    global selected_atom_distance
+    global min_distance
+    global screw_rot_angles
+    global vert_angles
+    global hor_angles
+    global no_screw_rot_vert
+    global fixed_indices_slab
+    global fixed_layers_slab
+    global fixed_indices_mol
+    global fix_slab_xyz
+    global fix_mol_xyz
+    global kpoints
+    global kpoints_offset
+    global pseudopotentials
+    global starting_mag
+    global vdwg2_london_c6
+    global vdwg2_london_rvdw
+    global sites_find_args
+        
+    #preset variables:######################################################################
+    #output paths
+    pwi_prefix               = 'input'  #prefix: the files will be named pwi_filenames_i.pwi with i=1,2,...
+    labels_filename          = 'scf_site_labels.csv'
+    prerelax_labels_filename = 'prerelax_site_labels.csv'
+    energies_filename        = 'scf_energies.csv'
+    #########################################################################################
 
 
-#TODO: write function to remove some adsites from list, and also from the label
-#      probably better if remove by label instead of by index
-#TODO: option to fix entire layers
-#TODO: check/rewrite explanation at the beginning, write commands in --h
-#TODO: test slab with dopant
-#TODO: possibly add a z_max if the relaxation brings the molecule too far (?)
+    #TODO: write function to remove some adsites from list, and also from the label
+    #      probably better if remove by label instead of by index
+    #TODO: option to fix entire layers
+    #TODO: check/rewrite explanation at the beginning, write commands in --h
+    #TODO: test slab with dopant
+    #TODO: possibly add a z_max if the relaxation brings the molecule too far (?)
 
 
-#user settings variables################################################################
-script_settings_dict, espresso_settings_dict = input.read_input_file("settings.in")
+    #user settings variables################################################################
+    script_settings_dict, espresso_settings_dict = input.read_input_file("settings.in")
 
 
-#check for existence of the four blocks
-blocks = ['INPUT','STRUCTURE','CALCULATION','PSEUDO']
-for block in blocks:
-    if block not in script_settings_dict:
-        raise RuntimeError("'"+block+"'block not found in settings.in.")
+    #check for existence of the four blocks
+    blocks = ['INPUT','STRUCTURE','CALCULATION','PSEUDO']
+    for block in blocks:
+        if block not in script_settings_dict:
+            raise RuntimeError("'"+block+"'block not found in settings.in.")
 
-#check existence of mandatory variables in blocks
-mandatory_flags_list = [
-    ['slab_filename','molecule_filename', 'jobscript'], 
-    ['selected_atom_index', 'screw_rot_angles', 'vert_angles', 'hor_angles'], 
-    ['kpoints', 'kpoints_offset']
-    ]
-for block in script_settings_dict:
-    i = -1
-    if   block=='INPUT': i=0
-    elif block=='STRUCTURE': i=1
-    elif block=='CALCULATION': i=2
-    elif block=='PSEUDO': continue
-    for flag in mandatory_flags_list[i]:
-        if flag not in script_settings_dict[block]:
-            raise RuntimeError("'"+flag + "' not found in settings.in.")
+    #check existence of mandatory variables in blocks
+    mandatory_flags_list = [
+        ['slab_filename','molecule_filename', 'jobscript'], 
+        ['selected_atom_index', 'screw_rot_angles', 'vert_angles', 'hor_angles'], 
+        ['kpoints', 'kpoints_offset']
+        ]
+    for block in script_settings_dict:
+        i = -1
+        if   block=='INPUT': i=0
+        elif block=='STRUCTURE': i=1
+        elif block=='CALCULATION': i=2
+        elif block=='PSEUDO': continue
+        for flag in mandatory_flags_list[i]:
+            if flag not in script_settings_dict[block]:
+                raise RuntimeError("'"+flag + "' not found in settings.in.")
 
-if 'molecule_axis_atoms' in script_settings_dict['STRUCTURE'] and 'axis_vector' in script_settings_dict['STRUCTURE']:
-    raise RuntimeError("You can specify the molecule axis either by 'molecule_axis_atoms' or 'axis_vector', not both.")
-if 'fixed_indices_slab' in script_settings_dict['STRUCTURE'] and 'fixed_layers_slab' in script_settings_dict['STRUCTURE']:
-    raise RuntimeError("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")            
+    if 'molecule_axis_atoms' in script_settings_dict['STRUCTURE'] and 'axis_vector' in script_settings_dict['STRUCTURE']:
+        raise RuntimeError("You can specify the molecule axis either by 'molecule_axis_atoms' or 'axis_vector', not both.")
+    if 'fixed_indices_slab' in script_settings_dict['STRUCTURE'] and 'fixed_layers_slab' in script_settings_dict['STRUCTURE']:
+        raise RuntimeError("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")            
 
-#set non-specified flags to default.
-print
+    #set non-specified flags to default.
 
-optional_flags_list = {
-    'symm_reduce'              : 0.01,
-    'near_reduce'              : 0.01,
-    'slab_repeat'              : '1 1 1',
-    'mol_atoms'                : ' ',
-    'molecule_axis_atoms'      : ' ',
-    'axis_vector'              : ' ',
-    'selected_atom_distance'   : 2.0,
-    'min_distance'             : 1.0,
-    'no_screw_rot_vert'        : '0',
-    'fixed_indices_slab'       : ' ',
-    'fixed_layers_slab'        : ' ',
-    'fixed_indices_mol'        : ' ',
-    'fix_slab_xyz'             : '0 0 1',
-    'fix_mol_xyz'              : '0 0 1',
-}
-for flag in optional_flags_list:
-    if flag not in script_settings_dict['STRUCTURE']:
-        script_settings_dict['STRUCTURE'].update({flag : optional_flags_list[flag]})
-
-
-#&INPUT:
-slab_filename          = script_settings_dict['INPUT']['slab_filename']
-molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
-jobscript              = script_settings_dict['INPUT']['jobscript']
-
-#&STRUCTURE
-symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
-near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
-slab_repeat            = np.array(script_settings_dict['STRUCTURE']['slab_repeat'].split(), dtype=int).tolist()
-
-mol_atoms              = np.array(script_settings_dict['STRUCTURE']['mol_atoms'].split(), dtype=int).tolist()
-molecule_axis_atoms    = np.array(script_settings_dict['STRUCTURE']['molecule_axis_atoms'].split(), dtype=int).tolist()
-axis_vector            = np.array(script_settings_dict['STRUCTURE']['axis_vector'].split(), dtype=float).tolist()
-selected_atom_index    = int(script_settings_dict['STRUCTURE']['selected_atom_index'])
-selected_atom_distance = float(script_settings_dict['STRUCTURE']['selected_atom_distance'])
-min_distance           = float(script_settings_dict['STRUCTURE']['min_distance'])           
-screw_rot_angles       = np.array(script_settings_dict['STRUCTURE']['screw_rot_angles'].split(), dtype=float).tolist()
-vert_angles            = np.array(script_settings_dict['STRUCTURE']['vert_angles'].split(), dtype=float).tolist()  
-hor_angles             = np.array(script_settings_dict['STRUCTURE']['hor_angles'].split(), dtype=float).tolist()          
-no_screw_rot_vert      = bool(int(script_settings_dict['STRUCTURE']['no_screw_rot_vert']))
-
-fixed_indices_slab     = np.array(script_settings_dict['STRUCTURE']['fixed_indices_slab'].split(), dtype=int).tolist()
-fixed_layers_slab      = np.array(script_settings_dict['STRUCTURE']['fixed_layers_slab'].split(), dtype=int).tolist()
-fixed_indices_mol      = np.array(script_settings_dict['STRUCTURE']['fixed_indices_mol'].split(), dtype=int).tolist()
-fix_slab_xyz           = np.array(script_settings_dict['STRUCTURE']['fix_slab_xyz'].split(), dtype=int).tolist() 
-fix_mol_xyz            = np.array(script_settings_dict['STRUCTURE']['fix_mol_xyz'].split(), dtype=int).tolist()
+    optional_flags_list = {
+        'symm_reduce'              : 0.01,
+        'near_reduce'              : 0.01,
+        'slab_repeat'              : '1 1 1',
+        'mol_atoms'                : ' ',
+        'molecule_axis_atoms'      : ' ',
+        'axis_vector'              : ' ',
+        'selected_atom_distance'   : 2.0,
+        'min_distance'             : 1.0,
+        'no_screw_rot_vert'        : '0',
+        'fixed_indices_slab'       : ' ',
+        'fixed_layers_slab'        : ' ',
+        'fixed_indices_mol'        : ' ',
+        'fix_slab_xyz'             : '0 0 1',
+        'fix_mol_xyz'              : '0 0 1',
+    }
+    for flag in optional_flags_list:
+        if flag not in script_settings_dict['STRUCTURE']:
+            script_settings_dict['STRUCTURE'].update({flag : optional_flags_list[flag]})
 
 
+    #&INPUT:
+    slab_filename          = script_settings_dict['INPUT']['slab_filename']
+    molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
+    jobscript              = script_settings_dict['INPUT']['jobscript']
 
-#&CALCULATION
-kpoints                = np.array(script_settings_dict['CALCULATION']['kpoints'].split(), dtype=int).tolist()
-kpoints_offset         = np.array(script_settings_dict['CALCULATION']['kpoints_offset'].split(), dtype=int).tolist()
+    #&STRUCTURE
+    symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
+    near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
+    slab_repeat            = np.array(script_settings_dict['STRUCTURE']['slab_repeat'].split(), dtype=int).tolist()
 
-#&PSEUDO
-pseudopotentials       = script_settings_dict['PSEUDO']
+    mol_atoms              = np.array(script_settings_dict['STRUCTURE']['mol_atoms'].split(), dtype=int).tolist()
+    molecule_axis_atoms    = np.array(script_settings_dict['STRUCTURE']['molecule_axis_atoms'].split(), dtype=int).tolist()
+    axis_vector            = np.array(script_settings_dict['STRUCTURE']['axis_vector'].split(), dtype=float).tolist()
+    selected_atom_index    = int(script_settings_dict['STRUCTURE']['selected_atom_index'])
+    selected_atom_distance = float(script_settings_dict['STRUCTURE']['selected_atom_distance'])
+    min_distance           = float(script_settings_dict['STRUCTURE']['min_distance'])           
+    screw_rot_angles       = np.array(script_settings_dict['STRUCTURE']['screw_rot_angles'].split(), dtype=float).tolist()
+    vert_angles            = np.array(script_settings_dict['STRUCTURE']['vert_angles'].split(), dtype=float).tolist()  
+    hor_angles             = np.array(script_settings_dict['STRUCTURE']['hor_angles'].split(), dtype=float).tolist()          
+    no_screw_rot_vert      = bool(int(script_settings_dict['STRUCTURE']['no_screw_rot_vert']))
 
-#Espresso &SYSTEM (correction to bugs in ase function to write pwis)
-starting_mag = []
-vdwg2_london_c6 = []
-vdwg2_london_rvdw = []
-keys_to_be_removed = []
-for i, species in enumerate(pseudopotentials):
-    for key in espresso_settings_dict['SYSTEM']:
-        if 'starting_magnetization' in key:
-            if i == int(key.split('(')[1].split(')')[0]):
-                starting_mag.append(espresso_settings_dict['SYSTEM'][key])
-                keys_to_be_removed.append(key)
-        if 'london_c6' in key:
-            if i == int(key.split('(')[1].split(')')[0]):
-                vdwg2_london_c6.append(espresso_settings_dict['SYSTEM'][key])
-                keys_to_be_removed.append(key)
-        if 'london_rvdw' in key:
-            if i == int(key.split('(')[1].split(')')[0]):
-                vdwg2_london_rvdw.append(espresso_settings_dict['SYSTEM'][key])
-                keys_to_be_removed.append(key)
-    if(len(starting_mag) < i): starting_mag.append(None)
-    if(len(vdwg2_london_c6) < i): vdwg2_london_c6.append(None)
-    if(len(vdwg2_london_rvdw) < i): vdwg2_london_rvdw.append(None)
+    fixed_indices_slab     = np.array(script_settings_dict['STRUCTURE']['fixed_indices_slab'].split(), dtype=int).tolist()
+    fixed_layers_slab      = np.array(script_settings_dict['STRUCTURE']['fixed_layers_slab'].split(), dtype=int).tolist()
+    fixed_indices_mol      = np.array(script_settings_dict['STRUCTURE']['fixed_indices_mol'].split(), dtype=int).tolist()
+    fix_slab_xyz           = np.array(script_settings_dict['STRUCTURE']['fix_slab_xyz'].split(), dtype=int).tolist() 
+    fix_mol_xyz            = np.array(script_settings_dict['STRUCTURE']['fix_mol_xyz'].split(), dtype=int).tolist()
 
-for key in keys_to_be_removed:
-    espresso_settings_dict['SYSTEM'].pop(key)
 
-sites_find_args = {
-    "distance":selected_atom_distance, 
-    'symm_reduce':symm_reduce, 
-    'near_reduce':near_reduce, 
-    'no_obtuse_hollow':True}
+
+    #&CALCULATION
+    kpoints                = np.array(script_settings_dict['CALCULATION']['kpoints'].split(), dtype=int).tolist()
+    kpoints_offset         = np.array(script_settings_dict['CALCULATION']['kpoints_offset'].split(), dtype=int).tolist()
+
+    #&PSEUDO
+    pseudopotentials       = script_settings_dict['PSEUDO']
+
+    #Espresso &SYSTEM (correction to bugs in ase function to write pwis)
+    starting_mag = []
+    vdwg2_london_c6 = []
+    vdwg2_london_rvdw = []
+    keys_to_be_removed = []
+    for i, species in enumerate(pseudopotentials):
+        for key in espresso_settings_dict['SYSTEM']:
+            if 'starting_magnetization' in key:
+                if i == int(key.split('(')[1].split(')')[0]):
+                    starting_mag.append(espresso_settings_dict['SYSTEM'][key])
+                    keys_to_be_removed.append(key)
+            if 'london_c6' in key:
+                if i == int(key.split('(')[1].split(')')[0]):
+                    vdwg2_london_c6.append(espresso_settings_dict['SYSTEM'][key])
+                    keys_to_be_removed.append(key)
+            if 'london_rvdw' in key:
+                if i == int(key.split('(')[1].split(')')[0]):
+                    vdwg2_london_rvdw.append(espresso_settings_dict['SYSTEM'][key])
+                    keys_to_be_removed.append(key)
+        if(len(starting_mag) < i): starting_mag.append(None)
+        if(len(vdwg2_london_c6) < i): vdwg2_london_c6.append(None)
+        if(len(vdwg2_london_rvdw) < i): vdwg2_london_rvdw.append(None)
+
+    for key in keys_to_be_removed:
+        espresso_settings_dict['SYSTEM'].pop(key)
+
+    sites_find_args = {
+        "distance":selected_atom_distance, 
+        'symm_reduce':symm_reduce, 
+        'near_reduce':near_reduce, 
+        'no_obtuse_hollow':True}
 ############################################################################################################
 
 
@@ -449,6 +485,13 @@ def main():
 
     if('--h' in sys.argv or '--help' in sys.argv):
         print('TODO: help')
+        return 0
+
+    if('-g' not in sys.argv and '-r' not in sys.argv and '-s' not in sys.argv and '-e' not in sys.argv and '-f' not in sys.argv and '-fe' not in sys.argv):
+        print('You need to specify at least one option (-r, -s, -e, -f, -fe). Quitting.')
+        return 1
+
+    init()
 
     SAVEFIG   = True
     WRITE_XSF = False

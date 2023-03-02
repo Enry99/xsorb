@@ -59,7 +59,7 @@ def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : st
 
                 line = data[config_label+1].split(',')
                 line[7] = line[7].split('\n')[0]
-                line.append(str(toten))
+                line.append('{:.3f}'.format(toten))
                 
                 data[config_label+1] = ','.join(line)
                 data[config_label+1] += '\n'
