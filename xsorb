@@ -454,7 +454,7 @@ def final_relax(threshold : float = None):
         fixed_indices_molecule = len(read(slab_filename)) + np.array(fixed_indices_mol)
 
         pwi_name = pwi_prefix+'_finalrelax_'+str(i)
-        pwi_names.append(pwi_names+'.pwi')
+        pwi_names.append(pwi_name+'.pwi')
         calc = Espresso_mod(pseudopotentials=pseudopotentials, 
                     input_data=espresso_settings_dict,
                     label=pwi_name,
@@ -483,7 +483,7 @@ def main():
         print('You need to specify at least one option. Quitting.')
         return 1
 
-    if('--h' in sys.argv or '--help' or '-h' in sys.argv):
+    if('--h' in sys.argv or '--help' in sys.argv or '-h' in sys.argv):
         print('TODO: help')
         return 0
 
@@ -511,11 +511,11 @@ def main():
                 threshold = sys.argv[sys.argv.index('--t')+1]
                 if not input._is_number(threshold):
                     print('The value after --t must be a number. Quitting.')
-                    return 1                
+                    return 1               
             else:
                 print('You need to specify a value after --t. Quitting.')
                 return 1
-        final_relax(threshold)
+        final_relax(float(threshold))
     elif('-fe' in sys.argv): #read final energies
         pass
 

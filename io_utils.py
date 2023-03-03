@@ -100,21 +100,23 @@ def launch_jobscripts(jobscript : str, pwi_list : list[str], outdirs : str):
     main_dir = os.getcwd()
     if not os.path.exists(outdirs): os.mkdir(outdirs)
 
-    for j, input_file in enumerate(pwi_list):
+    for input_file in pwi_list:
 
-        output_file = input_file.split('.pwi')[0]+'.pwo'
+        output_file = input_file.replace("pwi", "pwo")
+        output_file = output_file.replace("input", "output")
+        label = input_file.split('.pwi')[0].split('_')[-1]
 
         if(os.path.isfile(input_file)): # unnecessary, this check is also done before calling the function
 
             if(os.path.isfile(output_file)): 
                 raise RuntimeError(output_file+' already present, possibly from a running calculation. Quitting.')
 
-            j_dir = outdirs+'/'+str(j)
+            j_dir = outdirs+'/'+str(label)
             os.mkdir(j_dir)
 
             shutil.copyfile(jobscript, j_dir+'/job_simple')
 
             os.chdir(j_dir)
-            if(TEST): print("sbatch "+ jobscript + ' ' +input_file + ' '+ output_file)
-            else: os.system("sbatch "+ jobscript + ' ' +input_file + ' '+ output_file)  #launchs the jobscript in j_dir from j_dir
+            if(TEST): print("sbatch "+ jobscript + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)
+            else: os.system("sbatch "+ jobscript + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)  #launchs the jobscript in j_dir from j_dir
             os.chdir(main_dir)
