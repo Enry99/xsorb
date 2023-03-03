@@ -26,19 +26,27 @@ class Slab:
         self.slab_ase = read(filename=slab_filename)
         
 
-        self.slab_ase = sort(self.slab_ase, tags= self.slab_ase.positions[:, 2])  #sort atoms by height
+        #identification of the layers##################################
+        slab = sort(self.slab_ase, tags= self.slab_ase.positions[:, 2])
         self.layers = [[]] #each list element corresponds to a layer, and it is itself a list of the
         #atoms contained in the layer
-        zmin = min(self.slab_ase.positions[:,2])
+        zmin = min(slab.positions[:,2])
         i_layer = 0
-        for i, z in enumerate(self.slab_ase.positions[:,2]):
+        for i, z in enumerate(slab.positions[:,2]):
             if(z-zmin > threshold): #new layer
                 zmin = z
                 i_layer = i_layer+1
                 self.layers.append([])
             self.layers[i_layer].append(i)
+        ###############################################################
+
+        #reindex mapping before sorting by z for fixing atoms by index#
+        self.reindex_map = np.argsort(-self.slab_ase.positions[:, 2], kind='stable')
+        #NOTE: here we used np.argsort to get the indices, while ase.sort (which use sorted library) to actually sort the elements.
+        # Check if same result (possible problems with very similar numbers)         
+        ###############################################################      
     
-        self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height
+        self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
         self.slab_pymat = ase.AseAtomsAdaptor.get_structure(self.slab_ase)
         self.asf = AdsorbateSiteFinder(self.slab_pymat)
 

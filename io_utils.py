@@ -12,7 +12,7 @@ import os, shutil
 import glob
 from natsort import natsorted
 
-TEST = False #do not actually launch the jobs, simply prints the command
+TEST = True #do not actually launch the jobs, simply prints the command
 
 
 def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : str = 'output'):
@@ -29,7 +29,10 @@ def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : st
     #add E_ads column header
     line = data[0].split(',')
     line[-1] = line[-1].split('\n')[0]
-    line.append('E_scf(eV)\n')
+    if "final" in pwo_prefix:
+        line.append('E_rel(eV)\n')
+    else:
+        line.append('E_scf(eV)\n')
     data[0] = ','.join(line)
 
     energies = len(files)*[None]
@@ -58,7 +61,7 @@ def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : st
                 energies[i] = toten
 
                 line = data[config_label+1].split(',')
-                line[7] = line[7].split('\n')[0]
+                line[-1] = line[-1].split('\n')[0]
                 line.append('{:.3f}'.format(toten))
                 
                 data[config_label+1] = ','.join(line)
@@ -93,7 +96,7 @@ def get_z(pwo_filename : str, atom_index : int):
             return float(z)
             
 
-def launch_jobscripts(jobscript : str, pwi_list : list[str], outdirs : str):
+def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_prefix=''):
     #NOTE: for this script, the execution of pw.x in the jobscript need to be called with this option:  
     #      -input $1 >> $2, so that it reads the input from file $1 and writes output in file $2    
 
@@ -114,9 +117,59 @@ def launch_jobscripts(jobscript : str, pwi_list : list[str], outdirs : str):
             j_dir = outdirs+'/'+str(label)
             os.mkdir(j_dir)
 
-            shutil.copyfile(jobscript, j_dir+'/job_simple')
+            shutil.copyfile(jobscript, j_dir+'/jobscript')
 
-            os.chdir(j_dir)
-            if(TEST): print("sbatch "+ jobscript + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)
-            else: os.system("sbatch "+ jobscript + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)  #launchs the jobscript in j_dir from j_dir
-            os.chdir(main_dir)
+            os.chdir(j_dir) #####################
+            with open("jobscript", 'r') as f:
+                lines = f.readlines()
+
+                for i, line in enumerate(lines):
+                    if "job-name" in line:
+                        lines[i] = line.split('=')[0] + '="' + jobname_prefix + '_' + label +'"\n'
+                        break
+                
+
+            with open("jobscript", 'w') as f:
+                f.writelines( lines )
+
+            if(TEST): print("sbatch jobscript" + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)
+            else: os.system("sbatch jobscript " + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)  #launchs the jobscript in j_dir from j_dir
+            os.chdir(main_dir) ####################
+
+
+def restart_jobs(which : str = 'scf'):
+    if(which == 'scf'):
+        outdirs = 'scf_outdirs'
+        pwo_prefix = 'output_scf'
+    elif(which == 'prerelax'):
+        outdirs = 'prerel_outdirs'
+        pwo_prefix = 'output_prerelax'
+    elif(which == 'finalrelax'):
+        outdirs = 'finalrel_outdirs'
+        pwo_prefix = 'output_finalrelax'
+    else:
+        raise ValueError("Not clear which calculation should be restarted.")
+    
+
+    main_dir = os.getcwd()
+    pwos = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
+    pwis = [pwo.replace('output', 'input').replace('.pwo', '.pwi') for pwo in pwos]
+    config_labels = [(file.split('.pwo')[0]).split('_')[-1] for file in pwos]
+
+    #edit pwi(s)
+    for pwi in pwis:
+        with open(pwi, 'r') as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                if 'from_scratch' in line:
+                    lines[i].replace('from_scratch','restart')
+                    break
+        with open(pwi, 'w') as f:
+            f.writelines( lines )    
+
+    #launch jobs
+    for i, label in config_labels:        
+        os.chdir(outdirs+'/'+label) #####################
+        if(TEST): print("sbatch jobscript" + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])
+        else: os.system("sbatch jobscript " + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])  #launchs the jobscript in j_dir from j_dir
+        os.chdir(main_dir) ####################

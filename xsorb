@@ -41,7 +41,7 @@ Python script based on Pymatgen and ASE to build adatom adsorption on slabs calc
 #    writing a .csv file with all the energies, then the config corresponding to the energy minimum is also relaxed.
 
 """
-import json
+
 #Import statements#####################################################################
 import numpy as np
 #from pymatgen.analysis.adsorption import *
@@ -54,10 +54,21 @@ import input
 from espresso_mod import Espresso_mod
 from slab import Slab, adsorb_both_surfaces
 from molecule import Molecule
-from io_utils import get_energies, get_z, launch_jobscripts
+from io_utils import get_energies, get_z, launch_jobs, restart_jobs
 #
 ########################################################################################
 
+#WEEKEND
+#TODO: reindexing slab fixing
+#TODO: test slab with dopant
+#TODO: check/rewrite explanation at the beginning, write commands in --h
+#TODO: standardizza nomi file e cartelle:
+# input_scf_0.pwi -> scf_outdirs, input_prerelax_0.pwi -> prerelax_outdirs, input_finalrelax.pwi -> finalrelax_outdirs
+
+#OPTIONAL (chiedi a Paolo)
+#TODO: write function to remove some adsites from list, and also from the label
+#      probably better if remove by label instead of by index
+#TODO: possibly add a z_max if the relaxation brings the molecule too far (?)
 
 
 def init():
@@ -103,14 +114,6 @@ def init():
     prerelax_labels_filename = 'prerelax_site_labels.csv'
     energies_filename        = 'scf_energies.csv'
     #########################################################################################
-
-
-    #TODO: write function to remove some adsites from list, and also from the label
-    #      probably better if remove by label instead of by index
-    #TODO: option to fix entire layers
-    #TODO: check/rewrite explanation at the beginning, write commands in --h
-    #TODO: test slab with dopant
-    #TODO: possibly add a z_max if the relaxation brings the molecule too far (?)
 
 
     #user settings variables################################################################
@@ -237,7 +240,11 @@ def init():
 ############################################################################################################
 
 
-def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
+def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=False):
+    if(RESTART and SCF_RUN):
+        restart_jobs()
+        return 
+ 
     #BEGIN STRUCTURES GENERATION ############################################################################
 
     #Slab import from file
@@ -307,6 +314,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
     csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
 
     espresso_settings_dict['CONTROL'].update({'calculation' : 'scf'})
+    espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
 
     
     pwi_names = []
@@ -335,11 +343,13 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
     #END OF STRUCTURE GENERATIONS #########################################################################################
     
     if SCF_RUN:
-        launch_jobscripts(jobscript=jobscript, pwi_list=pwi_names, outdirs='scf_outdirs')
+        launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='scf_outdirs', jobname_prefix='scf')
 
 
-def pre_relax(WRITE_XSF : bool =False):
-    
+def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
+    if(RESTART):
+        restart_jobs("prerelax")
+        return     
    #BEGIN OF STRUCTURES GENERATION ############################################################################
 
     #Slab import from file
@@ -399,6 +409,7 @@ def pre_relax(WRITE_XSF : bool =False):
     csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
 
     espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
+    espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
     espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
 
     pwi_names = []
@@ -422,10 +433,13 @@ def pre_relax(WRITE_XSF : bool =False):
 
     csvfile.close()
 
-    launch_jobscripts(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerel_outdirs')
+    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerel_outdirs', jobname_prefix='prerel')
 
 
-def final_relax(threshold : float = None):
+def final_relax(threshold : float = None, RESTART: bool = False):
+    if(RESTART):
+        restart_jobs("finalrelax")
+        return 
 
     slab = Slab(slab_filename)
     mol  = Molecule(molecule_filename, molecule_axis_atoms, axis_vector, mol_atoms)
@@ -445,6 +459,7 @@ def final_relax(threshold : float = None):
 
 
     espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
+    espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
     espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
 
     pwi_names = []
@@ -471,7 +486,7 @@ def final_relax(threshold : float = None):
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(struct_ase)
 
-    launch_jobscripts(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrel_outdirs')
+    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrel_outdirs', jobname_prefix='finrel')
 
 
 def main():
@@ -499,12 +514,12 @@ def main():
     if('--xsf' in sys.argv): WRITE_XSF = True
     
     if('-g' in sys.argv or '-s' in sys.argv):
-        generate(SCF_RUN= '-s' in sys.argv, SAVEFIG=SAVEFIG, WRITE_XSF=WRITE_XSF)
-    elif('-r' in sys.argv):
-        pre_relax()
-    elif('-e' in sys.argv):
+        generate(SCF_RUN= '-s' in sys.argv, RESTART='--restart' in sys.argv, SAVEFIG=SAVEFIG, WRITE_XSF=WRITE_XSF)
+    elif('-pr' in sys.argv):
+        pre_relax(RESTART='--r' in sys.argv)
+    elif('-se' in sys.argv):
         get_energies(labels_filename, energies_filename)
-    elif('-f' in sys.argv):
+    elif('-fr' in sys.argv):
         threshold = None
         if('--t' in sys.argv):
             if(len(sys.argv)> sys.argv.index('--t')+1):
@@ -515,9 +530,9 @@ def main():
             else:
                 print('You need to specify a value after --t. Quitting.')
                 return 1
-        final_relax(float(threshold))
+        final_relax(float(threshold), RESTART='--r' in sys.argv)
     elif('-fe' in sys.argv): #read final energies
-        pass
+        get_energies(energies_filename, 'finalrelax_energies.csv', pwo_prefix='output_finalrelax')
 
 
 if __name__ == '__main__':
