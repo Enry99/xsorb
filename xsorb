@@ -59,7 +59,6 @@ from io_utils import get_energies, get_z, launch_jobs, restart_jobs
 ########################################################################################
 
 #WEEKEND
-#TODO: reindexing slab fixing
 #TODO: test slab with dopant
 #TODO: check/rewrite explanation at the beginning, write commands in --h
 #TODO: standardizza nomi file e cartelle:
@@ -106,6 +105,7 @@ def init():
     global vdwg2_london_c6
     global vdwg2_london_rvdw
     global sites_find_args
+    global ion_dynamics
         
     #preset variables:######################################################################
     #output paths
@@ -232,6 +232,9 @@ def init():
     for key in keys_to_be_removed:
         espresso_settings_dict['SYSTEM'].pop(key)
 
+    #Espresso &IONS
+    ion_dynamics = espresso_settings_dict['IONS']['ion_dynamics']
+
     sites_find_args = {
         "distance":selected_atom_distance, 
         'symm_reduce':symm_reduce, 
@@ -329,7 +332,7 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
         if(fixed_layers_slab): 
             fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
         else: fixed_slab = fixed_indices_slab
-        calc.set_fixed_atoms(fixed_slab, fixed_indices_mol, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites), fix_slab_xyz, fix_mol_xyz)
+        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, fixed_indices_mol, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites), fix_slab_xyz, fix_mol_xyz)
         calc.set_starting_magnetizations(starting_mag)
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(all_mol_on_slab_configs_ase[i])
@@ -410,7 +413,7 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
 
     espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
     espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
-    espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
+    espresso_settings_dict['IONS'].update({'ion_dynamics': ion_dynamics})
 
     pwi_names = []
     for i in np.arange(len(all_mol_on_slab_configs_ase)):
@@ -423,7 +426,7 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
 
         #all_slab_fixed = list(range(len(slab.slab_pymat.sites)))
         #all_mol_fixed = np.array(list(range(len(mol.mol_pymat.sites)))) + len(slab.slab_pymat.sites)
-        calc.set_fixed_atoms([-1], [-1], len(slab.slab_pymat.sites), len(mol.mol_pymat.sites) , [0, 0, 0], [0, 0, 1])
+        calc.set_fixed_atoms([-1], slab.reindex_map, [-1], len(slab.slab_pymat.sites), len(mol.mol_pymat.sites) , [0, 0, 0], [0, 0, 1])
         calc.set_starting_magnetizations(starting_mag)
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(all_mol_on_slab_configs_ase[i]) 
@@ -460,7 +463,7 @@ def final_relax(threshold : float = None, RESTART: bool = False):
 
     espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
     espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
-    espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
+    espresso_settings_dict['IONS'].update({'ion_dynamics': ion_dynamics})
 
     pwi_names = []
     for i in calcs:       
@@ -477,7 +480,8 @@ def final_relax(threshold : float = None, RESTART: bool = False):
         if(fixed_layers_slab): fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
         else: fixed_slab = fixed_indices_slab
         calc.set_fixed_atoms(
-            fixed_slab, 
+            fixed_slab,
+            slab.reindex_map, 
             fixed_indices_molecule, 
             len(slab.slab_pymat.sites), 
             len(mol.mol_pymat.sites),
@@ -502,7 +506,7 @@ def main():
         print('TODO: help')
         return 0
 
-    if('-g' not in sys.argv and '-r' not in sys.argv and '-s' not in sys.argv and '-e' not in sys.argv and '-f' not in sys.argv and '-fe' not in sys.argv):
+    if('-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv):
         print('You need to specify at least one option (-r, -s, -e, -f, -fe). Quitting.')
         return 1
 
@@ -516,8 +520,8 @@ def main():
     if('-g' in sys.argv or '-s' in sys.argv):
         generate(SCF_RUN= '-s' in sys.argv, RESTART='--restart' in sys.argv, SAVEFIG=SAVEFIG, WRITE_XSF=WRITE_XSF)
     elif('-pr' in sys.argv):
-        pre_relax(RESTART='--r' in sys.argv)
-    elif('-se' in sys.argv):
+        pre_relax(RESTART='--restart' in sys.argv)
+    elif('-es' in sys.argv):
         get_energies(labels_filename, energies_filename)
     elif('-fr' in sys.argv):
         threshold = None
@@ -530,8 +534,8 @@ def main():
             else:
                 print('You need to specify a value after --t. Quitting.')
                 return 1
-        final_relax(float(threshold), RESTART='--r' in sys.argv)
-    elif('-fe' in sys.argv): #read final energies
+        final_relax(float(threshold), RESTART='--restart' in sys.argv)
+    elif('-ef' in sys.argv): #read final energies
         get_energies(energies_filename, 'finalrelax_energies.csv', pwo_prefix='output_finalrelax')
 
 

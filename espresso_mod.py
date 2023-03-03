@@ -15,7 +15,7 @@ import numpy as np
 
 class Espresso_mod(Espresso):
 
-    def set_fixed_atoms(self, slab_atoms_indices: list, mol_atom_indices: list, natoms_slab : int, natoms_mol : int, fix_slab_xyz : list = [0,0,0], fix_mol_xyz : list = [0,0,1]):
+    def set_fixed_atoms(self, slab_atoms_indices: list, slab_remapping: list, mol_atom_indices: list, natoms_slab : int, natoms_mol : int, fix_slab_xyz : list = [0,0,0], fix_mol_xyz : list = [0,0,1]):
         '''
         Sets the indices of the atoms that need to be fixed during dynamics.
         Args: 
@@ -25,6 +25,7 @@ class Espresso_mod(Espresso):
         '''
 
         self.slab_atoms_indices = slab_atoms_indices.copy()
+        self.slab_remapping     = slab_remapping.copy()
         self.mol_atom_indices   = mol_atom_indices.copy()
         self.natoms_slab        = natoms_slab
         self.natoms_mol         = natoms_mol
@@ -59,7 +60,7 @@ class Espresso_mod(Espresso):
                 data[first_atom_index+i] = data[first_atom_index+i].split('\n')[0] + '    {0} {1} {2}\n'.format( *self.fix_slab_xyz)
         else:
             for i in self.slab_atoms_indices:
-                data[first_atom_index+i] = data[first_atom_index+i].split('\n')[0] + '    {0} {1} {2}\n'.format( *self.fix_slab_xyz)
+                data[first_atom_index+self.slab_remapping.tolist().index(i)] = data[first_atom_index+self.slab_remapping.tolist().index(i)].split('\n')[0] + '    {0} {1} {2}\n'.format( *self.fix_slab_xyz)
         
 
         

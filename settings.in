@@ -7,7 +7,7 @@
 /
 
 
-&STRUCTURE
+&STRUCTUREs
   #symm_reduce                   = 0.01            #tolerance for site finder
   #near_reduce                   = 0.01            #tolerance for site finder
   #slab_repeat                   = 1 1 1           #repeat the supercell along the three directions
@@ -18,13 +18,12 @@
    selected_atom_index           = 0               #Selected atom in molecule file, to be placed in all adsorption sites
    selected_atom_distance        = 2.0             #DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
   #min_distance                  = 1.0             #minimum distance (in A) of ANY atom from surface, must be < selected_atom_distance. The molecule is translated upwards if necessary, in order to meet this requirement.
-   screw_rot_angles              = 0 #90 180        #rotation angles (in deg) about x axis (performed first)
-   vert_angles                   = 0 #90            #rotation about y axis (performed secondly)
-   hor_angles                    = 0 #90            #rotation about z axis (performed lastly)
+   screw_rot_angles              = 0 #90 180       #rotation angles (in deg) about x axis (performed first)
+   vert_angles                   = 0 #90           #rotation about y axis (performed secondly)
+   hor_angles                    = 0 #90           #rotation about z axis (performed lastly)
    no_screw_rot_vert             = 1               #do not perform screw rotations for the vertical configuration. 
 
-  #fixed_indices_slab            = 0 1 2   !NOT WORKING: the atoms are sorted by height at the beginning, so the order changes wrt the input file
-  #TODO: implement possible solutions           #fix chosen atoms of the slab for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
+  #fixed_indices_slab            = 0 1 2           #fix chosen atoms of the slab for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
   # fixed_layers_slab             = 0 
    fixed_indices_mol             = 3               #fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
    fix_slab_xyz                  = 0 0 0           #coordinates to fix for the selected atoms in slab INVERTIRE! RENDERLI I COEFF DI ESPRESSO : True -> 0
@@ -55,8 +54,8 @@
 @ESPRESSO
 
 &CONTROL
-   calculation      = 'relax'
-   restart_mode     = 'from_scratch'  #possibly remove it from here and overwrite it in the script
+   calculation      = 'relax'          #overwritten in the script
+   restart_mode     = 'from_scratch'   #overwritten in the script
    nstep            = 400
    outdir           = 'WORK'
    max_seconds      = 86000

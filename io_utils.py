@@ -12,7 +12,7 @@ import os, shutil
 import glob
 from natsort import natsorted
 
-TEST = True #do not actually launch the jobs, simply prints the command
+TEST = False #do not actually launch the jobs, simply prints the command
 
 
 def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : str = 'output'):
@@ -156,19 +156,20 @@ def restart_jobs(which : str = 'scf'):
     pwis = [pwo.replace('output', 'input').replace('.pwo', '.pwi') for pwo in pwos]
     config_labels = [(file.split('.pwo')[0]).split('_')[-1] for file in pwos]
 
+
     #edit pwi(s)
     for pwi in pwis:
         with open(pwi, 'r') as f:
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if 'from_scratch' in line:
-                    lines[i].replace('from_scratch','restart')
+                    lines[i] = lines[i].replace('from_scratch','restart')
                     break
         with open(pwi, 'w') as f:
             f.writelines( lines )    
 
     #launch jobs
-    for i, label in config_labels:        
+    for i, label in enumerate(config_labels):        
         os.chdir(outdirs+'/'+label) #####################
         if(TEST): print("sbatch jobscript" + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])
         else: os.system("sbatch jobscript " + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])  #launchs the jobscript in j_dir from j_dir
