@@ -117,10 +117,11 @@ def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_pr
             j_dir = outdirs+'/'+str(label)
             os.mkdir(j_dir)
 
-            shutil.copyfile(jobscript, j_dir+'/jobscript')
+            jobscript_filename = jobscript.split('/')[-1]
+            shutil.copyfile(jobscript, j_dir+'/'+jobscript_filename)
 
             os.chdir(j_dir) #####################
-            with open("jobscript", 'r') as f:
+            with open(jobscript_filename, 'r') as f:
                 lines = f.readlines()
 
                 for i, line in enumerate(lines):
@@ -129,15 +130,15 @@ def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_pr
                         break
                 
 
-            with open("jobscript", 'w') as f:
+            with open(jobscript_filename, 'w') as f:
                 f.writelines( lines )
 
-            if(TEST): print("sbatch jobscript" + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)
-            else: os.system("sbatch jobscript " + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)  #launchs the jobscript in j_dir from j_dir
+            if(TEST): print("sbatch " + jobscript_filename + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)
+            else: os.system("sbatch " + jobscript_filename + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)  #launchs the jobscript in j_dir from j_dir
             os.chdir(main_dir) ####################
 
 
-def restart_jobs(which : str = 'scf'):
+def restart_jobs(jobscript : str, which : str = 'scf'):
     if(which == 'scf'):
         outdirs = 'scf_outdirs'
         pwo_prefix = 'output_scf'
@@ -168,9 +169,10 @@ def restart_jobs(which : str = 'scf'):
         with open(pwi, 'w') as f:
             f.writelines( lines )    
 
+    jobscript_filename = jobscript.split('/')[-1]
     #launch jobs
     for i, label in enumerate(config_labels):        
         os.chdir(outdirs+'/'+label) #####################
-        if(TEST): print("sbatch jobscript" + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])
-        else: os.system("sbatch jobscript " + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])  #launchs the jobscript in j_dir from j_dir
+        if(TEST): print("sbatch " + jobscript_filename + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])
+        else: os.system("sbatch " + jobscript_filename + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])  #launchs the jobscript in j_dir from j_dir
         os.chdir(main_dir) ####################

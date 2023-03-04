@@ -245,7 +245,7 @@ def init():
 
 def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=False):
     if(RESTART and SCF_RUN):
-        restart_jobs()
+        restart_jobs(jobscript=jobscript, which='scf')
         return 
  
     #BEGIN STRUCTURES GENERATION ############################################################################
@@ -351,7 +351,7 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
 
 def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
     if(RESTART):
-        restart_jobs("prerelax")
+        restart_jobs(jobscript=jobscript, which="prerelax")
         return     
    #BEGIN OF STRUCTURES GENERATION ############################################################################
 
@@ -441,7 +441,7 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
 
 def final_relax(threshold : float = None, RESTART: bool = False):
     if(RESTART):
-        restart_jobs("finalrelax")
+        restart_jobs(jobscript=jobscript, which="finalrelax")
         return 
 
     slab = Slab(slab_filename)
@@ -525,7 +525,7 @@ def main():
         get_energies(labels_filename, energies_filename)
     elif('-fr' in sys.argv):
         threshold = None
-        if('--t' in sys.argv):
+        if('--t' in sys.argv and '--restart' not in sys.argv):
             if(len(sys.argv)> sys.argv.index('--t')+1):
                 threshold = sys.argv[sys.argv.index('--t')+1]
                 if not input._is_number(threshold):
@@ -534,7 +534,12 @@ def main():
             else:
                 print('You need to specify a value after --t. Quitting.')
                 return 1
-        final_relax(float(threshold), RESTART='--restart' in sys.argv)
+            final_relax(float(threshold), RESTART='--restart' in sys.argv)
+        elif('--t' not in sys.argv and '--restart' in sys.argv):
+            final_relax(RESTART='--restart' in sys.argv)
+        else:
+            print('You cannot change the threshold for a restart. Quitting.')
+            return 1
     elif('-ef' in sys.argv): #read final energies
         get_energies(energies_filename, 'finalrelax_energies.csv', pwo_prefix='output_finalrelax')
 
