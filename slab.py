@@ -102,20 +102,19 @@ class Slab:
             ax = fig.add_subplot(111)
             plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.7)
 
-            adsites_ontop = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites["ontop"]]
-            ax.plot(*zip(*adsites_ontop), color="r", marker="x", markersize=10, mew=1, linestyle="", zorder=10000, label='ontop')
-
-            adsites_bridge = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites["bridge"]]
-            ax.plot(*zip(*adsites_bridge), color="g", marker="x", markersize=10, mew=1, linestyle="", zorder=10000, label='ontop')
-
-            adsites_hollow = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites["hollow"]]
-            ax.plot(*zip(*adsites_hollow), color="b", marker="x", markersize=10, mew=1, linestyle="", zorder=10000, label='ontop')
-
-            #for i, ads_site in enumerate(adsites["all"]): NOT WORKING
-            #    ax.annotate(str(i), sop.operate(ads_site)[:2].tolist())
-            
+            adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites["all"]]
+            for i, site in enumerate(adsites["all"]):
+                if any((site == x).all() for x in adsites['ontop']):
+                    color = 'r'
+                elif any((site == x).all() for x in adsites['bridge']):
+                    color = 'g'
+                elif any((site == x).all() for x in adsites['hollow']):
+                    color = 'b'
+                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=5, mew=1, linestyle="", zorder=10000)
+                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=3, zorder=20000)
+                            
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
-            fig.savefig('adsorption_sites.png', dpi=800, bbox_inches='tight')
+            fig.savefig('adsorption_sites.png', dpi=1500, bbox_inches='tight')
 
         return adsites, adsite_labels
 
