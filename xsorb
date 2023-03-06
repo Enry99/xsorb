@@ -236,7 +236,7 @@ def init():
     ion_dynamics = espresso_settings_dict['IONS']['ion_dynamics']
 
     sites_find_args = {
-        "distance":selected_atom_distance, 
+        "distance":0, 
         'symm_reduce':symm_reduce, 
         'near_reduce':near_reduce, 
         'no_obtuse_hollow':True}
@@ -274,15 +274,17 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
     print('Adsorption sites found.')
 
 
-    if os.path.isfile(pwi_prefix+'_prerelax_0.pwo'): #if the pre-relaxed files are present, read distance from there, else use the user-defined value
+    if os.path.isfile('output'+'_prerelax_0.pwo'): #if the pre-relaxed files are present, read distance from there, else use the user-defined value
         i = 0
         distances_from_surf = []
         while(True):
-            if os.path.isfile(pwi_prefix+'_prerelax_{0}.pwo'.format(i)):
+            if os.path.isfile('output'+'_prerelax_{0}.pwo'.format(i)):
                 atom_index = selected_atom_index + len(slab.slab_pymat.sites)
-                distances_from_surf.append(get_z(pwi_prefix+'_prerelax_{0}.pwo'.format(i)), atom_index)
+                distances_from_surf.append(get_z('output'+'_prerelax_{0}.pwo'.format(i), atom_index) - max(slab.slab_ase.positions[:,2]) )
                 i = i+1
             else: break
+        print("Prerelaxations found. Default distances will be read from there.")
+        #print(distances_from_surf)
     else:
         distances_from_surf = len(screw_rot_angles)*[selected_atom_distance]
 

@@ -101,13 +101,16 @@ class Molecule:
         if not screw_rotations : screw_rotations = [0]
         if not horiz_rotations : horiz_rotations = [0]
 
+        j=-1 #index for the pre-relax distances (no horiz. rotations)
+
         for vert_angle in vert_rotations:
         
             for i, screw_angle in enumerate(screw_rotations):             
 
+                j=j+1
                 if (isinstance(distance_from_surf, float)):
                     distance = distance_from_surf
-                else: distance = distance_from_surf[i]
+                else: distance = distance_from_surf[j]                
 
                 for hor_angle in horiz_rotations:
 
@@ -129,10 +132,12 @@ class Molecule:
                         #print('Config. roty={0} rotz={1}: {2} atoms closer than intended distance. Translating molecule {3:.3f} upwards '.format(vert_angle, hor_angle, len(atoms_too_close), delta_z))
                         mol.translate([0,0,delta_z])
 
+                    mol.translate([0,0,distance])
+
                     configs_ase.append(mol)
 
                     if(False): labels.append( ['{0},{1},{2},'.format(screw_angle, vert_angle, hor_angle), 0] )
-                    labels.append( ['{0},{1},{2},'.format(screw_angle, vert_angle, hor_angle), '{:.3f}'.format(distance + mol.get_positions()[atom_index][2])] )
+                    labels.append( ['{0},{1},{2},'.format(screw_angle, vert_angle, hor_angle), '{:.3f}'.format(mol.get_positions()[atom_index][2])] )
 
                     if vert_angle == 90: break
                 
