@@ -74,6 +74,7 @@ def init():
     global pwi_prefix
     global labels_filename
     global prerelax_labels_filename
+    global E_slab_mol
     global energies_filename
     global script_settings_dict
     global espresso_settings_dict
@@ -174,6 +175,7 @@ def init():
     slab_filename          = script_settings_dict['INPUT']['slab_filename']
     molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
     jobscript              = script_settings_dict['INPUT']['jobscript']
+    E_slab_mol             = np.array(script_settings_dict['INPUT']['E_slab_mol'].split(), dtype=float) if 'E_slab_mol' in script_settings_dict['INPUT'] else []
 
     #&STRUCTURE
     symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
@@ -325,7 +327,7 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
     pwi_names = []
 
     for i in np.arange(len(all_mol_on_slab_configs_ase)):
-        name_file = pwi_prefix+'_'+str(i)
+        name_file = pwi_prefix+'_scf_'+str(i)
         pwi_names.append(name_file+'.pwi')
         calc = Espresso_mod(pseudopotentials=pseudopotentials, 
                     input_data=espresso_settings_dict,
@@ -524,7 +526,7 @@ def main():
     elif('-pr' in sys.argv):
         pre_relax(RESTART='--restart' in sys.argv)
     elif('-es' in sys.argv):
-        get_energies(labels_filename, energies_filename)
+        get_energies(labels_filename, energies_filename, E_slab_mol=E_slab_mol)#, pwo_prefix='output_scf')
     elif('-fr' in sys.argv):
         threshold = None
         if('--t' in sys.argv and '--restart' not in sys.argv):
@@ -543,7 +545,7 @@ def main():
             print('You cannot change the threshold for a restart. Quitting.')
             return 1
     elif('-ef' in sys.argv): #read final energies
-        get_energies(energies_filename, 'finalrelax_energies.csv', pwo_prefix='output_finalrelax')
+        get_energies(energies_filename, 'finalrelax_energies.csv', E_slab_mol=E_slab_mol, pwo_prefix='output_finalrelax')
 
 
 if __name__ == '__main__':

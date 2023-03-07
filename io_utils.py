@@ -15,13 +15,15 @@ from natsort import natsorted
 TEST = False #do not actually launch the jobs, simply prints the command
 
 
-def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : str = 'output'):
+def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : list = [], pwo_prefix : str = 'output'):
     #can be called before all the jobs have finished
 
     rydbergtoev = 13.605703976
 
     #Begin script
     files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
+
+    files = [file for file in files if 'rel' not in file]
 
     with open(labels_filename, 'r') as f:
         data = f.readlines()
@@ -30,9 +32,15 @@ def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : st
     line = data[0].split(',')
     line[-1] = line[-1].split('\n')[0]
     if "final" in pwo_prefix:
-        line.append('E_rel(eV)\n')
+        if E_slab_mol.any():
+            line.append('Eads_rel(eV)\n')
+        else:
+            line.append('tot_rel(eV)\n')
     else:
-        line.append('E_scf(eV)\n')
+        if E_slab_mol.any():
+            line.append('Eads_scf(eV)\n')
+        else:
+            line.append('Etot_scf(eV)\n')
     data[0] = ','.join(line)
 
     energies = len(files)*[None]
@@ -56,9 +64,16 @@ def get_energies(labels_filename : str, energies_filename : str, pwo_prefix : st
             if job_finished and scf_terminated: #add energy to line in csv
 
                 config_label = int( (file.split('.pwo')[0]).split('_')[-1] )
+
+                #print(config_label)
+
+                toten = float(toten)
+                if E_slab_mol.any():
+                    toten -= (E_slab_mol[0]+E_slab_mol[1])
                 
-                toten = float(toten)*rydbergtoev
+                toten *= rydbergtoev
                 energies[i] = toten
+
 
                 line = data[config_label+1].split(',')
                 line[-1] = line[-1].split('\n')[0]

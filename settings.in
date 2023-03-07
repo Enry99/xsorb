@@ -4,6 +4,7 @@
    slab_filename                 = 'Fe110.pwo'
    molecule_filename             = 'Hex.pwo'
    jobscript                     = 'job_simple'
+   #E_slab_mol                    = 0 0 #slab and isolated molecule energies (in Ry). If omitted, calculates the total energies; if present, calculates the adsorption energies
 /
 
 
