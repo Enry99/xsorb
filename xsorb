@@ -58,16 +58,11 @@ from io_utils import get_energies, get_z, launch_jobs, restart_jobs
 #
 ########################################################################################
 
-#WEEKEND
-#TODO: test slab with dopant
-#TODO: check/rewrite explanation at the beginning, write commands in --h
-#TODO: standardizza nomi file e cartelle:
-# input_scf_0.pwi -> scf_outdirs, input_prerelax_0.pwi -> prerelax_outdirs, input_finalrelax.pwi -> finalrelax_outdirs
 
-#OPTIONAL (chiedi a Paolo)
-#TODO: write function to remove some adsites from list, and also from the label
-#      probably better if remove by label instead of by index
-#TODO: possibly add a z_max if the relaxation brings the molecule too far (?)
+#TODO: sistema scittura csv
+#TODO: check/rewrite explanation at the beginning, write commands in --h
+
+
 
 
 def init():
@@ -84,6 +79,7 @@ def init():
     global symm_reduce
     global near_reduce
     global slab_repeat
+    global selected_sites
     global mol_atoms
     global molecule_axis_atoms
     global axis_vector
@@ -153,6 +149,7 @@ def init():
     optional_flags_list = {
         'symm_reduce'              : 0.01,
         'near_reduce'              : 0.01,
+        'selected_sites'           : ' ',
         'slab_repeat'              : '1 1 1',
         'mol_atoms'                : ' ',
         'molecule_axis_atoms'      : ' ',
@@ -180,6 +177,7 @@ def init():
     #&STRUCTURE
     symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
     near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
+    selected_sites         = np.array(script_settings_dict['STRUCTURE']['slab_repeat'].split(), dtype=int).tolist()
     slab_repeat            = np.array(script_settings_dict['STRUCTURE']['slab_repeat'].split(), dtype=int).tolist()
 
     mol_atoms              = np.array(script_settings_dict['STRUCTURE']['mol_atoms'].split(), dtype=int).tolist()
@@ -245,6 +243,20 @@ def init():
 ############################################################################################################
 
 
+def ads_sites():
+    print('\nLoading slab...')
+    slab = Slab(slab_filename)
+    print('Slab loaded.')
+
+    print('Finding adsorption sites...')
+    slab.find_adsorption_sites(* {
+        "distance":0, 
+        'symm_reduce':0, 
+        'near_reduce':near_reduce, 
+        'no_obtuse_hollow':True}.values(),
+         save_image=True)
+    print('Adsorption sites found.')
+
 def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=False):
     if(RESTART and SCF_RUN):
         restart_jobs(jobscript=jobscript, which='scf')
@@ -272,7 +284,17 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
 
     #Find adsorption sites and labels (site type and x,y coords.)
     print('Finding adsorption sites...')
-    adsites, adsites_labels = slab.find_adsorption_sites(*sites_find_args.values(), save_image=SAVEFIG)
+    if selected_sites:
+        adsites, adsites_labels = slab.find_adsorption_sites(*{
+        "distance":0, 
+        'symm_reduce':0, 
+        'near_reduce':near_reduce, 
+        'no_obtuse_hollow':True}.values(), save_image=SAVEFIG)
+        adsites = adsites['all'][selected_sites]
+        adsites_labels = adsites_labels[selected_sites]
+    else:
+        adsites, adsites_labels = slab.find_adsorption_sites(*sites_find_args.values(), save_image=SAVEFIG)
+        adsites = adsites['all']
     print('Adsorption sites found.')
 
 
@@ -308,7 +330,7 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
 
     #Adsorption of molecule on all adsorption sites for all molecule orientations  
     print('Generating adsorption structures...')
-    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites['all'], repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
+    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites, repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
     all_mol_on_slab_configs_pymat = sum(all_mol_on_slab_configs_pymat, []) #flatten the 2D array
     if(False): all_mol_on_slab_configs_pymat = adsorb_both_surfaces(all_mol_on_slab_configs_pymat) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
     all_mol_on_slab_configs_ase = [ase.AseAtomsAdaptor.get_atoms(config) for config in all_mol_on_slab_configs_pymat]
@@ -399,17 +421,17 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
 
 
     #generate_adsorption_structures
-    #Adsorption of molecule only on a hollow site for z relaxation
+    #Adsorption of molecule only on a top site for z relaxation
     print('Generating adsorption structures...')
     # TODO: anziché prenderne uno a caso prendere quello con maggior coordination number.  
-    adsites_labels = [[ads for ads in adsites_labels if 'hollow' in ads][0]]
-    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=[adsites['hollow'][0]], repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
+    adsites_labels = [[ads for ads in adsites_labels if 'top' in ads][0]]
+    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=[adsites['top'][0]], repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
     all_mol_on_slab_configs_pymat = sum(all_mol_on_slab_configs_pymat, []) #flatten the 2D array
     if(False): all_mol_on_slab_configs_pymat = adsorb_both_surfaces(all_mol_on_slab_configs_pymat) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
     all_mol_on_slab_configs_ase = [ase.AseAtomsAdaptor.get_atoms(config) for config in all_mol_on_slab_configs_pymat]
 
     full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
-    print('Slab+adsorbate cells for the hollow sites generated.')
+    print('Slab+adsorbate cells for the top sites generated.')
 
         
     csvfile=open(prerelax_labels_filename, 'w')
@@ -440,7 +462,7 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
 
     csvfile.close()
 
-    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerel_outdirs', jobname_prefix='prerel')
+    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerelax_outdirs', jobname_prefix='prerel')
 
 
 def final_relax(threshold : float = None, RESTART: bool = False):
@@ -494,7 +516,7 @@ def final_relax(threshold : float = None, RESTART: bool = False):
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(struct_ase)
 
-    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrel_outdirs', jobname_prefix='finrel')
+    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrelax_outdirs', jobname_prefix='finrel')
 
 
 def main():
@@ -516,20 +538,22 @@ def main():
 
     init()
 
-    SAVEFIG   = True
+    SAVEFIG   = False
     WRITE_XSF = False
-    if('--nofig' in sys.argv): SAVEFIG = False
+    if('--fig' in sys.argv): SAVEFIG = True
     if('--xsf' in sys.argv): WRITE_XSF = True
     
-    if('-g' in sys.argv or '-s' in sys.argv):
+    if('-sites' in sys.argv):
+        ads_sites()
+    elif('-g' in sys.argv or '-s' in sys.argv):
         generate(SCF_RUN= '-s' in sys.argv, RESTART='--restart' in sys.argv, SAVEFIG=SAVEFIG, WRITE_XSF=WRITE_XSF)
     elif('-pr' in sys.argv):
-        pre_relax(RESTART='--restart' in sys.argv)
+        pre_relax(RESTART=('--restart' in sys.argv or '--res' in sys.argv))
     elif('-es' in sys.argv):
         get_energies(labels_filename, energies_filename, E_slab_mol=E_slab_mol)#, pwo_prefix='output_scf')
     elif('-fr' in sys.argv):
         threshold = None
-        if('--t' in sys.argv and '--restart' not in sys.argv):
+        if('--t' in sys.argv and ('--restart' not in sys.argv and '--res' not in sys.argv)):
             if(len(sys.argv)> sys.argv.index('--t')+1):
                 threshold = sys.argv[sys.argv.index('--t')+1]
                 if not input._is_number(threshold):
@@ -538,8 +562,8 @@ def main():
             else:
                 print('You need to specify a value after --t. Quitting.')
                 return 1
-            final_relax(float(threshold), RESTART='--restart' in sys.argv)
-        elif('--t' not in sys.argv and '--restart' in sys.argv):
+            final_relax(float(threshold), RESTART=('--restart' in sys.argv or '--res' in sys.argv))
+        elif('--t' not in sys.argv and ('--restart' in sys.argv or '--res' in sys.argv)):
             final_relax(RESTART='--restart' in sys.argv)
         else:
             print('You cannot change the threshold for a restart. Quitting.')

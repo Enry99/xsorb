@@ -67,7 +67,12 @@ class Slab:
             symm_reduce_thr, near_reduce_thr: thresholds for removing sites duplicates (increase them to reduce duplicates).
             no_obtuse_hollow: avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation of topmost layer used to find sites.
         '''
-       
+
+        if symm_reduce_thr == 0:
+            figname = 'adsorption_sites_all.png'
+        else:
+            figname = 'adsorption_sites.png'
+
         adsites = self.asf.find_adsorption_sites(distance=distance_from_surf, symm_reduce=symm_reduce_thr, near_reduce=near_reduce_thr, no_obtuse_hollow=no_obtuse_hollow)
 
         nn = MinimumDistanceNN()
@@ -114,7 +119,7 @@ class Slab:
                 ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=3, zorder=20000)
                             
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
-            fig.savefig('adsorption_sites.png', dpi=1500, bbox_inches='tight')
+            fig.savefig(figname, dpi=1500, bbox_inches='tight')
 
         return adsites, adsite_labels
 
