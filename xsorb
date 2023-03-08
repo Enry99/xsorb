@@ -144,6 +144,7 @@ def init():
     if 'fixed_indices_slab' in script_settings_dict['STRUCTURE'] and 'fixed_layers_slab' in script_settings_dict['STRUCTURE']:
         raise RuntimeError("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")            
 
+
     #set non-specified flags to default.
 
     optional_flags_list = {
@@ -172,7 +173,10 @@ def init():
     slab_filename          = script_settings_dict['INPUT']['slab_filename']
     molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
     jobscript              = script_settings_dict['INPUT']['jobscript']
-    E_slab_mol             = np.array(script_settings_dict['INPUT']['E_slab_mol'].split(), dtype=float) if 'E_slab_mol' in script_settings_dict['INPUT'] else []
+    E_slab_mol             = np.array(script_settings_dict['INPUT']['E_slab_mol'].split(), dtype=float).tolist() if 'E_slab_mol' in script_settings_dict['INPUT'] else []
+    if len(E_slab_mol) != 2 and len(E_slab_mol) != 0:
+        raise RuntimeError("If you specify the tag E_slab_mol you must provide TWO values.")
+
 
     #&STRUCTURE
     symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
@@ -289,9 +293,9 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
         "distance":0, 
         'symm_reduce':0, 
         'near_reduce':near_reduce, 
-        'no_obtuse_hollow':True}.values(), save_image=SAVEFIG)
-        adsites = adsites['all'][selected_sites]
-        adsites_labels = adsites_labels[selected_sites]
+        'no_obtuse_hollow':True}.values(), 
+        save_image=SAVEFIG,
+        selected_sites=selected_sites)
     else:
         adsites, adsites_labels = slab.find_adsorption_sites(*sites_find_args.values(), save_image=SAVEFIG)
         adsites = adsites['all']
@@ -422,8 +426,7 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
 
     #generate_adsorption_structures
     #Adsorption of molecule only on a top site for z relaxation
-    print('Generating adsorption structures...')
-    # TODO: anziché prenderne uno a caso prendere quello con maggior coordination number.  
+    print('Generating adsorption structures...') 
     adsites_labels = [[ads for ads in adsites_labels if 'top' in ads][0]]
     all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=[adsites['top'][0]], repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
     all_mol_on_slab_configs_pymat = sum(all_mol_on_slab_configs_pymat, []) #flatten the 2D array
@@ -529,10 +532,22 @@ def main():
         return 1
 
     if('--h' in sys.argv or '--help' in sys.argv or '-h' in sys.argv):
-        print('TODO: help')
+        print('Options:')
+        print('-sites')
+        print('-g')
+        print('-pr')
+        print('-s')
+        print('-es')
+        print('-fr')
+        print('-ef')
+        print('Additional flags:')
+        print('--fig')
+        print('--xsf')
+        print('--t (for final relax)')
+        print('--restart / --res')
         return 0
 
-    if('-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv):
+    if('-sites' not in sys.argv and '-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv):
         print('You need to specify at least one option (-r, -s, -e, -f, -fe). Quitting.')
         return 1
 

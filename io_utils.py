@@ -32,12 +32,12 @@ def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : li
     line = data[0].split(',')
     line[-1] = line[-1].split('\n')[0]
     if "final" in pwo_prefix:
-        if E_slab_mol.any():
+        if E_slab_mol:
             line.append('Eads_rel(eV)\n')
         else:
             line.append('tot_rel(eV)\n')
     else:
-        if E_slab_mol.any():
+        if E_slab_mol:
             line.append('Eads_scf(eV)\n')
         else:
             line.append('Etot_scf(eV)\n')
@@ -68,7 +68,7 @@ def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : li
                 #print(config_label)
 
                 toten = float(toten)
-                if E_slab_mol.any():
+                if E_slab_mol:
                     toten -= (E_slab_mol[0]+E_slab_mol[1])
                 
                 toten *= rydbergtoev

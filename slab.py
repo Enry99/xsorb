@@ -57,7 +57,7 @@ class Slab:
         return atoms_list
 
 
-    def find_adsorption_sites(self, distance_from_surf=2., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False):
+    def find_adsorption_sites(self, distance_from_surf=2., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False, selected_sites : list = None):
         '''
         Returns a list of cartesian coordinates of the adsites, and a list of labels ('ontop', x , y).
         Optionally it saves a figure with the sites on the surface.
@@ -80,8 +80,12 @@ class Slab:
         adsite_labels = []
         #runs over all the slab_adsites, classifiying them by checking if the
         #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'
-        for site in adsites['all']:
 
+        if selected_sites is not None:
+            sel_adsites = adsites['all'][selected_sites]
+        else:
+            sel_adsites = adsites['all']
+        for site in sel_adsites:
             #dummy structure just to place one atom in the site
             slab = self.slab_pymat.copy()
             slab.append('O', site.tolist(), coords_are_cartesian=True)
@@ -107,8 +111,8 @@ class Slab:
             ax = fig.add_subplot(111)
             plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.7)
 
-            adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites["all"]]
-            for i, site in enumerate(adsites["all"]):
+            adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in sel_adsites]
+            for i, site in enumerate(sel_adsites):
                 if any((site == x).all() for x in adsites['ontop']):
                     color = 'r'
                 elif any((site == x).all() for x in adsites['bridge']):
