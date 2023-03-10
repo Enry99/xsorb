@@ -255,7 +255,7 @@ def ads_sites():
     print('Finding adsorption sites...')
     slab.find_adsorption_sites(* {
         "distance":0, 
-        'symm_reduce':0, 
+        'symm_reduce':symm_reduce, 
         'near_reduce':near_reduce, 
         'no_obtuse_hollow':True}.values(),
          save_image=True)
@@ -291,7 +291,7 @@ def generate(SCF_RUN : bool, RESTART : bool = False, SAVEFIG=True, WRITE_XSF=Fal
     if selected_sites:
         adsites, adsites_labels = slab.find_adsorption_sites(*{
         "distance":0, 
-        'symm_reduce':0, 
+        'symm_reduce':symm_reduce, 
         'near_reduce':near_reduce, 
         'no_obtuse_hollow':True}.values(), 
         save_image=SAVEFIG,
@@ -465,7 +465,7 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
 
     csvfile.close()
 
-    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerelax_outdirs', jobname_prefix='prerel')
+    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerelax_outdirs', jobname_prefix='prerelax')
 
 
 def final_relax(threshold : float = None, RESTART: bool = False):
@@ -519,7 +519,7 @@ def final_relax(threshold : float = None, RESTART: bool = False):
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(struct_ase)
 
-    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrelax_outdirs', jobname_prefix='finrel')
+    launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrelax_outdirs', jobname_prefix='finalrelax')
 
 
 def main():

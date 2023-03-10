@@ -119,8 +119,8 @@ class Slab:
                     color = 'g'
                 elif any((site == x).all() for x in adsites['hollow']):
                     color = 'b'
-                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=5, mew=1, linestyle="", zorder=10000)
-                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=3, zorder=20000)
+                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=3, mew=1, linestyle="", zorder=10000)
+                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=2, zorder=20000)
                             
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')
