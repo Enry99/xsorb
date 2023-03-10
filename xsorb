@@ -181,7 +181,7 @@ def init():
     #&STRUCTURE
     symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
     near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
-    selected_sites         = np.array(script_settings_dict['STRUCTURE']['slab_repeat'].split(), dtype=int).tolist()
+    selected_sites         = np.array(script_settings_dict['STRUCTURE']['selected_sites'].split(), dtype=int).tolist()
     slab_repeat            = np.array(script_settings_dict['STRUCTURE']['slab_repeat'].split(), dtype=int).tolist()
 
     mol_atoms              = np.array(script_settings_dict['STRUCTURE']['mol_atoms'].split(), dtype=int).tolist()

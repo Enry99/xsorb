@@ -100,11 +100,10 @@ class Molecule:
         if not vert_rotations : vert_rotations = [0]
         if not screw_rotations : screw_rotations = [0]
         if not horiz_rotations : horiz_rotations = [0]
-
-        j=-1 #index for the pre-relax distances (no horiz. rotations)
-
-        for vert_angle in vert_rotations:
         
+        for vert_angle in vert_rotations:
+                     
+            j=-1 #index for the pre-relax distances (no horiz. rotations)
             for i, screw_angle in enumerate(screw_rotations):             
 
                 j=j+1
