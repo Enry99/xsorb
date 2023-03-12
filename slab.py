@@ -24,6 +24,11 @@ class Slab:
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
         self.slab_ase = read(filename=slab_filename)
+
+        #translate slab so that the bottom layer is at least 1 angstrom from the bottom
+        zmin = min(slab.positions[:,2])
+        if(zmin < 1):
+            slab_ase.translate([0,0,1-zmin])
         
 
         #identification of the layers##################################
@@ -57,7 +62,7 @@ class Slab:
         return atoms_list
 
 
-    def find_adsorption_sites(self, distance_from_surf=2., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False, selected_sites : list = None):
+    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False, selected_sites : list = None):
         '''
         Returns a list of cartesian coordinates of the adsites, and a list of labels ('ontop', x , y).
         Optionally it saves a figure with the sites on the surface.
@@ -88,7 +93,9 @@ class Slab:
         for site in sel_adsites:
             #dummy structure just to place one atom in the site
             slab = self.slab_pymat.copy()
-            slab.append('O', site.tolist(), coords_are_cartesian=True)
+            coords = site.tolist()
+            coords[2] += 2
+            slab.append('O', coords, coords_are_cartesian=True)
             coord_n = nn.get_cn(slab, len(slab.sites)-1)
             nn_list = nn.get_nn(slab, len(slab.sites)-1)       
 
