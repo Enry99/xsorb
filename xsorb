@@ -468,7 +468,7 @@ def pre_relax(WRITE_XSF : bool =False, RESTART : bool = False):
     launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerelax_outdirs', jobname_prefix='prerelax')
 
 
-def final_relax(threshold : float = None, RESTART: bool = False):
+def final_relax(threshold : float = None, exclude : list[int] = [], RESTART: bool = False):
     if(RESTART):
         restart_jobs(jobscript=jobscript, which="finalrelax")
         return 
@@ -476,15 +476,17 @@ def final_relax(threshold : float = None, RESTART: bool = False):
     slab = Slab(slab_filename)
     mol  = Molecule(molecule_filename, molecule_axis_atoms, axis_vector, mol_atoms)
     
-    energies = get_energies(labels_filename, energies_filename)
+    energies = get_energies(labels_filename, energies_filename, E_slab_mol=E_slab_mol)
     if None in energies:
         raise RuntimeError('Not all the calculations have (yet) produced a final energy. Cannot run the final calculation.')
     
-    e_min = min(energies)
+
+    e_min = min([energies[i] for i in [*range(len(energies))] if i not in exclude])
     i_minimum = energies.index(e_min)
     calcs = []
     if threshold is not None:
         for i, energy in enumerate(energies):
+            if i in exclude: continue
             if energy - e_min <= threshold:
                 calcs.append(i)
     else: calcs = [i_minimum]
@@ -496,7 +498,7 @@ def final_relax(threshold : float = None, RESTART: bool = False):
 
     pwi_names = []
     for i in calcs:       
-        struct_ase = read(pwi_prefix+'_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
+        struct_ase = read(pwi_prefix+'_scf_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
         fixed_indices_molecule = len(read(slab_filename)) + np.array(fixed_indices_mol)
 
@@ -568,18 +570,23 @@ def main():
         get_energies(labels_filename, energies_filename, E_slab_mol=E_slab_mol)#, pwo_prefix='output_scf')
     elif('-fr' in sys.argv):
         threshold = None
+        exclude = []
+        if '--exclude' in sys.argv:
+            exclude = [int(i) for i in (sys.argv[sys.argv.index('--exclude')+1].split('[')[1].split(']')[0].split(','))]
+            print('Labels {0} will be excluded, as requested'.format(exclude))
         if('--t' in sys.argv and ('--restart' not in sys.argv and '--res' not in sys.argv)):
             if(len(sys.argv)> sys.argv.index('--t')+1):
                 threshold = sys.argv[sys.argv.index('--t')+1]
                 if not input._is_number(threshold):
                     print('The value after --t must be a number. Quitting.')
-                    return 1               
+                    return 1 
+                threshold = float(threshold)             
             else:
                 print('You need to specify a value after --t. Quitting.')
                 return 1
-            final_relax(float(threshold), RESTART=('--restart' in sys.argv or '--res' in sys.argv))
+            final_relax(threshold, exclude=exclude, RESTART=('--restart' in sys.argv or '--res' in sys.argv))
         elif('--t' not in sys.argv and ('--restart' in sys.argv or '--res' in sys.argv)):
-            final_relax(RESTART='--restart' in sys.argv)
+            final_relax(RESTART=True)
         else:
             print('You cannot change the threshold for a restart. Quitting.')
             return 1

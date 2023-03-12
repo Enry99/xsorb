@@ -23,7 +23,7 @@ def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : li
     #Begin script
     files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
 
-    files = [file for file in files if 'rel' not in file]
+    #files = [file for file in files if 'rel' not in file]
 
     with open(labels_filename, 'r') as f:
         data = f.readlines()
@@ -63,9 +63,7 @@ def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : li
 
             if job_finished and scf_terminated: #add energy to line in csv
 
-                config_label = int( (file.split('.pwo')[0]).split('_')[-1] )
-
-                #print(config_label)
+                config_label = int( (file.split('.pwo')[0]).split('_')[-1] )                
 
                 toten = float(toten)
                 if E_slab_mol:
@@ -158,10 +156,10 @@ def restart_jobs(jobscript : str, which : str = 'scf'):
         outdirs = 'scf_outdirs'
         pwo_prefix = 'output_scf'
     elif(which == 'prerelax'):
-        outdirs = 'prerel_outdirs'
+        outdirs = 'prerelax_outdirs'
         pwo_prefix = 'output_prerelax'
     elif(which == 'finalrelax'):
-        outdirs = 'finalrel_outdirs'
+        outdirs = 'finalrelax_outdirs'
         pwo_prefix = 'output_finalrelax'
     else:
         raise ValueError("Not clear which calculation should be restarted.")

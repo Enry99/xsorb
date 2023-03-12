@@ -26,9 +26,9 @@ class Slab:
         self.slab_ase = read(filename=slab_filename)
 
         #translate slab so that the bottom layer is at least 1 angstrom from the bottom
-        zmin = min(slab.positions[:,2])
+        zmin = min(self.slab_ase.positions[:,2])
         if(zmin < 1):
-            slab_ase.translate([0,0,1-zmin])
+            self.slab_ase.translate([0,0,1-zmin])
         
 
         #identification of the layers##################################
