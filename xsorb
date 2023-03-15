@@ -125,7 +125,7 @@ def init():
     scf_labels_filename      = 'scf_site_labels.csv'
     prerelax_labels_filename = 'prerelax_site_labels.csv'
     scf_energies_filename    = 'scf_energies.csv'
-    relax_energies_filename  = 'final_energies.csv'
+    relax_energies_filename  = 'finalrelax_energies.csv'
     #########################################################################################
 
 

@@ -13,7 +13,7 @@ import os, sys, shutil
 import glob
 from natsort import natsorted
 
-TEST = True #do not actually launch the jobs, simply prints the command
+TEST = False #do not actually launch the jobs, simply prints the command
 
 
 def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str):
@@ -84,9 +84,9 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
                 
                 data[config_label+1] = ','.join(line)
                 data[config_label+1] += '\n'
+                
             else: 
                 print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
-
 
     with open(out_filename, 'w') as f:
         f.writelines( data )
