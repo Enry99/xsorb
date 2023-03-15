@@ -39,7 +39,7 @@ class Espresso_mod(Espresso):
             self.starting_mag = starting_magnetizations.copy()
 
 
-    def set_vdwd2_coeffs(self, vdw2_c6, vdw2_rvdw):
+    def set_vdwd2_coeffs(self, vdw2_c6 : list, vdw2_rvdw : list):
         if(vdw2_c6):
             self.vdw2_c6_list = vdw2_c6.copy()
         if(vdw2_rvdw):
@@ -76,7 +76,7 @@ class Espresso_mod(Espresso):
             file.writelines( data )
 
 
-    def _start_magnetization_pwi(self):
+    def _starting_magnetization_pwi(self):
         #Edit pwi after FileIOCalculator.write_input, adding the initial magnetization, since otherwise it is overwritten.
         
         with open(self.label + '.pwi', 'r') as file:
@@ -111,11 +111,11 @@ class Espresso_mod(Espresso):
 
         for i, coeff in enumerate(self.vdw2_c6_list):
             if coeff is not None:
-                data.insert(line_index, '   london_c6({0})   = {1}\n'.format(i+1, coeff))
+                data.insert(line_index, '   london_c6({0})     = {1}\n'.format(i+1, coeff))
 
         for i, coeff in enumerate(self.vdw2_rvdw_list):      
             if coeff is not None:
-                data.insert(line_index, '   london_rvdw({0})     = {1}\n'.format(i+1, coeff))
+                data.insert(line_index, '   london_rvdw({0})   = {1}\n'.format(i+1, coeff))
 
 
         with open(self.label + '.pwi', 'w') as file:
@@ -128,5 +128,5 @@ class Espresso_mod(Espresso):
         FileIOCalculator.write_input(self, atoms, properties, system_changes)
         write(self.label + '.pwi', atoms, **self.parameters)
         if(hasattr(self, 'slab_atoms_indices')): self._fix_atoms_pwi()
-        if(hasattr(self, 'starting_mag')): self._start_magnetization_pwi()
+        if(hasattr(self, 'starting_mag')): self._starting_magnetization_pwi()
         if(hasattr(self, 'vdw2_c6_list') or hasattr(self, 'vdw2_rvdw_list')): self._vdw2_coeffs_pwi()

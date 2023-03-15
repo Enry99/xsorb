@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
 Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
@@ -8,14 +9,14 @@ Function definitions to read from pwo and launch scripts
 
 """
 
-import os, shutil
+import os, sys, shutil
 import glob
 from natsort import natsorted
 
-TEST = False #do not actually launch the jobs, simply prints the command
+TEST = True #do not actually launch the jobs, simply prints the command
 
 
-def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : list = [], pwo_prefix : str = 'output'):
+def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str):
     #can be called before all the jobs have finished
 
     rydbergtoev = 13.605703976
@@ -23,45 +24,46 @@ def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : li
     #Begin script
     files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
 
-    #files = [file for file in files if 'rel' not in file]
-
-    with open(labels_filename, 'r') as f:
+    with open(in_filename, 'r') as f:
         data = f.readlines()
+
 
     #add E_ads column header
     line = data[0].split(',')
     line[-1] = line[-1].split('\n')[0]
-    if "final" in pwo_prefix:
+    if "final" in pwo_prefix: #finalrelax case
         if E_slab_mol:
             line.append('Eads_rel(eV)\n')
         else:
-            line.append('tot_rel(eV)\n')
-    else:
+            line.append('Etot_rel(eV)\n')
+    else: #scf case
         if E_slab_mol:
             line.append('Eads_scf(eV)\n')
         else:
             line.append('Etot_scf(eV)\n')
     data[0] = ','.join(line)
 
-    energies = len(files)*[None]
+
+    #get energies from pwo(s)
+    energies = len(files)*[None]  #those not completed will be left as None, raising an error if used for finalrelax
 
     for i, file in enumerate(files):
         
         with open(file, 'r') as f:
             pwo = f.readlines()
 
-            job_finished = False
             scf_terminated = False
+            relax_terminated = False
             for line in pwo: #make sure to get the last one (useful in relaxations)
                 if '!' in line: 
                     toten = line.split()[4]
-                if 'JOB DONE.' in line:
-                    job_finished = True
                 if 'End of self-consistent calculation' in line:
                     scf_terminated = True
+                if 'Begin final coordinates' in line:
+                    relax_terminated = True
 
 
-            if job_finished and scf_terminated: #add energy to line in csv
+            if scf_terminated: #add energy to line in csv
 
                 config_label = int( (file.split('.pwo')[0]).split('_')[-1] )                
 
@@ -76,14 +78,17 @@ def get_energies(labels_filename : str, energies_filename : str, E_slab_mol : li
                 line = data[config_label+1].split(',')
                 line[-1] = line[-1].split('\n')[0]
                 line.append('{:.3f}'.format(toten))
+                if "final" in pwo_prefix and not relax_terminated:
+                    print(file.split('/')[-1] + ' relaxation has not reached final configuration. The energy will be marked with a *')
+                    line[-1]+='*'
                 
                 data[config_label+1] = ','.join(line)
                 data[config_label+1] += '\n'
             else: 
-                print(file.split('/')[-1] + ' job is not (yet) completed. It will be skipped.')
+                print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
 
 
-    with open(energies_filename, 'w') as f:
+    with open(out_filename, 'w') as f:
         f.writelines( data )
 
     return energies
@@ -95,21 +100,21 @@ def get_z(pwo_filename : str, atom_index : int):
 
         pwo = f.readlines()
 
-        job_finished = False
+        relax_terminated = False
         first_index = 0
-        for i, line in enumerate(pwo): #make sure to get the last one (useful in relaxations)
+        for i, line in enumerate(pwo):
             if 'Begin final coordinates' in line:
-                job_finished = True
+                relax_terminated = True
                 first_index  = i+3
-                #do not break, so that if more than one run is present we take the last one
+                #do not break, so that if more than one relax is present we take the last one
 
-        if not job_finished: raise RuntimeError(pwo_filename + ' job did not terminate correctly. Quitting.')
+        if not relax_terminated: raise RuntimeError(pwo_filename + ' relax not terminated. Quitting.')
         else: 
             z = pwo[first_index+atom_index].split()[3]           
             return float(z)
             
 
-def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_prefix=''):
+def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_prefix : str, pwi_prefix : str, pwo_prefix : str):
     #NOTE: for this script, the execution of pw.x in the jobscript need to be called with this option:  
     #      -input $1 >> $2, so that it reads the input from file $1 and writes output in file $2    
 
@@ -119,13 +124,14 @@ def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_pr
     for input_file in pwi_list:
 
         output_file = input_file.replace("pwi", "pwo")
-        output_file = output_file.replace("input", "output")
+        output_file = output_file.replace(pwi_prefix, pwo_prefix)
         label = input_file.split('.pwi')[0].split('_')[-1]
 
         if(os.path.isfile(input_file)): # unnecessary, this check is also done before calling the function
 
             if(os.path.isfile(output_file)): 
-                raise RuntimeError(output_file+' already present, possibly from a running calculation. Quitting.')
+                print(output_file+' already present, possibly from a running calculation. Quitting.')
+                sys.exit(1)
 
             j_dir = outdirs+'/'+str(label)
             os.mkdir(j_dir)
@@ -141,33 +147,52 @@ def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_pr
                     if "job-name" in line:
                         lines[i] = line.split('=')[0] + '="' + jobname_prefix + '_' + label +'"\n'
                         break
-                
-
+        
             with open(jobscript_filename, 'w') as f:
                 f.writelines( lines )
+
 
             if(TEST): print("sbatch " + jobscript_filename + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)
             else: os.system("sbatch " + jobscript_filename + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)  #launchs the jobscript in j_dir from j_dir
             os.chdir(main_dir) ####################
 
 
-def restart_jobs(jobscript : str, which : str = 'scf'):
+def _is_completed(pwo : str, which : str):
+    if(which == 'scf'):
+        searchfor = 'End of self-consistent calculation'
+    elif(which == 'finalrelax' or which == 'prerelax'):
+        searchfor = 'Begin final coordinates'
+    
+    with open(pwo, 'r') as f:
+        file = f.readlines()
+
+    completed = False
+    for line in file:
+        if searchfor in line:
+            completed = True
+    
+    return completed
+
+
+def restart_jobs(jobscript : str, which : str, pwi_prefix : str, pwo_prefix : str):
     if(which == 'scf'):
         outdirs = 'scf_outdirs'
-        pwo_prefix = 'output_scf'
+        pwo_prefix_full = pwo_prefix + '_scf'
     elif(which == 'prerelax'):
         outdirs = 'prerelax_outdirs'
-        pwo_prefix = 'output_prerelax'
+        pwo_prefix_full = pwo_prefix + '_prerelax'
     elif(which == 'finalrelax'):
         outdirs = 'finalrelax_outdirs'
-        pwo_prefix = 'output_finalrelax'
+        pwo_prefix_full = pwo_prefix + '_finalrelax'
     else:
         raise ValueError("Not clear which calculation should be restarted.")
     
 
     main_dir = os.getcwd()
-    pwos = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
-    pwis = [pwo.replace('output', 'input').replace('.pwo', '.pwi') for pwo in pwos]
+    pwos = natsorted(glob.glob( pwo_prefix_full + "_*.pwo" ))
+    #restart only non-completed calculations
+    pwos = [pwo for pwo in pwos if not _is_completed(pwo, which=which)]
+    pwis = [pwo.replace(pwo_prefix, pwi_prefix).replace('.pwo', '.pwi') for pwo in pwos]
     config_labels = [(file.split('.pwo')[0]).split('_')[-1] for file in pwos]
 
 

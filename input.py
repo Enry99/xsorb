@@ -9,6 +9,7 @@ and return them as two dictionaries (script settings and Espresso settings)
 
 """
 
+import sys
 
 #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, as they are read from the input structures
 #NOTE 2: The kpoints, kpoints offsets and coordinates to be fixed must be set in the first section "@SETTINGS" of the input file, not in "@ESPRESSO"
@@ -38,7 +39,7 @@ def _read_block(lines : list[str], CONVERT = False):
         val = val.strip("'")
 
         if(CONVERT):
-            if (_is_number(val)): #don't do the conversion here, but in the main module
+            if (_is_number(val)):
                 if val.isnumeric(): val = int(val)
                 else: val = float(val)      
 
@@ -117,8 +118,10 @@ def read_input_file(filename: str):
     
 
     if(not script_settings_dict):
-        raise RuntimeError('Script settings not read correctly. Quitting.')
+        print('Script settings not read correctly. Quitting.')
+        sys.exit(1)
     if(not espresso_settings_dict):
-        raise RuntimeError('Espresso settings not read correctly. Quitting.')
+        print('Espresso settings not read correctly. Quitting.')
+        sys.exit(1)
 
     return script_settings_dict, espresso_settings_dict

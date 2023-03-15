@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
 Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
@@ -8,8 +9,6 @@ Helper class to manage the molecule
 
 """
 
-
-#from pymatgen.analysis.adsorption import *
 import numpy as np
 from pymatgen.io import ase
 from ase.io import read
@@ -23,15 +22,13 @@ class Molecule:
         '''
         Reads molecule from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         Optional parameters:
-        -rotation: initial rotation of the molecule, in the form (angle, axis), where axis can be 'x' or [1,0,0] 
-        or equivalently in the form (v1, v2), such that v1 is rotated into v2.
         -atoms_subset: indices of the atoms to include. Only removes atom NOT in this list, does not check
         if the atoms in the list actually exist in the molecule
         '''
 
         self.mol_ase = read(molecule_filename)
 
-
+        #align axis to x axis
         if molecule_axis_atoms:
             x1 = np.array(self.mol_ase.get_positions()[molecule_axis_atoms[0]])
             x2 = np.array(self.mol_ase.get_positions()[molecule_axis_atoms[1]])
@@ -40,7 +37,7 @@ class Molecule:
             self.mol_ase.rotate(axis_vector, 'x')
 
 
-
+        #select atoms subset
         self.original_mol_ase = self.mol_ase.copy() #before removing atoms
         if atoms_subset:
             all_indices = range(0, len(self.mol_ase))
@@ -103,10 +100,10 @@ class Molecule:
         
         for vert_angle in vert_rotations:
                      
-            j=-1 #index for the pre-relax distances (no horiz. rotations)
+            j = -1 #index for the pre-relax distances (no horiz. rotations)
             for i, screw_angle in enumerate(screw_rotations):             
 
-                j=j+1
+                j += 1
                 if (isinstance(distance_from_surf, float)):
                     distance = distance_from_surf
                 else: distance = distance_from_surf[j]                
@@ -120,7 +117,7 @@ class Molecule:
                     mol.rotate(hor_angle, 'z')
 
                     #Check for min_distance and translate accordingly
-                    assert(min_distance < distance)
+                    assert(min_distance <= distance)
                     atoms_too_close = [atom.z for atom in mol if atom.z < -(distance - min_distance)]
                     #print(atoms_too_close)
                     if atoms_too_close:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
 Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
@@ -62,9 +63,9 @@ class Slab:
         return atoms_list
 
 
-    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False, selected_sites : list = None):
+    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False, selected_sites : list = []):
         '''
-        Returns a list of cartesian coordinates of the adsites, and a list of labels ('ontop', x , y).
+        Returns a list of cartesian coordinates of the adsites, and a list of labels ('ontop', x, y).
         Optionally it saves a figure with the sites on the surface.
 
         Args:
@@ -79,17 +80,16 @@ class Slab:
             figname = 'adsorption_sites.png'
 
         adsites = self.asf.find_adsorption_sites(distance=distance_from_surf, symm_reduce=symm_reduce_thr, near_reduce=near_reduce_thr, no_obtuse_hollow=no_obtuse_hollow)
-
-        nn = MinimumDistanceNN()
-
-        adsite_labels = []
-        #runs over all the slab_adsites, classifiying them by checking if the
-        #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'
-
-        if selected_sites is not None:
+        if selected_sites:
             sel_adsites = adsites['all'][selected_sites]
         else:
             sel_adsites = adsites['all']
+        
+
+        adsite_labels = []
+        nn = MinimumDistanceNN()
+        #run over all the slab_adsites, classifiying them by checking if the
+        #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'
         for site in sel_adsites:
             #dummy structure just to place one atom in the site
             slab = self.slab_pymat.copy()
@@ -132,19 +132,20 @@ class Slab:
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')
 
-        return adsites, adsite_labels
+        return sel_adsites, adsite_labels
 
     def generate_adsorption_structures(self, molecule, adsites, repeat=[1,1,1], translate=False, reorient=False):
         
         structs = []
 
         for coords in adsites:
-            structs.append(self.asf.add_adsorbate(molecule, coords, repeat=repeat, translate=translate, reorient=reorient,))
+            structs.append(self.asf.add_adsorbate(molecule, coords, repeat=repeat, translate=translate, reorient=reorient))
 
         return structs
-    
 
-def adsorb_both_surfaces(all_mol_on_slab_configs_pymat : list): #NOTE!: CURRENTLY NOT WORKING
+
+#NOTE!!!: CURRENTLY NOT WORKING
+def adsorb_both_surfaces(all_mol_on_slab_configs_pymat : list): 
     new_adslabs = []
     
     for adslab in all_mol_on_slab_configs_pymat: 

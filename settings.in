@@ -4,7 +4,7 @@
    slab_filename                 = 'Fe110.pwo'
    molecule_filename             = 'Hex.pwo'
    jobscript                     = 'job_simple'
-   #E_slab_mol                    = 0 0 #slab and isolated molecule energies (in Ry). If omitted, calculates the total energies; if present, calculates the adsorption energies
+   #E_slab_mol                   = 0 0 #slab and isolated molecule energies (in Ry). If omitted, calculates the total energies; if present, calculates the adsorption energies
 /
 
 
@@ -13,20 +13,20 @@
   #near_reduce                   = 0.01            #tolerance for site finder
   #selected_sites                = 0 1 2           #explicitly select the adosrption sites by index between those automatically found
   #slab_repeat                   = 1 1 1           #repeat the supercell along the three directions
-  #mol_atoms                     = 0 1 2 3         #Indices of the subset of atoms to be included from the molecule. don't specify it if all atoms have to be included
+  #mol_subset_atoms              = 0 1 2 3         #Indices of the subset of atoms to be included from the molecule. don't specify it if all atoms have to be included
    molecule_axis_atoms           = 3 14            #Indices of the two atoms to define the x-axis direction
   #axis_vector                   = 1 0 0           #Vector to take as x-axis (you can use this OR the molecule_axis_atoms)
 
    selected_atom_index           = 0               #Selected atom in molecule file, to be placed in all adsorption sites
    selected_atom_distance        = 2.0             #DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
   #min_distance                  = 1.0             #minimum distance (in A) of ANY atom from surface, must be < selected_atom_distance. The molecule is translated upwards if necessary, in order to meet this requirement.
-   screw_rot_angles              = 0 #90 180       #rotation angles (in deg) about x axis (performed first)
-   vert_angles                   = 0 #90           #rotation about y axis (performed secondly)
-   hor_angles                    = 0 #90           #rotation about z axis (performed lastly)
-   no_screw_rot_vert             = 1               #do not perform screw rotations for the vertical configuration. 
+   x_rot_angles                  = 0 #90 180       #rotation angles (in deg) about x axis (performed first)
+   y_rot_angles                  = 0 #90           #rotation about y axis (performed secondly)
+   z_rot_angles                  = 0 #90           #rotation about z axis (performed lastly)
+   no_rot_vert                   = .true.          #do not perform x and z rotations for the vertical configuration (yrot=90). 
 
   #fixed_indices_slab            = 0 1 2           #fix chosen atoms of the slab for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
-  # fixed_layers_slab             = 0 
+  # fixed_layers_slab            = 0 
    fixed_indices_mol             = 3               #fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
    fix_slab_xyz                  = 0 0 0           #coordinates to fix for the selected atoms in slab INVERTIRE! RENDERLI I COEFF DI ESPRESSO : True -> 0
    fix_mol_xyz                   = 0 0 1           #coordinates to fix for the selected atoms in molecule
@@ -75,7 +75,7 @@
    nspin            = 2
    vdw_corr         = 'grimme-d2'
    london_c6(1)     = 159.927
-   london_rvdw(1)  = 3.014
+   london_rvdw(1)   = 3.014
 /
 
 
