@@ -481,7 +481,7 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
     print('Molecule loaded.')
     
     print('Collecting energies from scf screening...')
-    energies = get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=E_slab_mol)
+    energies = get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'_scf')
     if None in energies:
         print('Not all the calculations have reached convergence. Cannot run the final calculation.')
         sys.exit(1)
@@ -592,7 +592,7 @@ def main():
             exclude = []
             if '--exclude' in sys.argv:
                 exclude = [int(i) for i in (sys.argv[sys.argv.index('--exclude')+1].split('[')[1].split(']')[0].split(','))]
-                print('Labels {0} will be excluded, as requested'.format(exclude))
+                print('Configurations {0} will be excluded, as requested'.format(exclude))
             if('--t' in sys.argv):
                 if(len(sys.argv)> sys.argv.index('--t')+1):
                     threshold = sys.argv[sys.argv.index('--t')+1]
@@ -603,7 +603,7 @@ def main():
                 else:
                     print('You need to specify a value after --t. Quitting.')
                     return 1
-                final_relax(threshold, exclude=exclude)
+            final_relax(threshold, exclude=exclude)
 
     elif('-ef' in sys.argv): #read final energies
         if not os.path.isfile(scf_energies_filename):
