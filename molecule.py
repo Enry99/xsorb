@@ -36,16 +36,19 @@ class Molecule:
         elif axis_vector:
             self.mol_ase.rotate(axis_vector, 'x')
 
+        self.mol_pymat = ase.AseAtomsAdaptor.get_molecule(self.mol_ase, charge_spin_check=False)
+
 
         #select atoms subset
         self.original_mol_ase = self.mol_ase.copy() #before removing atoms
-        if atoms_subset:
-            all_indices = range(0, len(self.mol_ase))
+        all_indices = range(0, len(self.mol_ase))
+        if atoms_subset:            
             remove_indices = [index for index in all_indices if index not in atoms_subset]
+            self.reindex_map = [index for index in all_indices if index in atoms_subset]
             self.mol_pymat.remove_sites(remove_indices)
             self.mol_ase = ase.AseAtomsAdaptor.get_atoms(self.mol_pymat)
-
-        self.mol_pymat = ase.AseAtomsAdaptor.get_molecule(self.mol_ase)
+        else:
+            self.reindex_map = [*all_indices]
 
     #translation and rotation functions defs
     def _set_atom_to_origin(self, atom_index : int = None, coords : list = None):
@@ -158,6 +161,6 @@ class Molecule:
             fig.savefig('molecule_orientations.png', dpi=800, bbox_inches='tight')
 
         #Conversion into pymatgen object
-        configs_pymat = [ase.AseAtomsAdaptor.get_molecule(mol_ase) for mol_ase in configs_ase]
+        configs_pymat = [ase.AseAtomsAdaptor.get_molecule(mol_ase, charge_spin_check=False) for mol_ase in configs_ase]
 
         return configs_pymat, labels

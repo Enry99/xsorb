@@ -65,12 +65,13 @@ from molecule import Molecule
 from io_utils import get_energies, get_z, launch_jobs, restart_jobs
 ########################################################################################
 
-#TODO: reindex molecola per fissare gli atomi nel caso in cui sia stato preso un subset
+#TODO: sistemare la roba di magnetizzazione e potenziali, assicurarsi che gli indici corrispondano ai nomi.
+#quindi non prenderli dalle input settings di espresso, ma nel primo blocco,
+#usando un dizionario in modo che sia consistente coi nomi dei potenziali. Questo sia per starting_mag che per i vdw_coeffs
+
 
 #TODO: check if 4-fold site is identified correctly (cerca materiale con sito 4-fold)
 #TODO: job array?
-#TODO: aggiungere opzione per usare solo GAMMA nei kpoints (va aggiunto in Espresso_mod,
-# visto che ase non dà l'opzione di metterlo, e va gestita l'opzione in settings.in e init)
 
 
 
@@ -143,7 +144,7 @@ def init():
     mandatory_flags_list = [
         ['slab_filename','molecule_filename', 'jobscript'], 
         ['selected_atom_index', 'x_rot_angles', 'y_rot_angles', 'z_rot_angles'], 
-        ['kpoints', 'kpoints_offset']
+        ['kpoints']
         ]
     for block in script_settings_dict:
         i = -1
@@ -185,6 +186,10 @@ def init():
     for flag in optional_flags_list:
         if flag not in script_settings_dict['STRUCTURE']:
             script_settings_dict['STRUCTURE'].update({flag : optional_flags_list[flag]})
+    if 'ion_dynamics' not in espresso_settings_dict['IONS']:
+        espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
+    if 'kpoints_offset' not in script_settings_dict['CALCULATION']:
+        script_settings_dict['CALCULATION'].update({'kpoints_offset': '0 0 0'})
 
 
     #Finally read data from dictionary and initialize the actual variables
@@ -225,7 +230,7 @@ def init():
 
 
     #&CALCULATION
-    kpoints                = np.array(script_settings_dict['CALCULATION']['kpoints'].split(), dtype=int).tolist()
+    kpoints                = np.array(script_settings_dict['CALCULATION']['kpoints'].split(), dtype=int).tolist() if 'gamma' not in script_settings_dict['CALCULATION']['kpoints'].lower() else None
     kpoints_offset         = np.array(script_settings_dict['CALCULATION']['kpoints_offset'].split(), dtype=int).tolist()
 
     #&PSEUDO
@@ -253,6 +258,7 @@ def init():
         if(len(starting_mag) < i): starting_mag.append(None)
         if(len(vdwg2_london_c6) < i): vdwg2_london_c6.append(None)
         if(len(vdwg2_london_rvdw) < i): vdwg2_london_rvdw.append(None)
+
 
     for key in keys_to_be_removed:
         espresso_settings_dict['SYSTEM'].pop(key)
@@ -372,7 +378,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
         if(fixed_layers_slab): 
             fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
         else: fixed_slab = fixed_indices_slab
-        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, fixed_indices_mol, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites), fix_slab_xyz, fix_mol_xyz)
+        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, fixed_indices_mol, mol.reindex_map, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites), fix_slab_xyz, fix_mol_xyz)
         calc.set_starting_magnetizations(starting_mag)
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(all_mol_on_slab_configs_ase[i])
@@ -456,7 +462,7 @@ def pre_relax(WRITE_XSF : bool =False):
 
         #all_slab_fixed = list(range(len(slab.slab_pymat.sites)))
         #all_mol_fixed = np.array(list(range(len(mol.mol_pymat.sites)))) + len(slab.slab_pymat.sites)
-        calc.set_fixed_atoms([-1], slab.reindex_map, [-1], len(slab.slab_pymat.sites), len(mol.mol_pymat.sites) , [0, 0, 0], [0, 0, 1])
+        calc.set_fixed_atoms([-1], slab.reindex_map, [-1], mol.reindex_map, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites) , [0, 0, 0], [0, 0, 1])
         calc.set_starting_magnetizations(starting_mag)
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(all_mol_on_slab_configs_ase[i]) 
@@ -526,7 +532,8 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
         calc.set_fixed_atoms(
             fixed_slab,
             slab.reindex_map, 
-            fixed_indices_molecule, 
+            fixed_indices_molecule,
+            mol.reindex_map, 
             len(slab.slab_pymat.sites), 
             len(mol.mol_pymat.sites),
             fix_slab_xyz, fix_mol_xyz)

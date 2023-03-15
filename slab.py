@@ -81,7 +81,7 @@ class Slab:
 
         adsites = self.asf.find_adsorption_sites(distance=distance_from_surf, symm_reduce=symm_reduce_thr, near_reduce=near_reduce_thr, no_obtuse_hollow=no_obtuse_hollow)
         if selected_sites:
-            sel_adsites = adsites['all'][selected_sites]
+            sel_adsites = [adsites['all'][i] for i in selected_sites]
         else:
             sel_adsites = adsites['all']
         
