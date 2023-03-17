@@ -362,7 +362,8 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
     csvfile=open(scf_labels_filename, 'w')
     csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
 
-    espresso_settings_dict['CONTROL'].update({'calculation' : 'scf'})
+    if SCF_RUN or 'calculation' not in espresso_settings_dict['CONTROL']: 
+        espresso_settings_dict['CONTROL'].update({'calculation' : 'scf'})
     espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
 
     
