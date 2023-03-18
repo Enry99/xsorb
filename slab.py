@@ -108,7 +108,7 @@ class Slab:
                 if(coord_n>=4): #attemps to fix the problem of fake bridges for 4-fold sites
                     adsite_labels.append('hollow_c{0},{1:.3f},{2:.3f},'.format(coord_n, *site[:2]))
                 else:
-                    distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
+                    distance = 0 #np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
                     adsite_labels.append('bridge_{0:.2f},{1:.3f},{2:.3f},'.format(distance, *site[:2])) 
         
         if(save_image): #save png to visualize the identified sites
