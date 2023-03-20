@@ -119,19 +119,18 @@ class Molecule:
                     mol.rotate(vert_angle, '-y')
                     mol.rotate(hor_angle, 'z')
 
+                    mol.translate([0,0,distance])
+
                     #Check for min_distance and translate accordingly
                     assert(min_distance <= distance)
-                    atoms_too_close = [atom.z for atom in mol if atom.z < -(distance - min_distance)]
-                    #print(atoms_too_close)
+                    atoms_too_close = [atom.z for atom in mol if atom.z < min_distance]
                     if atoms_too_close:
                         z_min = min(atoms_too_close)                       
-                        delta_z = -z_min - (distance - min_distance)
+                        delta_z = -z_min + min_distance
                         if(False): delta_z_values.append(delta_z)
 
                         #print('Config. roty={0} rotz={1}: {2} atoms closer than intended distance. Translating molecule {3:.3f} upwards '.format(vert_angle, hor_angle, len(atoms_too_close), delta_z))
-                        mol.translate([0,0,delta_z])
-
-                    mol.translate([0,0,distance])
+                        mol.translate([0,0,delta_z])              
 
                     configs_ase.append(mol)
 

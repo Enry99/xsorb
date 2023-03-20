@@ -242,9 +242,9 @@ def init():
     vdwg2_london_c6 = []
     vdwg2_london_rvdw = []
     keys_to_be_removed = []
-    for i, species in enumerate(pseudopotentials):
+    for i in range(1,len(pseudopotentials)+1):
         for key in espresso_settings_dict['SYSTEM']:
-            if 'starting_magnetization' in key:
+            if 'starting_magnetization' in key:                
                 if i == int(key.split('(')[1].split(')')[0]):
                     starting_mag.append(espresso_settings_dict['SYSTEM'][key])
                     keys_to_be_removed.append(key)
