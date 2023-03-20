@@ -11,6 +11,9 @@ and return them as two dictionaries (script settings and Espresso settings)
 
 import sys
 
+#TODO: per ora il flag atomic species finisce quando trova una linea bianca. in futuro controlla il numero
+#andando a leggere gli altri input OPPURE chiedendo di specificare ntyp
+
 #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, as they are read from the input structures
 #NOTE 2: The kpoints, kpoints offsets and coordinates to be fixed must be set in the first section "@SETTINGS" of the input file, not in "@ESPRESSO"
 #
@@ -57,14 +60,20 @@ def read_input_file(filename: str):
     with open(filename) as file:
         
         lines = []
+        kpoints = []  #syntax: ['gamma'/'automatic', [kx,ky,kz], [koffx,koffy,koffz]]
+        atomic_species = []
         last_dump = [] #other lines not in the two main blocks
         in_block = False
+        ATOMIC_SPECIES = False
+        KPOINTS = False
         espresso_block = False
         settings_block = False
 
         for line in file:
             
-            if line.isspace() or line.strip()[0] == '!' or line.strip()[0] == '#': continue #skip empty / comment lines
+            if line.isspace() or line.strip()[0] == '!' or line.strip()[0] == '#':
+                if(ATOMIC_SPECIES): ATOMIC_SPECIES = False
+                continue #skip empty / comment lines
             
             if('#' in line):
                 line = line.split('#')[0] #deal with comments in the lines
@@ -113,6 +122,26 @@ def read_input_file(filename: str):
                     lines.clear()
                     continue
 
+                if('ATOMIC_SPECIES' in line or 'atomic_species' in line):
+                    ATOMIC_SPECIES = True
+                    continue
+                if(ATOMIC_SPECIES):
+                    #if(len(atomic_species) < espresso_settings_dict['SYSTEM']['ntyp']):
+                    atomic_species.append(line.split())
+                    #else:
+                    #    ATOMIC_SPECIES = False
+                    #    continue
+
+                if('KPOINTS' in line or 'kpoints' in line):
+                    KPOINTS = True
+                    kpoints.append(line.split()[-1].strip())
+                    continue
+                if(KPOINTS):
+                    kpoints.append([line.split()[:3]])
+                    kpoints.append([line.split()[3:]])
+                    KPOINTS = False
+
+
                 if in_block: lines.append(line)
                 else: last_dump.append(line)
     
@@ -124,4 +153,7 @@ def read_input_file(filename: str):
         print('Espresso settings not read correctly. Quitting.')
         sys.exit(1)
 
-    return script_settings_dict, espresso_settings_dict
+    #print(atomic_species)
+    #print(kpoints)
+
+    return script_settings_dict, espresso_settings_dict, atomic_species, kpoints

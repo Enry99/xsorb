@@ -71,7 +71,6 @@ from io_utils import get_energies, get_z, launch_jobs, restart_jobs
 
 
 #TODO: check if 4-fold site is identified correctly (cerca materiale con sito 4-fold)
-#TODO: job array?
 
 
 
@@ -88,6 +87,8 @@ def init():
 
     global script_settings_dict
     global espresso_settings_dict
+    global atomic_species_NEW
+    global kpoints_NEW
 
     global E_slab_mol   
     global symm_reduce
@@ -131,7 +132,7 @@ def init():
 
 
     #user settings variables################################################################
-    script_settings_dict, espresso_settings_dict = input.read_input_file("settings.in")
+    script_settings_dict, espresso_settings_dict, atomic_species_NEW, kpoints_NEW = input.read_input_file("settings.in")
 
     #check for existence of the four blocks
     blocks = ['INPUT','STRUCTURE','CALCULATION','PSEUDO']

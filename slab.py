@@ -108,8 +108,10 @@ class Slab:
                 if(coord_n>=4): #attemps to fix the problem of fake bridges for 4-fold sites
                     adsite_labels.append('hollow_c{0},{1:.3f},{2:.3f},'.format(coord_n, *site[:2]))
                 else:
-                    distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
-                    adsite_labels.append('bridge_{0:.2f},{1:.3f},{2:.3f},'.format(distance, *site[:2])) 
+                    if len(nn_list) >=2:
+                        distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
+                        adsite_labels.append('bridge_{0:.2f},{1:.3f},{2:.3f},'.format(distance, *site[:2]))
+                    else: adsite_labels.append('bridge,{0:.3f},{1:.3f},'.format(*site[:2]))
         
         if(save_image): #save png to visualize the identified sites
             sop = get_rot(self.asf.slab)
@@ -126,8 +128,8 @@ class Slab:
                     color = 'g'
                 elif any((site == x).all() for x in adsites['hollow']):
                     color = 'b'
-                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=3, mew=1, linestyle="", zorder=10000)
-                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=2, zorder=20000)
+                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=3, mew=1, linestyle="", zorder=500000)
+                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=2, zorder=1000000)
                             
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')
