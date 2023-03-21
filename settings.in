@@ -33,19 +33,6 @@
 /
 
 
-
-&CALCULATION
-   kpoints                       = 2 2 1           #specify either kx ky kz (Monkhorst Pack) or gamma
-   kpoints_offset                = 0 0 0
-/
-
-&PSEUDO
-   Fe                            = 'Fe.pbe-nd-rrkjus.UPF'
-   C                             = 'C.pbe-n-rrkjus_psl.1.0.0.UPF'
-   H                             = 'H.pbe-rrkjus_psl.1.0.0.UPF'
-/
-
-
 @/SETTINGS
 
 
@@ -56,7 +43,7 @@
 @ESPRESSO
 
 &CONTROL
-   calculation      = 'relax'          #overwritten in the script
+   calculation      = 'relax'
    restart_mode     = 'from_scratch'   #overwritten in the script
    nstep            = 400
    outdir           = 'WORK'
@@ -91,5 +78,16 @@
 /
 &CELL
 /
+
+ATOMIC_SPECIES
+Fe 55.845 Fe.pbe-nd-rrkjus.UPF
+C  12.011 C.pbe-n-rrkjus_psl.1.0.0.UPF
+H  1.008 H.pbe-rrkjus_psl.1.0.0.UPF
+
+
+KPOINTS automatic
+2 2 1  1 1 0
+
+
 
 @/ESPRESSO
