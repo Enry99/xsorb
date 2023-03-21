@@ -11,11 +11,7 @@ and return them as two dictionaries (script settings and Espresso settings)
 
 import sys
 
-#TODO: per ora il flag atomic species finisce quando trova una linea bianca. in futuro controlla il numero
-#andando a leggere gli altri input OPPURE chiedendo di specificare ntyp
-
 #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, as they are read from the input structures
-#NOTE 2: The kpoints, kpoints offsets and coordinates to be fixed must be set in the first section "@SETTINGS" of the input file, not in "@ESPRESSO"
 #
 #NOTE 3(possible TODO): This code does not yet support the following Espresso blocks:
 #OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS, HUBBARD
@@ -29,7 +25,7 @@ def _is_number(s : str):
         return False
 
 
-def _read_block(lines : list[str], CONVERT = False):
+def _read_card(lines : list[str], CONVERT = False):
 
     block_dict =  {}
 
@@ -61,9 +57,9 @@ def read_input_file(filename: str):
         
         lines = []
         kpoints = []  #syntax: ['gamma'/'automatic', [kx,ky,kz], [koffx,koffy,koffz]]
-        atomic_species = []
+        atomic_species = []  #syntax: [[Fe, 1.000, Fe.pbe-n-rrkjus_psl.1.0.0.UPF], ...]
         last_dump = [] #other lines not in the two main blocks
-        in_block = False
+        in_card = False
         ATOMIC_SPECIES = False
         KPOINTS = False
         espresso_block = False
@@ -74,6 +70,19 @@ def read_input_file(filename: str):
             if line.isspace() or line.strip()[0] == '!' or line.strip()[0] == '#':
                 if(ATOMIC_SPECIES): ATOMIC_SPECIES = False
                 continue #skip empty / comment lines
+            if(ATOMIC_SPECIES):
+                if ('ATOMIC_POSITIONS' in line or 
+                'K_POINTS' in line or 
+                'ADDITIONAL_K_POINTS' in line or 
+                'CELL_PARAMETERS' in line or 
+                'CONSTRAINTS' in line or 
+                'OCCUPATIONS' in line or 
+                'ATOMIC_VELOCITIES' in line or 
+                'ATOMIC_FORCES' in line or 
+                'SOLVENTS' in line or 
+                'HUBBARD' in line):
+                    ATOMIC_SPECIES = False
+
             
             if('#' in line):
                 line = line.split('#')[0] #deal with comments in the lines
@@ -98,52 +107,58 @@ def read_input_file(filename: str):
             if(settings_block):
                 if line.strip()[0] == '&':
                     block_name = line.split('&')[1].strip()
-                    in_block = True
+                    in_card = True
                     continue
 
                 if line.strip()=='/':
-                    script_settings_dict.update({block_name : _read_block(lines)})
-                    in_block = False
+                    script_settings_dict.update({block_name : _read_card(lines)})
+                    in_card = False
                     lines.clear()
                     continue
 
-                if in_block: lines.append(line)  
+                if in_card: lines.append(line)  
 
             elif(espresso_block):
 
                 if line.strip()[0] == '&':
                     block_name = line.split('&')[1].strip()
-                    in_block = True
+                    in_card = True
                     continue
 
                 if line.strip()=='/':
-                    espresso_settings_dict.update({block_name : _read_block(lines, CONVERT=True)})
-                    in_block = False
+                    espresso_settings_dict.update({block_name : _read_card(lines, CONVERT=True)})
+                    in_card = False
                     lines.clear()
                     continue
+
+                if in_card: 
+                    lines.append(line)
+                    continue
+
+
 
                 if('ATOMIC_SPECIES' in line or 'atomic_species' in line):
                     ATOMIC_SPECIES = True
                     continue
                 if(ATOMIC_SPECIES):
-                    #if(len(atomic_species) < espresso_settings_dict['SYSTEM']['ntyp']):
                     atomic_species.append(line.split())
-                    #else:
-                    #    ATOMIC_SPECIES = False
-                    #    continue
+                    continue
 
-                if('KPOINTS' in line or 'kpoints' in line):
+                if('K_POINTS' in line or 'kpoints' in line):
                     KPOINTS = True
-                    kpoints.append(line.split()[-1].strip())
+                    gamma_or_auto = line.split()[1].strip().lower()
+                    kpoints.append(gamma_or_auto)
+                    if 'gamma' in gamma_or_auto:
+                        KPOINTS = False
                     continue
                 if(KPOINTS):
-                    kpoints.append([line.split()[:3]])
-                    kpoints.append([line.split()[3:]])
+                    kpoints.append(line.split()[:3])
+                    kpoints.append(line.split()[3:])
                     KPOINTS = False
+                    continue
 
-
-                if in_block: lines.append(line)
-                else: last_dump.append(line)
+                #collects everything that did not fall in any of the previous category. This is appended as-is at the end of the pwi.
+                last_dump.append(line)         
     
 
     if(not script_settings_dict):
@@ -152,8 +167,11 @@ def read_input_file(filename: str):
     if(not espresso_settings_dict):
         print('Espresso settings not read correctly. Quitting.')
         sys.exit(1)
+    if(not kpoints):
+        print('Kpoints not read correctly. Quitting.')
+        sys.exit(1)
+    if(not atomic_species):
+        print('Atomic_species not read correctly. Quitting.')
+        sys.exit(1)
 
-    #print(atomic_species)
-    #print(kpoints)
-
-    return script_settings_dict, espresso_settings_dict, atomic_species, kpoints
+    return script_settings_dict, espresso_settings_dict, atomic_species, kpoints, last_dump

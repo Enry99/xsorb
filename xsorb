@@ -87,8 +87,8 @@ def init():
 
     global script_settings_dict
     global espresso_settings_dict
-    global atomic_species_NEW
-    global kpoints_NEW
+    global atomic_species
+    global kpoints
 
     global E_slab_mol   
     global symm_reduce
@@ -110,8 +110,6 @@ def init():
     global fixed_indices_mol
     global fix_slab_xyz
     global fix_mol_xyz
-    global kpoints
-    global kpoints_offset
     global pseudopotentials
     global starting_mag
     global vdwg2_london_c6
@@ -132,10 +130,10 @@ def init():
 
 
     #user settings variables################################################################
-    script_settings_dict, espresso_settings_dict, atomic_species_NEW, kpoints_NEW = input.read_input_file("settings.in")
+    script_settings_dict, espresso_settings_dict, atomic_species, kpoints, last_dump = input.read_input_file("settings.in")
 
     #check for existence of the four blocks
-    blocks = ['INPUT','STRUCTURE','CALCULATION','PSEUDO']
+    blocks = ['INPUT','STRUCTURE']
     for block in blocks:
         if block not in script_settings_dict:
             print("'"+block+"' block not found in settings.in.")
@@ -145,14 +143,11 @@ def init():
     mandatory_flags_list = [
         ['slab_filename','molecule_filename', 'jobscript'], 
         ['selected_atom_index', 'x_rot_angles', 'y_rot_angles', 'z_rot_angles'], 
-        ['kpoints']
         ]
     for block in script_settings_dict:
         i = -1
         if   block=='INPUT': i=0
         elif block=='STRUCTURE': i=1
-        elif block=='CALCULATION': i=2
-        elif block=='PSEUDO': continue
         for flag in mandatory_flags_list[i]:
             if flag not in script_settings_dict[block]:
                 print("Mandatory flag '"+flag + "' not found in settings.in.")
@@ -189,8 +184,8 @@ def init():
             script_settings_dict['STRUCTURE'].update({flag : optional_flags_list[flag]})
     if 'ion_dynamics' not in espresso_settings_dict['IONS']:
         espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
-    if 'kpoints_offset' not in script_settings_dict['CALCULATION']:
-        script_settings_dict['CALCULATION'].update({'kpoints_offset': '0 0 0'})
+    if len(kpoints) == 2: #so no gamma but also no offset
+        kpoints.append([0,0,0])
 
 
     #Finally read data from dictionary and initialize the actual variables
@@ -229,13 +224,15 @@ def init():
     fix_mol_xyz            = np.array(script_settings_dict['STRUCTURE']['fix_mol_xyz'].split(), dtype=int).tolist()
 
 
-
-    #&CALCULATION
-    kpoints                = np.array(script_settings_dict['CALCULATION']['kpoints'].split(), dtype=int).tolist() if 'gamma' not in script_settings_dict['CALCULATION']['kpoints'].lower() else None
-    kpoints_offset         = np.array(script_settings_dict['CALCULATION']['kpoints_offset'].split(), dtype=int).tolist()
-
     #&PSEUDO
-    pseudopotentials       = script_settings_dict['PSEUDO']
+    pseudopotentials       = {}
+    for i, typ in enumerate(atomic_species):
+        pseudopotentials.update({typ[0] : typ[2]})
+
+    #KPOINTS
+    if(len(kpoints) > 1): #so no gamma
+        kpoints[1] = np.array(kpoints[1], dtype=int).tolist()
+        kpoints[2] = np.array(kpoints[2], dtype=int).tolist()
 
     #Espresso &SYSTEM (correction to bugs in ase function to write pwis)
     starting_mag = []
@@ -317,7 +314,10 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
         *sites_find_args.values(), 
         save_image=SAVEFIG,
         selected_sites=selected_sites)
+    for i, ads in enumerate(adsites):
+        adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
     print('Adsorption sites found.')
+
 
 
     if os.path.isfile(pwo_prefix+'_prerelax_0.pwo'): #if the pre-relaxed files are present, read distance from there, else use the user-defined value
@@ -376,7 +376,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
         calc = Espresso_mod(pseudopotentials=pseudopotentials, 
                     input_data=espresso_settings_dict,
                     label=name_file,
-                    kpts=kpoints,koffset=kpoints_offset)
+                    kpts= kpoints[1] if 'gamma' not in kpoints[0] else None, koffset=kpoints[2] if 'gamma' not in kpoints[0] else None)
         if(fixed_layers_slab): 
             fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
         else: fixed_slab = fixed_indices_slab
@@ -413,7 +413,10 @@ def pre_relax(WRITE_XSF : bool =False):
     #Find adsorption sites and labels (site type and x,y coords.)
     print('Finding adsorption sites...')
     adsites, adsites_labels = slab.find_adsorption_sites(*sites_find_args.values(), save_image=False)
+    for i, ads in enumerate(adsites):
+        adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
     print('Adsorption sites found.')
+
 
     x = ['ontop' in i for i in adsites_labels]
     ontop_index = x[0]
@@ -460,7 +463,7 @@ def pre_relax(WRITE_XSF : bool =False):
         calc = Espresso_mod(pseudopotentials=pseudopotentials, 
                     input_data=espresso_settings_dict,
                     label=name_file,
-                    kpts=kpoints,koffset=kpoints_offset)
+                    kpts= kpoints[1] if 'gamma' not in kpoints[0] else None, koffset=kpoints[2] if 'gamma' not in kpoints[0] else None)
 
         #all_slab_fixed = list(range(len(slab.slab_pymat.sites)))
         #all_mol_fixed = np.array(list(range(len(mol.mol_pymat.sites)))) + len(slab.slab_pymat.sites)
@@ -527,8 +530,7 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
         calc = Espresso_mod(pseudopotentials=pseudopotentials, 
                     input_data=espresso_settings_dict,
                     label=pwi_name,
-                    kpts=kpoints,
-                    koffset=kpoints_offset)
+                    kpts= kpoints[1] if 'gamma' not in kpoints[0] else None, koffset=kpoints[2] if 'gamma' not in kpoints[0] else None)
         if(fixed_layers_slab): fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
         else: fixed_slab = fixed_indices_slab
         calc.set_fixed_atoms(
