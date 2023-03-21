@@ -314,7 +314,10 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
         *sites_find_args.values(), 
         save_image=SAVEFIG,
         selected_sites=selected_sites)
+    for i, ads in enumerate(adsites):
+        adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
     print('Adsorption sites found.')
+
 
 
     if os.path.isfile(pwo_prefix+'_prerelax_0.pwo'): #if the pre-relaxed files are present, read distance from there, else use the user-defined value
@@ -410,7 +413,10 @@ def pre_relax(WRITE_XSF : bool =False):
     #Find adsorption sites and labels (site type and x,y coords.)
     print('Finding adsorption sites...')
     adsites, adsites_labels = slab.find_adsorption_sites(*sites_find_args.values(), save_image=False)
+    for i, ads in enumerate(adsites):
+        adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
     print('Adsorption sites found.')
+
 
     x = ['ontop' in i for i in adsites_labels]
     ontop_index = x[0]
