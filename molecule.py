@@ -26,7 +26,7 @@ class Molecule:
         if the atoms in the list actually exist in the molecule
         '''
 
-        self.mol_ase = read(molecule_filename)
+        self.mol_ase = read(molecule_filename, results_required=False) if molecule_filename.split('.')[-1]=='pwo' else read(molecule_filename)
 
         #align axis to x axis
         if molecule_axis_atoms:

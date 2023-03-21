@@ -520,7 +520,7 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
     for i in calcs:       
         struct_ase = read(pwi_prefix+'_scf_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
-        fixed_indices_molecule = len(read(slab_filename)) + np.array(fixed_indices_mol)
+        fixed_indices_molecule = len(slab) + np.array(fixed_indices_mol)
 
         pwi_name = pwi_prefix+'_finalrelax_'+str(i)
         pwi_names.append(pwi_name+'.pwi')

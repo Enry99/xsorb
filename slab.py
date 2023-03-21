@@ -24,7 +24,7 @@ class Slab:
         '''
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
-        self.slab_ase = read(filename=slab_filename)
+        self.slab_ase = read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename)
 
         #translate slab so that the bottom layer is at least 1 angstrom from the bottom
         zmin = min(self.slab_ase.positions[:,2])
