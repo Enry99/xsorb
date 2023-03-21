@@ -12,7 +12,6 @@
   #symm_reduce                   = 0.01            #tolerance for site finder
   #near_reduce                   = 0.01            #tolerance for site finder
   #selected_sites                = 0 1 2           #explicitly select the adosrption sites by index between those automatically found
-  #slab_repeat                   = 1 1 1           #repeat the supercell along the three directions
   #mol_subset_atoms              = 0 1 2 3         #Indices of the subset of atoms to be included from the molecule. don't specify it if all atoms have to be included
    molecule_axis_atoms           = 3 14            #Indices of the two atoms to define the x-axis direction
   #axis_vector                   = 1 0 0           #Vector to take as x-axis (you can use this OR the molecule_axis_atoms)
@@ -85,7 +84,7 @@ C  12.011 C.pbe-n-rrkjus_psl.1.0.0.UPF
 H  1.008 H.pbe-rrkjus_psl.1.0.0.UPF
 
 
-KPOINTS automatic
+K_POINTS automatic
 2 2 1  1 1 0
 
 

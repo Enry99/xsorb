@@ -25,6 +25,7 @@ class Slab:
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
         self.slab_ase = read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename)
+        self.slab_ase.set_initial_magnetic_moments(self.slab_ase.get_global_number_of_atoms()*[0])
 
         #translate slab so that the bottom layer is at least 1 angstrom from the bottom
         zmin = min(self.slab_ase.positions[:,2])
@@ -136,12 +137,14 @@ class Slab:
 
         return sel_adsites, adsite_labels
 
-    def generate_adsorption_structures(self, molecule, adsites, repeat=[1,1,1], translate=False, reorient=False):
+    def generate_adsorption_structures(self, molecule, adsites):
         
         structs = []
 
         for coords in adsites:
-            structs.append(self.asf.add_adsorbate(molecule, coords, repeat=repeat, translate=translate, reorient=reorient))
+            mol = molecule.copy()
+            mol.translate(coords)
+            structs.append(self.slab_ase + mol)
 
         return structs
 

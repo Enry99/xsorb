@@ -11,9 +11,14 @@ Subclass Espresso to modify write pwi in order to fix atoms xy only
 from ase.calculators.espresso import Espresso
 from ase.calculators.calculator import FileIOCalculator
 from ase.io import write
-import numpy as np
+#import numpy as np
 
 class Espresso_mod(Espresso):
+
+    def __init__(self, restart=None, ignore_bad_restart_file=FileIOCalculator._deprecated, label='espresso', atoms=None, **kwargs):
+        super().__init__(restart, ignore_bad_restart_file, label, atoms, **kwargs)
+        self.pseudo = kwargs['pseudopotentials'].keys()
+
 
     def set_fixed_atoms(self, slab_atoms_indices: list, slab_remapping: list, mol_atom_indices: list, mol_remapping: list, natoms_slab : int, natoms_mol : int, fix_slab_xyz : list = [0,0,0], fix_mol_xyz : list = [0,0,1]):
         '''
@@ -121,11 +126,28 @@ class Espresso_mod(Espresso):
             file.writelines( data )
 
 
+    def _sort_pseudo(self):
+        with open(self.label + '.pwi', 'r') as file:
+            data = file.readlines()
+
+            for i, line in enumerate(data):
+                if 'ATOMIC_SPECIES' in line.upper():
+                    block = data[i+1 : i+len(self.pseudo)+1]
+                    i0 = i
+                    break
+            
+            for j, ps in enumerate(self.pseudo):
+                data[i0+j+1] = block[[x.split()[0] for x in block].index(ps)]
+
+        with open(self.label + '.pwi', 'w') as file:
+            file.writelines( data )
+
 
     #Redefinition of function from Espresso to add option to fix atoms in pwi.
     def write_input(self, atoms, properties=None, system_changes=None):
         FileIOCalculator.write_input(self, atoms, properties, system_changes)
         write(self.label + '.pwi', atoms, **self.parameters)
+        self._sort_pseudo()
         if(hasattr(self, 'slab_atoms_indices')): self._fix_atoms_pwi()
         if(hasattr(self, 'starting_mag')): self._starting_magnetization_pwi()
         if(hasattr(self, 'vdw2_c6_list') or hasattr(self, 'vdw2_rvdw_list')): self._vdw2_coeffs_pwi()

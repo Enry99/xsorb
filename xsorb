@@ -54,7 +54,6 @@ Python script based on Pymatgen and ASE to build adatom adsorption on slabs calc
 
 #Import statements#####################################################################
 import numpy as np
-from pymatgen.io import ase
 from ase.io import read, write
 import os, sys
 #
@@ -325,7 +324,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
         distances_from_surf = []
         while(True):
             if os.path.isfile(pwo_prefix+'_prerelax_{0}.pwo'.format(i)):
-                atom_index = selected_atom_index + len(slab.slab_pymat.sites)
+                atom_index = selected_atom_index + slab.slab_ase.get_global_number_of_atoms()
                 distances_from_surf.append(get_z(pwo_prefix+'_prerelax_{0}.pwo'.format(i), atom_index) - max(slab.slab_ase.positions[:,2]) )
                 i = i+1
             else: break
@@ -336,7 +335,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
 
     #Generate all the configs for the various molecular rotations and a list of labels
     print('Generating molecular configurations...')
-    all_mol_configs_pymat, configs_labels = mol.generate_molecule_rotations(
+    all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
         atom_index=selected_atom_index,  
         vert_rotations=y_rot_angles,
         screw_rotations=x_rot_angles, 
@@ -351,10 +350,9 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
 
     #Adsorption of molecule on all adsorption sites for all molecule orientations  
     print('Generating adsorption structures...')
-    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites, repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
-    all_mol_on_slab_configs_pymat = sum(all_mol_on_slab_configs_pymat, []) #flatten the 2D array
-    if(False): all_mol_on_slab_configs_pymat = adsorb_both_surfaces(all_mol_on_slab_configs_pymat) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
-    all_mol_on_slab_configs_ase = [ase.AseAtomsAdaptor.get_atoms(config) for config in all_mol_on_slab_configs_pymat]
+    all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites) for mol_config in all_mol_configs_ase]
+    all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
+    if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
     full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
     print('All slab+adsorbate cells generated.')
 
@@ -380,7 +378,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
         if(fixed_layers_slab): 
             fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
         else: fixed_slab = fixed_indices_slab
-        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, fixed_indices_mol, mol.reindex_map, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites), fix_slab_xyz, fix_mol_xyz)
+        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, fixed_indices_mol, mol.reindex_map, slab.slab_ase.get_global_number_of_atoms(), mol.mol_ase.get_global_number_of_atoms(), fix_slab_xyz, fix_mol_xyz)
         calc.set_starting_magnetizations(starting_mag)
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(all_mol_on_slab_configs_ase[i])
@@ -423,7 +421,7 @@ def pre_relax(WRITE_XSF : bool =False):
 
     #Generate all the configs for the various molecular rotations and a list of labels
     print('Generating molecular configurations...')
-    all_mol_configs_pymat, configs_labels = mol.generate_molecule_rotations(
+    all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
         atom_index=selected_atom_index,  
         vert_rotations=y_rot_angles,
         screw_rotations=x_rot_angles, 
@@ -440,10 +438,9 @@ def pre_relax(WRITE_XSF : bool =False):
     #Adsorption of molecule only on a top site for z relaxation
     print('Generating adsorption structures...') 
     adsites_labels = [[ads for ads in adsites_labels if 'top' in ads][0]]
-    all_mol_on_slab_configs_pymat = [slab.generate_adsorption_structures(molecule=mol_config, adsites=[adsites[ontop_index]], repeat=slab_repeat, translate=False, reorient=False) for mol_config in all_mol_configs_pymat]
-    all_mol_on_slab_configs_pymat = sum(all_mol_on_slab_configs_pymat, []) #flatten the 2D array
-    if(False): all_mol_on_slab_configs_pymat = adsorb_both_surfaces(all_mol_on_slab_configs_pymat) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
-    all_mol_on_slab_configs_ase = [ase.AseAtomsAdaptor.get_atoms(config) for config in all_mol_on_slab_configs_pymat]
+    all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=[adsites[ontop_index]]) for mol_config in all_mol_configs_ase]
+    all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
+    if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
 
     full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
     print('Slab+adsorbate cells for the top sites generated.')
@@ -465,9 +462,7 @@ def pre_relax(WRITE_XSF : bool =False):
                     label=name_file,
                     kpts= kpoints[1] if 'gamma' not in kpoints[0] else None, koffset=kpoints[2] if 'gamma' not in kpoints[0] else None)
 
-        #all_slab_fixed = list(range(len(slab.slab_pymat.sites)))
-        #all_mol_fixed = np.array(list(range(len(mol.mol_pymat.sites)))) + len(slab.slab_pymat.sites)
-        calc.set_fixed_atoms([-1], slab.reindex_map, [-1], mol.reindex_map, len(slab.slab_pymat.sites), len(mol.mol_pymat.sites) , [0, 0, 0], [0, 0, 1])
+        calc.set_fixed_atoms([-1], slab.reindex_map, [-1], mol.reindex_map, slab.slab_ase.get_global_number_of_atoms(), mol.mol_ase.get_global_number_of_atoms() , [0, 0, 0], [0, 0, 1])
         calc.set_starting_magnetizations(starting_mag)
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
         calc.write_input(all_mol_on_slab_configs_ase[i]) 
@@ -538,8 +533,8 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
             slab.reindex_map, 
             fixed_indices_molecule,
             mol.reindex_map, 
-            len(slab.slab_pymat.sites), 
-            len(mol.mol_pymat.sites),
+            slab.slab_ase.get_global_number_of_atoms(), 
+            mol.mol_ase.get_global_number_of_atoms(),
             fix_slab_xyz, fix_mol_xyz)
         calc.set_starting_magnetizations(starting_mag)
         calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)

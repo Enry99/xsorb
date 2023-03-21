@@ -10,7 +10,6 @@ Helper class to manage the molecule
 """
 
 import numpy as np
-from pymatgen.io import ase
 from ase.io import read
 from matplotlib import pyplot as plt
 from ase.visualize.plot import plot_atoms
@@ -27,6 +26,7 @@ class Molecule:
         '''
 
         self.mol_ase = read(molecule_filename, results_required=False) if molecule_filename.split('.')[-1]=='pwo' else read(molecule_filename)
+        self.mol_ase.set_initial_magnetic_moments(self.mol_ase.get_global_number_of_atoms()*[0])
 
         #align axis to x axis
         if molecule_axis_atoms:
@@ -36,17 +36,13 @@ class Molecule:
         elif axis_vector:
             self.mol_ase.rotate(axis_vector, 'x')
 
-        self.mol_pymat = ase.AseAtomsAdaptor.get_molecule(self.mol_ase, charge_spin_check=False)
-
-
         #select atoms subset
         self.original_mol_ase = self.mol_ase.copy() #before removing atoms
         all_indices = range(0, len(self.mol_ase))
         if atoms_subset:            
             remove_indices = [index for index in all_indices if index not in atoms_subset]
             self.reindex_map = [index for index in all_indices if index in atoms_subset]
-            self.mol_pymat.remove_sites(remove_indices)
-            self.mol_ase = ase.AseAtomsAdaptor.get_atoms(self.mol_pymat)
+            del self.mol_ase[remove_indices]
         else:
             self.reindex_map = [*all_indices]
 
@@ -82,7 +78,7 @@ class Molecule:
             save_image = False
             ):
         '''
-        Returns a pymatgen list of all the rotated configurations and their labels.
+        Returns list (of ase Atoms) of all the rotated configurations and their labels.
 
         Args:
             atom_index, coords: index of the atom to be translated to the origin, which will be placed on the selected site. Alternatively you can specify the [x,y,z] coordinates that you want to place in the origin.
@@ -159,7 +155,4 @@ class Molecule:
             fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
             fig.savefig('molecule_orientations.png', dpi=800, bbox_inches='tight')
 
-        #Conversion into pymatgen object
-        configs_pymat = [ase.AseAtomsAdaptor.get_molecule(mol_ase, charge_spin_check=False) for mol_ase in configs_ase]
-
-        return configs_pymat, labels
+        return configs_ase, labels
