@@ -56,6 +56,7 @@ Python script based on Pymatgen and ASE to build adatom adsorption on slabs calc
 import numpy as np
 from ase.io import read, write
 import os, sys
+import glob
 #
 import input
 from espresso_mod import Espresso_mod
@@ -80,6 +81,7 @@ def init():
     global prerelax_labels_filename
     global scf_energies_filename
     global relax_energies_filename
+    global scf_images_dirname
     global slab_filename
     global molecule_filename
     global jobscript
@@ -125,6 +127,7 @@ def init():
     prerelax_labels_filename = 'prerelax_site_labels.csv'
     scf_energies_filename    = 'scf_energies.csv'
     relax_energies_filename  = 'finalrelax_energies.csv'
+    scf_images_dirname       = 'scf_images'
     #########################################################################################
 
 
@@ -532,6 +535,28 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
     launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrelax_outdirs', jobname_prefix='f_rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
 
+def scf_images():
+
+    print('Reading pwi(s)...')
+    pwi_list=glob.glob(pwi_prefix+'_scf_*.pwi')
+    configs = [read(pwi) for pwi in pwi_list]
+    print('All pwi(s) read.')
+
+    print('Saving images...')
+    if(not os.path.exists(scf_images_dirname)):
+        os.mkdir(scf_images_dirname)
+    for i, config in enumerate(configs):
+        label = pwi_list[i].split('.pwi')[0].split('_')[-1]
+        write(scf_images_dirname+'/'+pwi_prefix+'_scf_{0}.png'.format(label), config, rotation='-10z,-80x')
+        write(scf_images_dirname+'/'+pwi_prefix+'_scf_{0}_top.png'.format(label), config)
+    print('All images saved to {0}.'.format(scf_images_dirname))
+
+def relax_images():
+    pass
+
+def relax_animations():
+    pass
+
 def main():
 
     if(len(sys.argv) == 1):
@@ -555,7 +580,7 @@ def main():
         print('--restart         restart calculation (can also be abbreviated as --res)')
         return 0
 
-    if('-sites' not in sys.argv and '-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv):
+    if('-sites' not in sys.argv and '-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv and '-scf-images' not in sys.argv):
         print('You need to specify at least one option (-sites, -g, -pr, -s, -es, -fr, -ef). Quitting.')
         return 1
 
@@ -607,6 +632,9 @@ def main():
             os.remove(scf_energies_filename)
         else:    
             get_energies(scf_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'_finalrelax')
+    
+    elif('-scf-images' in sys.argv):
+        scf_images()
 
 
 if __name__ == '__main__':
