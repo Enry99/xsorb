@@ -16,8 +16,9 @@ import numpy as np
 
 class Espresso_mod(Espresso):
 
-    def __init__(self, restart=None, ignore_bad_restart_file=FileIOCalculator._deprecated, label='espresso', atoms=None, **kwargs):
-        super().__init__(restart, ignore_bad_restart_file, label, atoms, **kwargs)
+    def __init__(self, filename='input.pwi', **kwargs):
+        super().__init__(**kwargs)
+        self.filename = filename
         self.pseudo = kwargs['pseudopotentials'].keys()
 
 
@@ -48,7 +49,7 @@ class Espresso_mod(Espresso):
     def _fix_atoms_pwi(self):
         #Edit pwi after FileIOCalculator.write_input, adding the constraints on atom dynamics
         
-        with open(self.label + '.pwi', 'r') as file:
+        with open(self.filename, 'r') as file:
             data = file.readlines()
 
         first_atom_index = data.index('ATOMIC_POSITIONS angstrom\n') + 1
@@ -69,14 +70,14 @@ class Espresso_mod(Espresso):
             for i in self.mol_atom_indices:
                 data[first_atom_index + self.natoms_slab + self.mol_remapping.index(i)] = data[first_atom_index+ self.natoms_slab +self.mol_remapping.index(i)].split('\n')[0] + '    {0} {1} {2}\n'.format( *self.fix_mol_xyz)            
 
-        with open(self.label + '.pwi', 'w') as file:
+        with open(self.filename, 'w') as file:
             file.writelines( data )
 
 
     def _system_flags_pwi(self):
         #Edit pwi after FileIOCalculator.write_input, adding the initial magnetization, since otherwise it is overwritten.
         
-        with open(self.label + '.pwi', 'r') as file:
+        with open(self.filename, 'r') as file:
             data = file.readlines()
 
         for i, mag in enumerate(self.starting_mag):
@@ -99,11 +100,11 @@ class Espresso_mod(Espresso):
         for i, flag in enumerate(self.flags_i):
             data.insert(j0+i, '   {0} = {1}\n'.format(flag[0], flag[1]))
         
-        with open(self.label + '.pwi', 'w') as file:
+        with open(self.filename, 'w') as file:
             file.writelines( data )
 
     def _sort_pseudo(self):
-        with open(self.label + '.pwi', 'r') as file:
+        with open(self.filename, 'r') as file:
             data = file.readlines()
 
             for i, line in enumerate(data):
@@ -119,14 +120,14 @@ class Espresso_mod(Espresso):
             for j, ps in enumerate(self.pseudo):
                 data[i0+j+1] = block[[x.split()[0] for x in block].index(ps)]
 
-        with open(self.label + '.pwi', 'w') as file:
+        with open(self.filename, 'w') as file:
             file.writelines( data )
 
 
     #Redefinition of function from Espresso to add option to fix atoms in pwi.
     def write_input(self, atoms, properties=None, system_changes=None):
         FileIOCalculator.write_input(self, atoms, properties, system_changes)
-        write(self.label + '.pwi', atoms, **self.parameters)
+        write(self.filename, atoms, **self.parameters)
         self._sort_pseudo()
         if(hasattr(self, 'slab_atoms_indices')): self._fix_atoms_pwi()
         if(hasattr(self, 'starting_mag')): self._system_flags_pwi()
