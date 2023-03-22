@@ -11,7 +11,8 @@ Subclass Espresso to modify write pwi in order to fix atoms xy only
 from ase.calculators.espresso import Espresso
 from ase.calculators.calculator import FileIOCalculator
 from ase.io import write
-#import numpy as np
+import sys
+import numpy as np
 
 class Espresso_mod(Espresso):
 
@@ -135,6 +136,10 @@ class Espresso_mod(Espresso):
                     block = data[i+1 : i+len(self.pseudo)+1]
                     i0 = i
                     break
+
+            if(np.any(np.array(block) == '\n')):
+                print('Number of ATOMIC_SPECIES not compatible with input structures. Quitting.')
+                sys.exit(1)
             
             for j, ps in enumerate(self.pseudo):
                 data[i0+j+1] = block[[x.split()[0] for x in block].index(ps)]

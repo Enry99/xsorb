@@ -11,6 +11,7 @@ Small helper class to deal with the slab
 
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder, plot_slab, get_rot
 from pymatgen.analysis.local_env import MinimumDistanceNN
+from pymatgen.core.structure import Structure
 from pymatgen.io import ase
 from ase.io import read
 from ase.build.tools import sort
@@ -20,7 +21,7 @@ import numpy as np
 
 class Slab:
 
-    def __init__(self, slab_filename : str, threshold = 0.2):
+    def __init__(self, slab_filename : str, layers_threshold = 0.5, surface_sites_height = 0.9):
         '''
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
@@ -40,7 +41,7 @@ class Slab:
         zmin = min(slab.positions[:,2])
         i_layer = 0
         for i, z in enumerate(slab.positions[:,2]):
-            if(z-zmin > threshold): #new layer
+            if(z-zmin > layers_threshold): #new layer
                 zmin = z
                 i_layer = i_layer+1
                 self.layers.append([])
@@ -55,7 +56,7 @@ class Slab:
     
         self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
         self.slab_pymat = ase.AseAtomsAdaptor.get_structure(self.slab_ase)
-        self.asf = AdsorbateSiteFinder(self.slab_pymat)
+        self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height)
 
     def get_atoms_by_layers(self, layers_list : list[int]):
         atoms_list = []
@@ -75,7 +76,7 @@ class Slab:
             no_obtuse_hollow: avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation of topmost layer used to find sites.
         '''
 
-        if symm_reduce_thr == 0:
+        if symm_reduce_thr == 0 and not selected_sites:
             figname = 'adsorption_sites_all.png'
         else:
             figname = 'adsorption_sites.png'
@@ -89,16 +90,21 @@ class Slab:
 
         adsite_labels = []
         nn = MinimumDistanceNN()
+        surf_coords = [s.coords for s in self.asf.surface_sites]
+        nonsurf_sites_indices = [i for i in range(len(self.asf.slab.sites)) if not np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
+        slab = self.asf.slab.copy()
+        slab.remove_sites(nonsurf_sites_indices)
+        for i in range(len(slab)): slab[i].z = 0
         #run over all the slab_adsites, classifiying them by checking if the
-        #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'
+        #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'        
         for site in sel_adsites:
             #dummy structure just to place one atom in the site
-            slab = self.slab_pymat.copy()
             coords = site.tolist()
-            coords[2] += 2
+            coords[2] = 0.2
             slab.append('O', coords, coords_are_cartesian=True)
-            coord_n = nn.get_cn(slab, len(slab.sites)-1)
-            nn_list = nn.get_nn(slab, len(slab.sites)-1)       
+            coord_n = nn.get_cn(slab, len(slab)-1)
+            nn_list = nn.get_nn(slab, len(slab)-1) 
+            slab.remove_sites([len(slab)-1]) #remove dummy atom     
 
             if any((site == x).all() for x in adsites['ontop']):
                 first_nn_species = nn_list[0].species_string
@@ -115,21 +121,22 @@ class Slab:
                     else: adsite_labels.append('bridge,{0:.3f},{1:.3f},'.format(*site[:2]))
         
         if(save_image): #save png to visualize the identified sites
+            print("Saving image to {0}".format(figname))
             sop = get_rot(self.asf.slab)
 
             fig = plt.figure(figsize=(4,3))
             ax = fig.add_subplot(111)
-            plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.7)
+            plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.7, decay=0.25)
 
             adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in sel_adsites]
             for i, site in enumerate(sel_adsites):
-                if any((site == x).all() for x in adsites['ontop']):
+                if 'ontop' in adsite_labels[i]:
                     color = 'r'
-                elif any((site == x).all() for x in adsites['bridge']):
+                elif 'bridge' in adsite_labels[i]:
                     color = 'g'
-                elif any((site == x).all() for x in adsites['hollow']):
+                elif 'hollow' in adsite_labels[i]:
                     color = 'b'
-                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=3, mew=1, linestyle="", zorder=500000)
+                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=2, mew=0.5, linestyle="", zorder=500000)
                 ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=2, zorder=1000000)
                             
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
