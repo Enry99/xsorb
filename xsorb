@@ -112,8 +112,7 @@ def init():
     global fix_mol_xyz
     global pseudopotentials
     global starting_mag
-    global vdwg2_london_c6
-    global vdwg2_london_rvdw
+    global flags_i
     global sites_find_args
     global ion_dynamics
 
@@ -236,27 +235,19 @@ def init():
 
     #Espresso &SYSTEM (correction to bugs in ase function to write pwis)
     starting_mag = []
-    vdwg2_london_c6 = []
-    vdwg2_london_rvdw = []
+    flags_i = []
     keys_to_be_removed = []
     for i in range(1,len(pseudopotentials)+1):
         for key in espresso_settings_dict['SYSTEM']:
-            if 'starting_magnetization' in key:                
+            if 'starting_magnetization' in key: #this needs special treatment because it must be overwritten, while the others are just appended              
                 if i == int(key.split('(')[1].split(')')[0]):
                     starting_mag.append(espresso_settings_dict['SYSTEM'][key])
-                    keys_to_be_removed.append(key)
-            if 'london_c6' in key:
-                if i == int(key.split('(')[1].split(')')[0]):
-                    vdwg2_london_c6.append(espresso_settings_dict['SYSTEM'][key])
-                    keys_to_be_removed.append(key)
-            if 'london_rvdw' in key:
-                if i == int(key.split('(')[1].split(')')[0]):
-                    vdwg2_london_rvdw.append(espresso_settings_dict['SYSTEM'][key])
-                    keys_to_be_removed.append(key)
+                    keys_to_be_removed.append(key)                   
         if(len(starting_mag) < i): starting_mag.append(None)
-        if(len(vdwg2_london_c6) < i): vdwg2_london_c6.append(None)
-        if(len(vdwg2_london_rvdw) < i): vdwg2_london_rvdw.append(None)
-
+    for key in espresso_settings_dict['SYSTEM']:
+        if '(' in key and ')' in key and 'starting_magnetization' not in key:
+            flags_i.append([key, espresso_settings_dict['SYSTEM'][key]])
+            keys_to_be_removed.append(key)
 
     for key in keys_to_be_removed:
         espresso_settings_dict['SYSTEM'].pop(key)
@@ -380,8 +371,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
             fixed_slab = slab.get_atoms_by_layers(fixed_layers_slab)
         else: fixed_slab = fixed_indices_slab
         calc.set_fixed_atoms(fixed_slab, slab.reindex_map, fixed_indices_mol, mol.reindex_map, slab.slab_ase.get_global_number_of_atoms(), mol.mol_ase.get_global_number_of_atoms(), fix_slab_xyz, fix_mol_xyz)
-        calc.set_starting_magnetizations(starting_mag)
-        calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
+        calc.set_system_flags(starting_mag, flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
         if(WRITE_XSF): write(name_file+'.xsf', all_mol_on_slab_configs_ase[i])
 
@@ -464,8 +454,7 @@ def pre_relax(WRITE_XSF : bool =False):
                     kpts= kpoints[1] if 'gamma' not in kpoints[0] else None, koffset=kpoints[2] if 'gamma' not in kpoints[0] else None)
 
         calc.set_fixed_atoms([-1], slab.reindex_map, [-1], mol.reindex_map, slab.slab_ase.get_global_number_of_atoms(), mol.mol_ase.get_global_number_of_atoms() , [0, 0, 0], [0, 0, 1])
-        calc.set_starting_magnetizations(starting_mag)
-        calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
+        calc.set_system_flags(starting_mag, flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i]) 
         if(WRITE_XSF): write(name_file+'.xsf', all_mol_on_slab_configs_ase[i])      
 
@@ -537,8 +526,7 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
             slab.slab_ase.get_global_number_of_atoms(), 
             mol.mol_ase.get_global_number_of_atoms(),
             fix_slab_xyz, fix_mol_xyz)
-        calc.set_starting_magnetizations(starting_mag)
-        calc.set_vdwd2_coeffs(vdwg2_london_c6, vdwg2_london_rvdw)
+        calc.set_system_flags(starting_mag, flags_i)
         calc.write_input(struct_ase)
 
     launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrelax_outdirs', jobname_prefix='f_rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)

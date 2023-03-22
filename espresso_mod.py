@@ -40,17 +40,9 @@ class Espresso_mod(Espresso):
         self.fix_mol_xyz        = fix_mol_xyz.copy()
 
 
-    def set_starting_magnetizations(self, starting_magnetizations : list):
-
-        if(starting_magnetizations):
-            self.starting_mag = starting_magnetizations.copy()
-
-
-    def set_vdwd2_coeffs(self, vdw2_c6 : list, vdw2_rvdw : list):
-        if(vdw2_c6):
-            self.vdw2_c6_list = vdw2_c6.copy()
-        if(vdw2_rvdw):
-            self.vdw2_rvdw_list = vdw2_rvdw.copy()
+    def set_system_flags(self, starting_magnetizations : list, flags_i : list):
+        self.starting_mag = starting_magnetizations.copy()
+        self.flags_i = flags_i.copy()
 
 
     def _fix_atoms_pwi(self):
@@ -81,7 +73,7 @@ class Espresso_mod(Espresso):
             file.writelines( data )
 
 
-    def _starting_magnetization_pwi(self):
+    def _system_flags_pwi(self):
         #Edit pwi after FileIOCalculator.write_input, adding the initial magnetization, since otherwise it is overwritten.
         
         with open(self.label + '.pwi', 'r') as file:
@@ -96,36 +88,19 @@ class Espresso_mod(Espresso):
             if mag is not None:
                 data[line_index] = '   starting_magnetization({0}) = {1}\n'.format(i+1, mag)
 
-        with open(self.label + '.pwi', 'w') as file:
-            file.writelines( data )
-
-
-    def _vdw2_coeffs_pwi(self):
-
-        with open(self.label + '.pwi', 'r') as file:
-            data = file.readlines()
-
-        line_index=0
-        for i, line in enumerate(data):
-            if 'vdw_corr' in line:
-                line_index = i+1
+        in_SYSTEM = False
+        j0 = -1
+        for j, line in enumerate(data):
+            if 'SYSTEM' in line: in_SYSTEM = True
+            if('/' in line and in_SYSTEM):
+                j0 = j
+                break
         
-        if line_index == 0: 
-            print('No vdw option found. vdw2 parameters NOT written in pwi.')
-            return   #no vdw option found
-
-        for i, coeff in enumerate(self.vdw2_c6_list):
-            if coeff is not None:
-                data.insert(line_index, '   london_c6({0})     = {1}\n'.format(i+1, coeff))
-
-        for i, coeff in enumerate(self.vdw2_rvdw_list):      
-            if coeff is not None:
-                data.insert(line_index, '   london_rvdw({0})   = {1}\n'.format(i+1, coeff))
-
-
+        for i, flag in enumerate(self.flags_i):
+            data.insert(j0+i, '   {0} = {1}\n'.format(flag[0], flag[1]))
+        
         with open(self.label + '.pwi', 'w') as file:
             file.writelines( data )
-
 
     def _sort_pseudo(self):
         with open(self.label + '.pwi', 'r') as file:
@@ -154,5 +129,4 @@ class Espresso_mod(Espresso):
         write(self.label + '.pwi', atoms, **self.parameters)
         self._sort_pseudo()
         if(hasattr(self, 'slab_atoms_indices')): self._fix_atoms_pwi()
-        if(hasattr(self, 'starting_mag')): self._starting_magnetization_pwi()
-        if(hasattr(self, 'vdw2_c6_list') or hasattr(self, 'vdw2_rvdw_list')): self._vdw2_coeffs_pwi()
+        if(hasattr(self, 'starting_mag')): self._system_flags_pwi()
