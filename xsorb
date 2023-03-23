@@ -56,6 +56,7 @@ Python script based on Pymatgen and ASE to build adatom adsorption on slabs calc
 import numpy as np
 from ase.io import read, write
 from ase.visualize import view
+from ase.io.pov import get_bondpairs
 import os, sys
 import glob
 #
@@ -66,23 +67,20 @@ from molecule import Molecule
 from io_utils import get_energies, get_z, launch_jobs, restart_jobs
 ########################################################################################
 
-#TODO: sistemare la roba di magnetizzazione e potenziali, assicurarsi che gli indici corrispondano ai nomi.
-#quindi non prenderli dalle input settings di espresso, ma nel primo blocco,
-#usando un dizionario in modo che sia consistente coi nomi dei potenziali. Questo sia per starting_mag che per i vdw_coeffs
 
-
-#TODO: check if 4-fold site is identified correctly (cerca materiale con sito 4-fold)
-
+#preset variables:######################################################################
+#output paths
+pwi_prefix               = 'input'  #prefix: the files will be named pwi_prefix_i.pwi with i=1,2,...
+pwo_prefix               = 'output'
+scf_labels_filename      = 'scf_site_labels.csv'
+prerelax_labels_filename = 'prerelax_site_labels.csv'
+scf_energies_filename    = 'scf_energies.csv'
+relax_energies_filename  = 'finalrelax_energies.csv'
+images_dirname           = 'images'
+#########################################################################################
 
 
 def init():
-    global pwi_prefix
-    global pwo_prefix
-    global scf_labels_filename
-    global prerelax_labels_filename
-    global scf_energies_filename
-    global relax_energies_filename
-    global images_dirname
     global slab_filename
     global molecule_filename
     global jobscript
@@ -120,16 +118,7 @@ def init():
     global ion_dynamics
 
 
-    #preset variables:######################################################################
-    #output paths
-    pwi_prefix               = 'input'  #prefix: the files will be named pwi_prefix_i.pwi with i=1,2,...
-    pwo_prefix               = 'output'
-    scf_labels_filename      = 'scf_site_labels.csv'
-    prerelax_labels_filename = 'prerelax_site_labels.csv'
-    scf_energies_filename    = 'scf_energies.csv'
-    relax_energies_filename  = 'finalrelax_energies.csv'
-    images_dirname           = 'images'
-    #########################################################################################
+
 
 
     #user settings variables################################################################
@@ -536,7 +525,7 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
     launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='finalrelax_outdirs', jobname_prefix='f_rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
 
-def config_images(which : str):
+def config_images(which : str, povray = False):
 
     if which == 'scf':
         prefix = pwi_prefix
@@ -554,9 +543,22 @@ def config_images(which : str):
         os.mkdir(which+'_'+images_dirname)
     for i, config in enumerate(configs):
         label = pw_list[i].split('.'+pw)[0].split('_')[-1]
-        write(which+'_'+images_dirname+'/'+prefix+'_'+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
-        write(which+'_'+images_dirname+'/'+prefix+'_'+which+'_{0}_top.png'.format(label), config, scale = 100)
+
+        if(povray):
+            os.chdir(which+'_'+images_dirname)    
+            try:
+                write(prefix+'_'+which+'_{0}_pov.pov'.format(label), config, format='pov',radii = 0.6, rotation='-10z,-80x', povray_settings=dict(canvas_width=4000, bondatoms=get_bondpairs(config, radius=1))).render()
+                os.remove(prefix+'_'+which+'_{0}_pov.pov'.format(label))
+                os.remove(prefix+'_'+which+'_{0}_pov.ini'.format(label))
+            except:
+                print("Something went wrong when trying to render with povray. Probably povray not found. Quitting.")
+                sys.exit(1)
+            os.chdir('..')
+        else:
+            write(which+'_'+images_dirname+'/'+prefix+'_'+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
+            write(which+'_'+images_dirname+'/'+prefix+'_'+which+'_{0}_top.png'.format(label), config, scale = 100)
     print('All images saved to {0}.'.format(which+'_'+images_dirname))
+
 
 def view_config(which : str, index : int):
     if which == 'scf':
@@ -566,11 +568,29 @@ def view_config(which : str, index : int):
         prefix = pwo_prefix
         pw = 'pwo'
     file = prefix+'_'+which+'_{0}.'.format(index)+pw
-    config = read(file) if pw == 'pwi' else read(file, results_required=False)
+    config = read(file, index=':')
     view(config)
 
-def relax_animations():
-    pass
+def relax_animations(index = -1):
+
+    print('Reading files...')
+    pwo_list=glob.glob(pwo_prefix+'_finalrelax_*.pwo')
+    configs = [read(file, index=':') for file in pwo_list]
+    labels = [pwo.split('.pwo')[0].split('_')[-1] for pwo in pwo_list]
+    print('All files read.')
+    
+    print('Generating animation(s)...')
+    if index == -1:
+        for i, config in enumerate(configs):
+            write('finalrelax_'+images_dirname+'/'+pwo_prefix+'_finalrelax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
+    else:
+        if index not in labels:
+            print('Selected configuration not found. Quitting.')
+            sys.exit(1)
+        else:
+            config = configs[labels.index(index)]
+            write('finalrelax_'+images_dirname+'/'+pwo_prefix+'_finalrelax_{0}.gif'.format(index), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
+    print('All animations saved to {0}.'.format('finalrelax_'+images_dirname))
 
 
 
@@ -597,9 +617,36 @@ def main():
         print('--restart         restart calculation (can also be abbreviated as --res)')
         return 0
 
-    if('-sites' not in sys.argv and '-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv and '-scf-images' not in sys.argv and '-relax-images' not in sys.argv and '-view' not in sys.argv):
+    if('-sites' not in sys.argv and '-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv and '-scf-images' not in sys.argv and '-relax-images' not in sys.argv and '-relax-animations' not in sys.argv and '-view' not in sys.argv):
         print('You need to specify at least one option (-sites, -g, -pr, -s, -es, -fr, -ef). Quitting.')
         return 1
+
+    if('-scf-images' in sys.argv):
+        config_images(which='scf', povray = '--povray' in sys.argv)
+        return 0
+    elif('-relax-images' in sys.argv):
+        config_images(which='finalrelax', povray = '--povray' in sys.argv)
+        return 0
+    elif('-relax-animations' in sys.argv):
+        if('--i' in sys.argv):
+            if(len(sys.argv)> sys.argv.index('--i')+1):
+                index = int(sys.argv[sys.argv.index('--i')+1])
+            else:
+                print('You need to specify an integer index after --i. Quitting.')
+                return 1
+        else: index = -1
+        relax_animations(index)
+        return 0
+    elif('-view' in sys.argv):
+        if(len(sys.argv)> sys.argv.index('-view')+2):
+            which = sys.argv[sys.argv.index('-view')+1]
+            index = int(sys.argv[sys.argv.index('-view')+2])
+            view_config(which=which, index=index)
+            return 0
+        else:
+            print('You need to specify which calculation (scf, relax) and the index value. Quitting.')
+            return 1
+    
 
     init()
 
@@ -650,20 +697,6 @@ def main():
         else:    
             get_energies(scf_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'_finalrelax')
     
-    elif('-scf-images' in sys.argv):
-        config_images(which='scf')
-    elif('-relax-images' in sys.argv):
-        config_images(which='relax')
-    elif('-view' in sys.argv):
-        if(len(sys.argv)> sys.argv.index('-view')+2):
-            which = sys.argv[sys.argv.index('-view')+1]
-            index = int(sys.argv[sys.argv.index('-view')+2])
-            view_config(which=which, index=index)
-        else:
-            print('You need to specify which calculation (scf, relax) and the index value. Quitting.')
-            return 1        
-
-
 
 if __name__ == '__main__':
     sys.exit(main())
