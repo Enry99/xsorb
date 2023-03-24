@@ -79,6 +79,21 @@ relax_energies_filename  = 'finalrelax_energies.csv'
 images_dirname           = 'images'
 #########################################################################################
 
+def read_energy(filename : str):
+    with open(filename, 'r') as f:
+        pwo = f.readlines()
+
+    toten = 0
+    scf_terminated = False
+    for line in pwo: #make sure to get the last one (useful in relaxations)
+        if '!' in line: 
+            toten = line.split()[4]
+        if 'End of self-consistent calculation' in line:
+            scf_terminated = True
+    if(scf_terminated and toten != 0): 
+        return toten
+    else: return None
+       
 
 def init():
     global slab_filename
@@ -187,10 +202,22 @@ def init():
     molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
     jobscript              = script_settings_dict['INPUT']['jobscript']
     E_slab_mol             = np.array(script_settings_dict['INPUT']['E_slab_mol'].split(), dtype=float).tolist() if 'E_slab_mol' in script_settings_dict['INPUT'] else []
+
+    #try to read E_salb_mol directly from files (if files are completed pwos)
     if len(E_slab_mol) != 2 and len(E_slab_mol) != 0:
-        print("If you specify the tag E_slab_mol you must provide TWO values.")
+        print("If you specify the tag E_slab_mol you must provide TWO values. Quitting.")
         sys.exit(1)
 
+    if(slab_filename.split('.')[-1] == 'pwo' and molecule_filename.split('.')[-1] == 'pwo'):
+        slab_en = read_energy(slab_filename)
+        mol_en  = read_energy(molecule_filename)
+        if slab_en is not None and mol_en is not None:
+            additional_text = ''
+            if E_slab_mol:
+                additional_text = ' The values from settings.in will be discarded.'
+            print("Slab and molecule energies read from files."+additional_text)
+            E_slab_mol = [float(slab_en), float(mol_en)]
+        
 
     #&STRUCTURE
     symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
@@ -270,7 +297,7 @@ def plot_adsorption_sites():
          save_image=True)
     print('Adsorption sites found.')
 
-def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False): 
+def generate(SCF_RUN : bool, SAVEFIG=True, SAVEAS=False, file_format=''): 
  
     #BEGIN STRUCTURES GENERATION ############################################################################
 
@@ -366,7 +393,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
         calc.set_fixed_atoms(fixed_slab, slab.reindex_map, fixed_indices_mol, mol.reindex_map, slab.slab_ase.get_global_number_of_atoms(), mol.mol_ase.get_global_number_of_atoms(), fix_slab_xyz, fix_mol_xyz)
         calc.set_system_flags(starting_mag, flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
-        if(WRITE_XSF): write(filename.split('.')[0]+'.xsf', all_mol_on_slab_configs_ase[i])
+        if(SAVEAS): write(filename.split('.')[0]+'.'+file_format, all_mol_on_slab_configs_ase[i])
 
         csvfile.write(str(i)+','+full_labels[i]+'\n')
 
@@ -378,7 +405,7 @@ def generate(SCF_RUN : bool, SAVEFIG=True, WRITE_XSF=False):
     if SCF_RUN:
         launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='scf_outdirs', jobname_prefix='scf', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
-def pre_relax(WRITE_XSF : bool =False):
+def pre_relax(SAVEAS=False, file_format=''):
   
    #BEGIN OF STRUCTURES GENERATION ############################################################################
 
@@ -449,7 +476,7 @@ def pre_relax(WRITE_XSF : bool =False):
         calc.set_fixed_atoms([-1], slab.reindex_map, [-1], mol.reindex_map, slab.slab_ase.get_global_number_of_atoms(), mol.mol_ase.get_global_number_of_atoms() , [0, 0, 0], [0, 0, 1])
         calc.set_system_flags(starting_mag, flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i]) 
-        if(WRITE_XSF): write(filename.split('.')[0]+'.xsf', all_mol_on_slab_configs_ase[i])      
+        if(SAVEAS): write(filename.split('.')[0]+'.'+file_format, all_mol_on_slab_configs_ase[i])      
 
         csvfile.write(str(i)+','+full_labels[i]+'\n')
 
@@ -457,7 +484,7 @@ def pre_relax(WRITE_XSF : bool =False):
 
     launch_jobs(jobscript=jobscript, pwi_list=pwi_names, outdirs='prerelax_outdirs', jobname_prefix='p_rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
-def final_relax(threshold : float = None, exclude : list[int] = []):
+def final_relax(threshold : float = None, exclude : list[int] = [], indices : list[int] = []):
 
     #Slab import from file
     print('\nLoading slab...')
@@ -477,20 +504,22 @@ def final_relax(threshold : float = None, exclude : list[int] = []):
     print('Scf energies collected.')
     
 
-    e_min = min([energies[i] for i in [*range(len(energies))] if i not in exclude])
-    i_minimum = energies.index(e_min)
-    calcs = []
-    subset_energies = []
-    if threshold is not None:
-        for i, energy in enumerate(energies):
-            if i in exclude: continue
-            if energy - e_min <= threshold:
-                calcs.append(i)
-                subset_energies.append(energy)
-        #sort them by minimum energy, in order to launch first the minimum
-        sorted_indices = np.argsort(subset_energies, kind='stable').tolist()
-        calcs = [calcs[i] for i in sorted_indices]
-    else: calcs = [i_minimum]
+    if indices: calcs = indices
+    else:
+        e_min = min([energies[i] for i in [*range(len(energies))] if i not in exclude])
+        i_minimum = energies.index(e_min)
+        calcs = []
+        subset_energies = []
+        if threshold is not None:
+            for i, energy in enumerate(energies):
+                if i in exclude: continue
+                if energy - e_min <= threshold:
+                    calcs.append(i)
+                    subset_energies.append(energy)
+            #sort them by minimum energy, in order to launch first the minimum
+            sorted_indices = np.argsort(subset_energies, kind='stable').tolist()
+            calcs = [calcs[i] for i in sorted_indices]
+        else: calcs = [i_minimum]
 
 
     espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
@@ -568,8 +597,13 @@ def view_config(which : str, index : int):
         prefix = pwo_prefix
         pw = 'pwo'
     file = prefix+'_'+which+'_{0}.'.format(index)+pw
-    config = read(file, index=':')
-    view(config)
+    try:
+        config = read(file, index=':')
+        view(config)
+    except:
+        config =  read(file) if pw == 'pwi' else read(file, results_required=False)
+        print('Not possible to load the full relaxation history because of the ase bug for Espresso > 6.7. Showing only the last configuration.')
+        view(config)        
 
 def relax_animations(index = -1):
 
@@ -611,7 +645,7 @@ def main():
         print('-ef               get final relaxed energies')
         print('Additional flags:')
         print('--fig             plot also the figures (sites + molecule orientations) when launching scf screening')
-        print('--xsf             generate also xsf files besides the pwi(s)')
+        print(r'--saveas {format} generate also files in the desiered format besides the pwi(s)')
         print('--t value         energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
         print('--exclude [0,3,4] exclude selected configurations from the final relaxation ')
         print('--restart         restart calculation (can also be abbreviated as --res)')
@@ -647,24 +681,28 @@ def main():
             print('You need to specify which calculation (scf, relax) and the index value. Quitting.')
             return 1
     
-
+    print('xSorb: Reading settings.in and initializing variables...')
     init()
+    print('Settings loaded.')
 
     SAVEFIG   = '--fig' in sys.argv
-    WRITE_XSF = '--xsf' in sys.argv
+    SAVEAS    = '--saveas' in sys.argv
+    file_format = ''
+    if '--saveas' in sys.argv:
+        file_format = sys.argv[sys.argv.index('--saveas')+1]
     
     if('-sites' in sys.argv):
         plot_adsorption_sites()
     
     elif('-g' in sys.argv or '-s' in sys.argv):
         if '-s' in sys.argv and ('--restart' in sys.argv or '--res' in sys.argv): restart_jobs(jobscript=jobscript, which='scf', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
-        else: generate(SCF_RUN = '-s' in sys.argv, SAVEFIG=SAVEFIG, WRITE_XSF=WRITE_XSF)
+        else: generate(SCF_RUN = '-s' in sys.argv, SAVEFIG=SAVEFIG, SAVEAS=SAVEAS, file_format=file_format)
 
     elif('-pr' in sys.argv):
         if '--restart' in sys.argv or '--res' in sys.argv:
             restart_jobs(jobscript=jobscript, which="prerelax", pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
         else:
-            pre_relax(WRITE_XSF=WRITE_XSF)
+            pre_relax(SAVEAS=SAVEAS, file_format=file_format)
 
     elif('-es' in sys.argv):
         get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'_scf')
@@ -672,22 +710,26 @@ def main():
     elif('-fr' in sys.argv):
         if '--restart' in sys.argv or '--res' in sys.argv: restart_jobs(jobscript=jobscript, which="finalrelax", pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
         else:
-            threshold = None
-            exclude = []
-            if '--exclude' in sys.argv:
-                exclude = [int(i) for i in (sys.argv[sys.argv.index('--exclude')+1].split('[')[1].split(']')[0].split(','))]
-                print('Configurations {0} will be excluded, as requested'.format(exclude))
-            if('--t' in sys.argv):
-                if(len(sys.argv)> sys.argv.index('--t')+1):
-                    threshold = sys.argv[sys.argv.index('--t')+1]
-                    if not input._is_number(threshold):
-                        print('The value after --t must be a number. Quitting.')
-                        return 1 
-                    threshold = float(threshold)             
-                else:
-                    print('You need to specify a value after --t. Quitting.')
-                    return 1
-            final_relax(threshold, exclude=exclude)
+            if('--i' in sys.argv):
+                indices = [int(i) for i in (sys.argv[sys.argv.index('--i')+1].split('[')[1].split(']')[0].split(','))]
+                final_relax(indices=indices)
+            else:
+                threshold = None
+                exclude = []
+                if '--exclude' in sys.argv:
+                    exclude = [int(i) for i in (sys.argv[sys.argv.index('--exclude')+1].split('[')[1].split(']')[0].split(','))]
+                    print('Configurations {0} will be excluded, as requested'.format(exclude))
+                if('--t' in sys.argv):
+                    if(len(sys.argv)> sys.argv.index('--t')+1):
+                        threshold = sys.argv[sys.argv.index('--t')+1]
+                        if not input._is_number(threshold):
+                            print('The value after --t must be a number. Quitting.')
+                            return 1 
+                        threshold = float(threshold)             
+                    else:
+                        print('You need to specify a value after --t. Quitting.')
+                        return 1
+                final_relax(threshold, exclude=exclude)
 
     elif('-ef' in sys.argv): #read final energies
         if not os.path.isfile(scf_energies_filename):
