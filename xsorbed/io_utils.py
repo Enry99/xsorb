@@ -31,7 +31,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
     #add E_ads column header
     line = data[0].split(',')
     line[-1] = line[-1].split('\n')[0]
-    if "final" in pwo_prefix: #finalrelax case
+    if "relax" in pwo_prefix: #relax case
         if E_slab_mol:
             line.append('Eads_rel(eV)\n')
         else:
@@ -45,7 +45,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
 
 
     #get energies from pwo(s)
-    energies = len(files)*[None]  #those not completed will be left as None, raising an error if used for finalrelax
+    energies = len(files)*[None]  #those not completed will be left as None, raising an error if used for relax
 
     for i, file in enumerate(files):
         
@@ -78,7 +78,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
                 line = data[config_label+1].split(',')
                 line[-1] = line[-1].split('\n')[0]
                 line.append('{:.3f}'.format(toten))
-                if "final" in pwo_prefix and not relax_terminated:
+                if "relax" in pwo_prefix and not relax_terminated:
                     print(file.split('/')[-1] + ' relaxation has not reached final configuration. The energy will be marked with a *')
                     line[-1]+='*'
                 
@@ -160,7 +160,7 @@ def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_pr
 def _is_completed(pwo : str, which : str):
     if(which == 'scf'):
         searchfor = 'End of self-consistent calculation'
-    elif(which == 'finalrelax' or which == 'prerelax'):
+    elif(which == 'relax' or which == 'prerelax'):
         searchfor = 'Begin final coordinates'
     
     with open(pwo, 'r') as f:
@@ -178,13 +178,10 @@ def restart_jobs(jobscript : str, which : str, pwi_prefix : str, pwo_prefix : st
     #remove jobscript dependence: simply copy the jobscript from path to workingdir naming it jobscript and use this for restart
     if(which == 'scf'):
         outdirs = 'scf_outdirs'
-        pwo_prefix_full = pwo_prefix + '_scf'
-    elif(which == 'prerelax'):
-        outdirs = 'prerelax_outdirs'
-        pwo_prefix_full = pwo_prefix + '_prerelax'
-    elif(which == 'finalrelax'):
-        outdirs = 'finalrelax_outdirs'
-        pwo_prefix_full = pwo_prefix + '_finalrelax'
+        pwo_prefix_full = pwo_prefix + 'scf'
+    elif(which == 'relax'):
+        outdirs = 'relax_outdirs'
+        pwo_prefix_full = pwo_prefix + 'relax'
     else:
         raise ValueError("Not clear which calculation should be restarted.")
     

@@ -24,11 +24,11 @@ def config_images(which : str, povray = False):
     if which == 'scf':
         prefix = pwi_prefix
         pw = 'pwi'
-    elif which == 'finalrelax':
+    elif which == 'relax':
         prefix = pwo_prefix
         pw = 'pwo'
     print('Reading files...')
-    pw_list=glob.glob(prefix+'_'+which+'_*.'+pw)
+    pw_list=glob.glob(prefix+which+'_*.'+pw)
     configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
     print('All files read.')
 
@@ -39,9 +39,9 @@ def config_images(which : str, povray = False):
         label = pw_list[i].split('.'+pw)[0].split('_')[-1]
 
         if(povray):
-            os.chdir(which+'_'+images_dirname)    
+            os.chdir(which+images_dirname)    
 
-            write(prefix+'_'+which+'_{0}_pov.pov'.format(label), 
+            write(prefix+which+'_{0}_pov.pov'.format(label), 
                 config, 
                 format='pov',
                 radii = 0.65, 
@@ -49,13 +49,13 @@ def config_images(which : str, povray = False):
                 povray_settings=dict(canvas_width=4000, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config, radius=1))
                 #camera_type='perspective'
             ).render()
-            os.remove(prefix+'_'+which+'_{0}_pov.pov'.format(label))
-            os.remove(prefix+'_'+which+'_{0}_pov.ini'.format(label))
+            os.remove(prefix+which+'_{0}_pov.pov'.format(label))
+            os.remove(prefix+which+'_{0}_pov.ini'.format(label))
 
             os.chdir('..')
         else:
-            write(which+'_'+images_dirname+'/'+prefix+'_'+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
-            write(which+'_'+images_dirname+'/'+prefix+'_'+which+'_{0}_top.png'.format(label), config, scale = 100)
+            write(which+'_'+images_dirname+'/'+prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
+            write(which+'_'+images_dirname+'/'+prefix+which+'_{0}_top.png'.format(label), config, scale = 100)
     print('All images saved to {0}.'.format(which+'_'+images_dirname))
 
 
@@ -63,10 +63,10 @@ def view_config(which : str, index : int):
     if which == 'scf':
         prefix = pwi_prefix
         pw = 'pwi'
-    elif which == 'finalrelax':
+    elif which == 'relax':
         prefix = pwo_prefix
         pw = 'pwo'
-    file = prefix+'_'+which+'_{0}.'.format(index)+pw
+    file = prefix+which+'_{0}.'.format(index)+pw
     try:
         config = read(file, index=':')
         view(config)
@@ -79,7 +79,7 @@ def view_config(which : str, index : int):
 def relax_animations(index = -1):
 
     print('Reading files...')
-    pwo_list=glob.glob(pwo_prefix+'_finalrelax_*.pwo')
+    pwo_list=glob.glob(pwo_prefix+'relax_*.pwo')
     configs = [read(file, index=':') for file in pwo_list]
     labels = [pwo.split('.pwo')[0].split('_')[-1] for pwo in pwo_list]
     print('All files read.')
@@ -87,12 +87,12 @@ def relax_animations(index = -1):
     print('Generating animation(s)...')
     if index == -1:
         for i, config in enumerate(configs):
-            write('finalrelax_'+images_dirname+'/'+pwo_prefix+'_finalrelax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
+            write('relax_'+images_dirname+'/'+pwo_prefix+'relax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
     else:
         if index not in labels:
             print('Selected configuration not found. Quitting.')
             sys.exit(1)
         else:
             config = configs[labels.index(index)]
-            write('finalrelax_'+images_dirname+'/'+pwo_prefix+'_finalrelax_{0}.gif'.format(index), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
-    print('All animations saved to {0}.'.format('finalrelax_'+images_dirname))
+            write('relax_'+images_dirname+'/'+pwo_prefix+'relax_{0}.gif'.format(index), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
+    print('All animations saved to {0}.'.format('relax_'+images_dirname))

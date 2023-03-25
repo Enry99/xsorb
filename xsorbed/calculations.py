@@ -103,9 +103,7 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
     slab = Slab(settings.slab_filename)
 
     #Molecule import from file
-    print('Loading molecule...')
     mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms)
-    print('Molecule loaded.')
 
     if indices: calcs = indices
     else:  
