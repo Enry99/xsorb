@@ -83,18 +83,17 @@ class Settings:
             print("If you specify the tag E_slab_mol you must provide TWO values. Quitting.")
             sys.exit(1)
 
-        #try to read E_salb_mol directly from files (if files are completed pwos)
-        if(self.slab_filename.split('.')[-1] == 'pwo' 
-            and self.molecule_filename.split('.')[-1] == 'pwo'
-            and script_settings_dict['STRUCTURE']['mol_subset_atoms'] == ' '):
+        if(not self.E_slab_mol):
+            #try to read E_salb_mol directly from files (if files are completed pwos)
+            if(self.slab_filename.split('.')[-1] == 'pwo' 
+                and self.molecule_filename.split('.')[-1] == 'pwo'
+                and script_settings_dict['STRUCTURE']['mol_subset_atoms'] == ' '):
 
-            slab_en = self._read_energy(self.slab_filename)
-            mol_en  = self._read_energy(self.molecule_filename)
-            if slab_en is not None and mol_en is not None:
-                additional_text = ''
-                if self.E_slab_mol:
-                    additional_text = ' The values from settings.in will be discarded.'
-                print("Slab and molecule energies read from files."+additional_text)
+                slab_en = self._read_energy(self.slab_filename)
+                mol_en  = self._read_energy(self.molecule_filename)
+                if slab_en is not None and mol_en is not None:
+                    print("Slab and molecule energies read from files.")
+                    self.E_slab_mol = [slab_en, mol_en]
 
 
         #&STRUCTURE
