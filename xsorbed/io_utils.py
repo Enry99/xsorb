@@ -175,6 +175,7 @@ def _is_completed(pwo : str, which : str):
 
 
 def restart_jobs(jobscript : str, which : str, pwi_prefix : str, pwo_prefix : str):
+    #remove jobscript dependence: simply copy the jobscript from path to workingdir naming it jobscript and use this for restart
     if(which == 'scf'):
         outdirs = 'scf_outdirs'
         pwo_prefix_full = pwo_prefix + '_scf'

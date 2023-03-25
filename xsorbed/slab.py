@@ -11,7 +11,6 @@ Small helper class to deal with the slab
 
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder, plot_slab, get_rot
 from pymatgen.analysis.local_env import MinimumDistanceNN
-from pymatgen.core.structure import Structure
 from pymatgen.io import ase
 from ase.io import read
 from ase.build.tools import sort
@@ -25,6 +24,9 @@ class Slab:
         '''
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
+
+        print('\nLoading slab...')
+
         self.slab_ase = read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename)
         self.slab_ase.set_initial_magnetic_moments(self.slab_ase.get_global_number_of_atoms()*[0])
 
@@ -58,6 +60,8 @@ class Slab:
         self.slab_pymat = ase.AseAtomsAdaptor.get_structure(self.slab_ase)
         self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height)
 
+        print('Slab loaded.')
+
     def get_atoms_by_layers(self, layers_list : list[int]):
         atoms_list = []
         for layer in layers_list:
@@ -75,6 +79,8 @@ class Slab:
             symm_reduce_thr, near_reduce_thr: thresholds for removing sites duplicates (increase them to reduce duplicates).
             no_obtuse_hollow: avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation of topmost layer used to find sites.
         '''
+
+        print('Finding adsorption sites...')
 
         if symm_reduce_thr == 0 and not selected_sites:
             figname = 'adsorption_sites_all.png'
@@ -142,6 +148,8 @@ class Slab:
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')
 
+        print('Adsorption sites found.')
+        
         return sel_adsites, adsite_labels
 
     def generate_adsorption_structures(self, molecule, adsites):

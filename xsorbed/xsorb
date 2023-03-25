@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Created on Fri 6 Feb 2023
+
+@author: Enrico Pedretti
+@author: Paolo Restuccia
+
+Python script based on Pymatgen and ASE to build adatom adsorption on slabs calculated with Quantum ESPRESSO
+
+
+# @Brief summary of the program:
+# -Reads slab from file (many types supported, e.g. pwi/pwo, .xyz, .cif, POSCAR ...). The slab is assumed to be already relaxed.
+
+# -Reads molecule from file. You must provide the indices of the two atoms that will define the x axis direction, or directly specify
+#   the vector that will be taken as the x axis for the rotations.
+#   It is also possible to select only a subset of the atoms by specifying the indices in the file. This can be useful to create fragments.
+
+# -Finds all adsorption sites on the surface, optionally saves a .png with the identified sites.
+#    If too many sites are identified, try to adjust (increase) the two threshold parameters 
+#    'symm_reduce' and 'near_reduce' in the sites_find_args dictionary. 
+#    Optionally you can also manually select the sites by specifying them with the indices plotted in the 
+#    image generated with the option -sites. Note that by setting symm_reduce = 0 the program finds
+#    ALL the high-symmetry sites, from which you can choose those that you want. 
+
+# -Generates all the desired orientations of the molecule after translating to the origin the selected atom of the molecule, 
+#    which will be later placed above the slab in the adsorption sites. 
+#    NOTE: the selected atom index must be the one in the input file,
+#    even if only a subset of the molecule is selected. The rotations are performed in the following order:
+#    1) rotations along x axis ("screw")
+#    2) rotations along y axis ("verticality": 0 = molecule horizontal, 90 = molecule vertical)
+#    3) rotations along z axis (rotations in the horizontal plane)
+#    
+#    Optionally saves a .png with all the orientations viewed from above.
+
+# -Generates configurations for all orientations placing the selected atom above all adsorption sites. Each configuration is labeled by an integer index.
+#    In order to identify the labels, a table is written into a .csv containing label, xrot_angle, yrot_angle, z_rot_angle, site_type, x_site, y_site, z_site
+
+# -Writes the .pwi for all the generated configurations and submits all the jobs in parallel for the scf screening.
+#    Optionally it is possible to just generate the .pwi(s) without launching the jobs (useful for checking the generated
+#    configurations before starting the calculations)
+#    Optionally writes also the xsf files for visualization (so you can open them also with VESTA)
+
+# -After the scf screening is completed, the scf energies can be extracted and are saved into a .csv
+
+# -Finally, the configurations close to the energy minimum (within a threshold) calculated
+#    with the scf screening can be relaxed to find the adsorption energies.
+
+# -The parameters of the scripts (and of Espresso) must be set in the settings.in file, for which a template example
+#    with all the mandatory and optional flags is provided.
+
+"""
+
+#Import statements#####################################################################
+import os, sys
+#
+from filenames import *
+########################################################################################
+
+def main():
+
+    if(len(sys.argv) == 1):
+        print('You need to specify at least one option. Quitting.')
+        return 1
+
+    if('--h' in sys.argv or '--help' in sys.argv or '-h' in sys.argv):
+        print('Options:')
+        print('-sites            plot the identified high-symmetry sites sites with labels')
+        print('-pr               prerelax molecule along z for the different x rotations (only for the ontop site)')
+        print('-g                generate all pwi(s) and csv with labels, without submitting the jobs')        
+        print('-s                launch scf screening')
+        print('-es               get scf energies')
+        print('-fr               launch final relaxations')
+        print('-ef               get final relaxed energies')
+        print('Additional flags:')
+        print('--fig             plot also the figures (sites + molecule orientations) when launching scf screening')
+        print(r'--saveas {format} generate also files in the desiered format besides the pwi(s)')
+        print('--t value         energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
+        print('--exclude [0,3,4] exclude selected configurations from the final relaxation ')
+        print('--restart         restart calculation (can also be abbreviated as --res)')
+        return 0
+
+    if('-sites' not in sys.argv and '-g' not in sys.argv and '-pr' not in sys.argv and '-s' not in sys.argv and '-es' not in sys.argv and '-fr' not in sys.argv and '-ef' not in sys.argv and '-scf-images' not in sys.argv and '-relax-images' not in sys.argv and '-relax-animations' not in sys.argv and '-view' not in sys.argv):
+        print('You need to specify at least one option (-sites, -g, -pr, -s, -es, -fr, -ef). Quitting.')
+        return 1
+
+
+
+    #import statements##########################################################################
+    import input
+    from settings import Settings
+    from io_utils import get_energies, restart_jobs
+    from calculations import generate, final_relax
+    from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations
+    ############################################################################################
+
+    if('-scf-images' in sys.argv):
+        config_images(which='scf', povray = '--povray' in sys.argv)
+        return 0
+    elif('-relax-images' in sys.argv):
+        config_images(which='relax', povray = '--povray' in sys.argv)
+        return 0
+    elif('-relax-animations' in sys.argv):
+        if('--i' in sys.argv):
+            if(len(sys.argv)> sys.argv.index('--i')+1):
+                index = int(sys.argv[sys.argv.index('--i')+1])
+            else:
+                print('You need to specify an integer index after --i. Quitting.')
+                return 1
+        else: index = -1
+        relax_animations(index)
+        return 0
+    elif('-view' in sys.argv):
+        if(len(sys.argv)> sys.argv.index('-view')+2):
+            which = sys.argv[sys.argv.index('-view')+1]
+            index = int(sys.argv[sys.argv.index('-view')+2])
+            view_config(which=which, index=index)
+            return 0
+        else:
+            print('You need to specify which calculation (scf, relax) and the index value. Quitting.')
+            return 1
+
+
+    SAVEFIG   = '--fig' in sys.argv
+    SAVEAS    = '--saveas' in sys.argv
+    file_format = ''
+    if '--saveas' in sys.argv:
+        file_format = sys.argv[sys.argv.index('--saveas')+1]
+    
+    if('-sites' in sys.argv):
+        plot_adsorption_sites()
+    
+    elif('-g' in sys.argv or '-s' in sys.argv):
+        if '-s' in sys.argv and ('--restart' in sys.argv or '--res' in sys.argv): restart_jobs(which='scf', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+        else: generate(SCF_RUN = '-s' in sys.argv, SAVEFIG=SAVEFIG, SAVEAS=SAVEAS, file_format=file_format)
+
+    elif('-fr' in sys.argv):
+        if '--restart' in sys.argv or '--res' in sys.argv: restart_jobs(which="relax", pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+        else:
+            if('--i' in sys.argv):
+                indices = [int(i) for i in (sys.argv[sys.argv.index('--i')+1].split('[')[1].split(']')[0].split(','))]
+                final_relax(indices=indices)
+            else:
+                threshold = None
+                exclude = []
+                if '--exclude' in sys.argv:
+                    exclude = [int(i) for i in (sys.argv[sys.argv.index('--exclude')+1].split('[')[1].split(']')[0].split(','))]
+                    print('Configurations {0} will be excluded, as requested'.format(exclude))
+                if('--t' in sys.argv):
+                    if(len(sys.argv)> sys.argv.index('--t')+1):
+                        threshold = sys.argv[sys.argv.index('--t')+1]
+                        if not input._is_number(threshold):
+                            print('The value after --t must be a number. Quitting.')
+                            return 1 
+                        threshold = float(threshold)             
+                    else:
+                        print('You need to specify a value after --t. Quitting.')
+                        return 1
+                final_relax(threshold, exclude=exclude)
+
+    elif('-es' in sys.argv):
+        try:
+            E_slab_mol = Settings().E_slab_mol
+        except: #if settings.in or some other input file is no more present.
+            E_slab_mol = []
+        get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'scf')
+
+    elif('-ef' in sys.argv): #read final energies
+        try:
+            E_slab_mol = Settings().E_slab_mol
+        except: #if settings.in or some other input file is no more present.
+            E_slab_mol = []
+
+        if not os.path.isfile(scf_energies_filename):
+            get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'scf')
+            get_energies(scf_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'relax')
+            os.remove(scf_energies_filename)
+        else:    
+            get_energies(scf_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'relax')
+    
+
+if __name__ == '__main__':
+    sys.exit(main())
