@@ -162,7 +162,7 @@ class Settings:
             'no_obtuse_hollow':True}
 
 
-    def _read_energy(filename : str):
+    def _read_energy(self, filename : str):
         with open(filename, 'r') as f:
             pwo = f.readlines()
 
