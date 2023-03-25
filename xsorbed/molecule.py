@@ -25,8 +25,10 @@ class Molecule:
         if the atoms in the list actually exist in the molecule
         '''
 
+
+        print('Loading molecule...')
         self.mol_ase = read(molecule_filename, results_required=False) if molecule_filename.split('.')[-1]=='pwo' else read(molecule_filename)
-        self.mol_ase.set_initial_magnetic_moments(self.mol_ase.get_global_number_of_atoms()*[0])
+        self.mol_ase.set_initial_magnetic_moments(len(self.mol_ase)*[0])
 
         #align axis to x axis
         if molecule_axis_atoms:
@@ -45,6 +47,10 @@ class Molecule:
             del self.mol_ase[remove_indices]
         else:
             self.reindex_map = [*all_indices]
+
+        self.natoms = len(self.mol_ase)
+        
+        print('Molecule loaded.')
 
     #translation and rotation functions defs
     def _set_atom_to_origin(self, atom_index : int = None, coords : list = None):
@@ -86,6 +92,7 @@ class Molecule:
             min_distance: minimum distance that any atom can have from the surface. The whole molecule is translated upwards if necessary, in order to satisfy this condition.
         '''
         
+        print('Generating molecular configurations...')
         configs_ase = []
         labels = []   #format [[xrot, yrot, zrot], z_coord]
         delta_z_values = []
@@ -154,5 +161,7 @@ class Molecule:
                 axes[i].set_title('({0}, {1}, {2})'.format(* labels[i][0].split(',')))
             fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
             fig.savefig('molecule_orientations.png', dpi=800, bbox_inches='tight')
+        
+        print('All molecular configurations generated.')
 
         return configs_ase, labels

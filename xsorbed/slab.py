@@ -28,7 +28,8 @@ class Slab:
         print('\nLoading slab...')
 
         self.slab_ase = read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename)
-        self.slab_ase.set_initial_magnetic_moments(self.slab_ase.get_global_number_of_atoms()*[0])
+        self.natoms   = len(self.slab_ase)
+        self.slab_ase.set_initial_magnetic_moments(len(self.slab_ase)*[0])
 
         #translate slab so that the bottom layer is at least 1 angstrom from the bottom
         zmin = min(self.slab_ase.positions[:,2])
@@ -153,13 +154,16 @@ class Slab:
         return sel_adsites, adsite_labels
 
     def generate_adsorption_structures(self, molecule, adsites):
-        
+
+        print('Generating adsorption structures...')        
         structs = []
 
         for coords in adsites:
             mol = molecule.copy()
             mol.translate(coords)
             structs.append(self.slab_ase + mol)
+        
+        print('All slab+adsorbate cells generated.')
 
         return structs
 

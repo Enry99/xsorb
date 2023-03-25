@@ -1,6 +1,6 @@
 from ase.io import read, write
 import numpy as np
-import os, sys
+import sys
 #
 from slab import Slab, adsorb_both_surfaces
 from molecule import Molecule
@@ -25,27 +25,20 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
     #    if sop.rotation_matrix[2][2] == 1.:
     #        print(sop.rotation_matrix)
 
-
     #Molecule import from file
-    print('Loading molecule...')
     mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms)
-    print('Molecule loaded.')
-
 
     #Find adsorption sites and labels (site type and x,y coords.)
-    print('Finding adsorption sites...')
     adsites, adsites_labels = slab.find_adsorption_sites(
         *settings.sites_find_args.values(), 
         save_image=SAVEFIG,
         selected_sites=settings.selected_sites)
     for i, ads in enumerate(adsites):
         adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
-    print('Adsorption sites found.')
 
     distances_from_surf = len(settings.x_rot_angles)*[settings.selected_atom_distance]
 
     #Generate all the configs for the various molecular rotations and a list of labels
-    print('Generating molecular configurations...')
     all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
         atom_index=settings.selected_atom_index,  
         vert_rotations=settings.y_rot_angles,
@@ -56,18 +49,15 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
         min_distance=settings.min_distance, 
         save_image=SAVEFIG
         )
-    print('All molecular configurations generated.')
 
 
     #Adsorption of molecule on all adsorption sites for all molecule orientations  
-    print('Generating adsorption structures...')
     all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites) for mol_config in all_mol_configs_ase]
     all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
     if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
     full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
-    print('All slab+adsorbate cells generated.')
 
-        
+       
     print('Writing pwi(s)...')
     csvfile=open(scf_labels_filename, 'w')
     csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
@@ -89,7 +79,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
         if(settings.fixed_layers_slab): 
             fixed_slab = slab.get_atoms_by_layers(settings.fixed_layers_slab)
         else: fixed_slab = settings.fixed_indices_slab
-        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, settings.fixed_indices_mol, mol.reindex_map, slab.slab_ase.get_global_number_of_atoms(), mol.mol_ase.get_global_number_of_atoms(), settings.fix_slab_xyz, settings.fix_mol_xyz)
+        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, settings.fixed_indices_mol, mol.reindex_map, slab.natoms, mol.natoms, settings.fix_slab_xyz, settings.fix_mol_xyz)
         calc.set_system_flags(settings.starting_mag, settings.flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
         if(SAVEAS): write(filename.split('.')[0]+'.'+file_format, all_mol_on_slab_configs_ase[i])
@@ -102,7 +92,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
     #END OF STRUCTURE GENERATIONS #########################################################################################
     
     if SCF_RUN:
-        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs='scf_outdirs', jobname_prefix='scf', pwi_prefix=settings.pwi_prefix, pwo_prefix=settings.pwo_prefix)
+        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=scf_outdir, jobname_prefix='scf', pwi_prefix=settings.pwi_prefix, pwo_prefix=settings.pwo_prefix)
 
 
 def final_relax(threshold : float = None, exclude : list[int] = [], indices : list[int] = []):
@@ -146,11 +136,36 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
     settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
     settings.espresso_settings_dict['IONS'].update({'ion_dynamics': settings.ion_dynamics})
 
+
+    #Re-generation of structures, placing the molecule very close to the surface to avoid
+    #trapping in local physisorption minima
+    adsites, adsites_labels = slab.find_adsorption_sites(
+        *settings.sites_find_args.values(), 
+        save_image=False,
+        selected_sites=settings.selected_sites)
+
+    all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
+        atom_index=settings.selected_atom_index,  
+        vert_rotations=settings.y_rot_angles,
+        screw_rotations=settings.x_rot_angles, 
+        horiz_rotations=settings.z_rot_angles, 
+        no_vert_rotx=settings.no_rot_vert,
+        distance_from_surf=relax_startdist, 
+        min_distance=relax_mindist, 
+        save_image=False
+        )
+
+    #Adsorption of molecule on all adsorption sites for all molecule orientations  
+    all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites) for mol_config in all_mol_configs_ase]
+    all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
+    if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
+    full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
+
     pwi_names = []
     for i in calcs:       
-        struct_ase = read(pwi_prefix+'scf_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
+        #struct_ase = read(pwi_prefix+'scf_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
-        fixed_indices_molecule = slab.slab_ase.get_global_number_of_atoms() + np.array(settings.fixed_indices_mol)
+        fixed_indices_molecule = slab.natoms + np.array(settings.fixed_indices_mol)
 
         filename = pwi_prefix+'relax_'+str(i)+'.pwi'
         pwi_names.append(filename)
@@ -165,10 +180,10 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
             slab.reindex_map, 
             fixed_indices_molecule,
             mol.reindex_map, 
-            slab.slab_ase.get_global_number_of_atoms(), 
-            mol.mol_ase.get_global_number_of_atoms(),
+            slab.natoms, 
+            mol.natoms,
             settings.fix_slab_xyz, settings.fix_mol_xyz)
         calc.set_system_flags(settings.starting_mag, settings.flags_i)
-        calc.write_input(struct_ase)
+        calc.write_input(all_mol_on_slab_configs_ase[i])
 
-    launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs='relax_outdirs', jobname_prefix='rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+    launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=relax_outdir, jobname_prefix='rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
