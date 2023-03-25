@@ -174,6 +174,6 @@ class Settings:
             if 'End of self-consistent calculation' in line:
                 scf_terminated = True
         if(scf_terminated and toten != 0): 
-            return toten
+            return float(toten)
         else: return None
 
