@@ -154,8 +154,7 @@ class Slab:
         return sel_adsites, adsite_labels
 
     def generate_adsorption_structures(self, molecule, adsites, min_norm_distance_threshold = 0.5):
-
-        print('Generating adsorption structures...')        
+              
         structs = []
 
         for coords in adsites:
@@ -185,8 +184,6 @@ class Slab:
             #################################################################
 
             structs.append(self.slab_ase + mol)
-        
-        print('All slab+adsorbate cells generated.')
 
         return structs
 

@@ -51,12 +51,13 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
         )
 
 
-    #Adsorption of molecule on all adsorption sites for all molecule orientations  
+    #Adsorption of molecule on all adsorption sites for all molecule orientations
+    print('Generating adsorption structures...') 
     all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites) for mol_config in all_mol_configs_ase]
     all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
     if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
     full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
-
+    print('All slab+adsorbate cells generated.')
        
     print('Writing pwi(s)...')
     csvfile=open(scf_labels_filename, 'w')
@@ -108,7 +109,7 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
     if indices: calcs = indices
     else:  
         print('Collecting energies from scf screening...')
-        energies = get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=settings.pwo_prefix+'scf')
+        energies = get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=pwo_prefix+'scf')
         if None in energies:
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)
@@ -153,11 +154,13 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
         save_image=False
         )
 
-    #Adsorption of molecule on all adsorption sites for all molecule orientations  
+    #Adsorption of molecule on all adsorption sites for all molecule orientations
+    print('Generating adsorption structures...') 
     all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites) for mol_config in all_mol_configs_ase]
     all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
     if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
     full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
+    print('All slab+adsorbate cells generated.')
 
     pwi_names = []
     for i in calcs:       
