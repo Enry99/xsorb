@@ -108,7 +108,7 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
     if indices: calcs = indices
     else:  
         print('Collecting energies from scf screening...')
-        energies = get_energies(settings.scf_labels_filename, settings.scf_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=settings.pwo_prefix+'scf')
+        energies = get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=settings.pwo_prefix+'scf')
         if None in energies:
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)
