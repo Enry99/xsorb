@@ -10,4 +10,4 @@ scf_outdir               = 'scf_outdirs'
 relax_outdir             = 'relax_outdirs'
 
 relax_startdist          = 0.9
-relax_mindist            = 0.2
+relax_mindist            = 0.2  # actually a delta_z, not really a distance

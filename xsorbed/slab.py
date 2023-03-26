@@ -153,7 +153,7 @@ class Slab:
         
         return sel_adsites, adsite_labels
 
-    def generate_adsorption_structures(self, molecule, adsites):
+    def generate_adsorption_structures(self, molecule, adsites, min_norm_distance_threshold = 0.5):
 
         print('Generating adsorption structures...')        
         structs = []
@@ -161,6 +161,29 @@ class Slab:
         for coords in adsites:
             mol = molecule.copy()
             mol.translate(coords)
+
+            #final check on distance, assuming zmol >z atoms #############
+            distances = []
+            for mol_atom in mol:
+                for slab_atom in self.slab_ase:
+                    distances.append(np.linalg.norm(mol_atom.position - slab_atom.position))
+            
+            mindist = min(distances)
+            if mindist < min_norm_distance_threshold:
+                i_min = distances.index(mindist)
+                i_mol, j_slab = ( i_min // len(self.slab_ase), i_min % len(mol) )
+
+                mol_coords = mol[i_mol].position
+                slab_coords = self.slab_ase[j_slab].position
+                if(mol_coords[2] < slab_coords[2]): #if mol atom below slab atom
+                    mol.translate( [0, 0, 2*np.abs(mol_coords[2] - slab_coords[2])] )
+                    mol_coords = mol[i_mol].position
+                
+                dz = np.sqrt(min_norm_distance_threshold**2 - (mol_coords[0] - slab_coords[0])**2 - (mol_coords[1] - slab_coords[1])) - (mol_coords[2] - slab_coords[2])
+                mol.translate([0, 0, dz])
+                print("mol was translated further by ", dz)
+            #################################################################
+
             structs.append(self.slab_ase + mol)
         
         print('All slab+adsorbate cells generated.')
