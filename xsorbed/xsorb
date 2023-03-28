@@ -90,7 +90,8 @@ def cli_parse():
     #main flags
     main_energy = energy_group.add_mutually_exclusive_group()
     main_energy.add_argument('-es', action='store_true', help='save scf energies to csv')
-    main_energy.add_argument('-er', action='store_true', help='save relax energies to csv') 
+    main_energy.add_argument('-er', action='store_true', help='save relax energies to csv')
+    main_energy.add_argument('-plot-energies', action='store_true', help='save image with energies evolution during relax')
 
 
     visualization_group = parser.add_argument_group(title='Visualization options')
@@ -164,7 +165,7 @@ def main():
     from settings import Settings
     from io_utils import get_energies, restart_jobs
     from calculations import generate, final_relax
-    from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations
+    from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
     ############################################################################################
 
     #calc
@@ -201,6 +202,9 @@ def main():
             os.remove(scf_energies_filename)
         else:    
             get_energies(scf_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'relax')
+    
+    elif(args.plot_energies):
+        plot_energy_evolution()
 
 
     #visualization
