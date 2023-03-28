@@ -9,7 +9,7 @@ from filenames import *
 def plot_adsorption_sites():
 
     settings = Settings()
-    slab = Slab(settings.slab_filename)
+    slab = Slab(settings.slab_filename, surface_sites_height=settings.surface_height)
   
     slab.find_adsorption_sites(* {
         "distance":0, 
@@ -19,8 +19,9 @@ def plot_adsorption_sites():
          save_image=True)
 
 
-def config_images(which : str, povray = False):
+def config_images(which : str, povray = False, witdth_res=3000):
 
+    if witdth_res is None and povray: witdth_res = 3000 
     if which == 'scf':
         prefix = pwi_prefix
         pw = 'pwi'
@@ -48,7 +49,7 @@ def config_images(which : str, povray = False):
                 format='pov',
                 radii = 0.65, 
                 rotation='-10z,-80x', 
-                povray_settings=dict(canvas_width=4000, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=0.95))
+                povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=0.95))
                 #camera_type='perspective'
             ).render()
             os.remove(prefix+which+'_{0}_pov.pov'.format(label))
@@ -79,7 +80,8 @@ def view_config(which : str, index : int):
         view(config)        
 
 
-def relax_animations(povray = False):
+def relax_animations(povray = False, witdth_res=3000):
+
 
     print('Reading files...')
     pwo_list=glob.glob(pwo_prefix+'relax_*.pwo')
@@ -93,6 +95,7 @@ def relax_animations(povray = False):
     os.chdir('relax_'+images_dirname)
 
     if(povray):
+        if witdth_res is None: witdth_res = 3000 
         for i, config in enumerate(configs):
             if os.path.exists('temp'):
                 shutil.rmtree('temp')
@@ -108,12 +111,13 @@ def relax_animations(povray = False):
                     format='pov',
                     radii = 0.65, 
                     rotation='-10z,-80x', 
-                    povray_settings=dict(canvas_width=3500, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=0.95))
+                    povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=0.95))
                     #camera_type='perspective'
                 ).render()
 
             os.chdir('..')
-            os.system('convert -delay 20 temp/step_*.png '+pwo_prefix+'relax_{0}_pov.gif'.format(labels[i]))
+            #os.system('convert -delay 20 temp/step_*.png '+pwo_prefix+'relax_{0}_pov.gif'.format(labels[i]))
+            os.system('ffmpeg -framerate 10 -i temp/step_%04d.png -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '+pwo_prefix+'relax_{0}_pov.mp4'.format(labels[i]))
             shutil.rmtree('temp')
 
     else:

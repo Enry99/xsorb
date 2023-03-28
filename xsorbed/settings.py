@@ -47,6 +47,8 @@ class Settings:
         optional_flags_list = {
             'symm_reduce'              : 0.01,
             'near_reduce'              : 0.01,
+            'surface_height'           : 0.9,
+            'layers_height'            : 0.5,
             'selected_sites'           : ' ',
             'mol_subset_atoms'         : ' ',
             'molecule_axis_atoms'      : ' ',
@@ -101,6 +103,8 @@ class Settings:
         #&STRUCTURE
         self.symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
         self.near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
+        self.surface_height         = float(script_settings_dict['STRUCTURE']['surface_height'])
+        self.layers_height          = float(script_settings_dict['STRUCTURE']['layers_height'])
         self.selected_sites         = np.array(script_settings_dict['STRUCTURE']['selected_sites'].split(), dtype=int).tolist()
 
         self.mol_subset_atoms       = np.array(script_settings_dict['STRUCTURE']['mol_subset_atoms'].split(), dtype=int).tolist()

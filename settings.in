@@ -11,6 +11,7 @@
 &STRUCTURE
   #symm_reduce                   = 0.01            #tolerance for site finder
   #near_reduce                   = 0.01            #tolerance for site finder
+  surface_height                 = 0.9             #delta_z from topmost atom defining the surface atoms for finding adsorption sites
   #selected_sites                = 0 1 2           #explicitly select the adosrption sites by index between those automatically found
   #mol_subset_atoms              = 0 1 2 3         #Indices of the subset of atoms to be included from the molecule. don't specify it if all atoms have to be included
    molecule_axis_atoms           = 3 14            #Indices of the two atoms to define the x-axis direction
@@ -27,6 +28,7 @@
    z_rot_angles                  = 0 #90           #rotation about z axis (performed lastly)
    no_rot_vert                   = .true.          #do not perform x and z rotations for the vertical configuration (yrot=90). 
 
+   layers_height                 = 0.5             #delta_z within which atoms are considered to be part of the same layer
    #fixed_indices_slab           = 0 1 2           #fix chosen atoms of the slab for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
    #fixed_layers_slab            = 0 
    fixed_indices_mol             = 3               #fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all

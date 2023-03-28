@@ -103,6 +103,7 @@ def cli_parse():
     main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (format: [s/r][index], e.g. s3)')
     #optional flags
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
+    visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
 
 
     #parsing the command line
@@ -137,6 +138,8 @@ def cli_parse():
         parser.error("--exclude option can only be used with -rel")
     if args.povray and not args.scf_images and not args.relax_images and not args.relax_gifs:
         parser.error("--povray option can only be used with -scf-images or -relax-images or -relax-gifs")
+    if args.width_res is not None and not args.povray:
+        parser.error("--width-res can be specified only for povray rendering")
 
     #Final check on values that are not already dealt with by argparse
     if(args.view):
@@ -205,13 +208,13 @@ def main():
         plot_adsorption_sites()
 
     elif(args.scf_images):
-        config_images(which='scf', povray=args.povray)
+        config_images(which='scf', povray=args.povray, witdth_res=args.width_res)
 
     elif(args.relax_images):
-        config_images(which='relax', povray=args.povray)
+        config_images(which='relax', povray=args.povray, witdth_res=args.width_res)
 
     elif(args.relax_gifs):
-        relax_animations(povray=args.povray)
+        relax_animations(povray=args.povray, witdth_res=args.width_res)
 
     elif(args.view):
         view_config(which=args.view[0], index=int(args.view[1:]))

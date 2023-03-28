@@ -17,7 +17,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
     settings=Settings()
 
     #Slab import from file
-    slab = Slab(settings.slab_filename)
+    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height)
 
     #sga = SpacegroupAnalyzer(slab.slab_pymat)
     #sops = sga.get_point_group_operations(cartesian=True)
@@ -102,7 +102,7 @@ def final_relax(threshold : float = None, exclude : list[int] = None, indices : 
     
 
     #Slab import from file
-    slab = Slab(settings.slab_filename)
+    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height)
 
     #Molecule import from file
     mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms)
