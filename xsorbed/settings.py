@@ -51,8 +51,10 @@ class Settings:
             'mol_subset_atoms'         : ' ',
             'molecule_axis_atoms'      : ' ',
             'axis_vector'              : ' ',
-            'selected_atom_distance'   : 2.0,
-            'min_distance'             : 1.0,
+            'scf_atom_distance'        : 2.0,
+            'scf_min_distance'         : 1.0,
+            'rel_atom_distance'        : 1.0,
+            'rel_min_distance'         : 0.5,
             'no_rot_vert'              : '.true.',
             'fixed_indices_slab'       : ' ',
             'fixed_layers_slab'        : ' ',
@@ -105,8 +107,10 @@ class Settings:
         self.molecule_axis_atoms    = np.array(script_settings_dict['STRUCTURE']['molecule_axis_atoms'].split(), dtype=int).tolist()
         self.axis_vector            = np.array(script_settings_dict['STRUCTURE']['axis_vector'].split(), dtype=float).tolist()
         self.selected_atom_index    = int(script_settings_dict['STRUCTURE']['selected_atom_index'])
-        self.selected_atom_distance = float(script_settings_dict['STRUCTURE']['selected_atom_distance'])
-        self.min_distance           = float(script_settings_dict['STRUCTURE']['min_distance'])           
+        self.scf_atom_distance      = float(script_settings_dict['STRUCTURE']['scf_atom_distance'])
+        self.scf_min_distance       = float(script_settings_dict['STRUCTURE']['scf_min_distance'])
+        self.rel_atom_distance      = float(script_settings_dict['STRUCTURE']['rel_atom_distance'])
+        self.rel_min_distance       = float(script_settings_dict['STRUCTURE']['rel_min_distance'])                
         self.x_rot_angles           = np.array(script_settings_dict['STRUCTURE']['x_rot_angles'].split(), dtype=float).tolist()
         self.y_rot_angles           = np.array(script_settings_dict['STRUCTURE']['y_rot_angles'].split(), dtype=float).tolist()  
         self.z_rot_angles           = np.array(script_settings_dict['STRUCTURE']['z_rot_angles'].split(), dtype=float).tolist()          

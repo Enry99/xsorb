@@ -1,7 +1,7 @@
 from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
-import glob, sys, os
+import glob, sys, os, shutil
 from slab import Slab
 from settings import Settings
 from filenames import *
@@ -35,35 +35,38 @@ def config_images(which : str, povray = False):
     print('Saving images...')
     if(not os.path.exists(which+'_'+images_dirname)):
         os.mkdir(which+'_'+images_dirname)
+    os.chdir(which+'_'+images_dirname) 
+
     for i, config in enumerate(configs):
         label = pw_list[i].split('.'+pw)[0].split('_')[-1]
 
         if(povray):
-            os.chdir(which+images_dirname)    
-
+            config_copy = config.copy()
+            config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
             write(prefix+which+'_{0}_pov.pov'.format(label), 
                 config, 
                 format='pov',
                 radii = 0.65, 
                 rotation='-10z,-80x', 
-                povray_settings=dict(canvas_width=4000, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config, radius=1))
+                povray_settings=dict(canvas_width=4000, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=0.95))
                 #camera_type='perspective'
             ).render()
             os.remove(prefix+which+'_{0}_pov.pov'.format(label))
             os.remove(prefix+which+'_{0}_pov.ini'.format(label))
 
-            os.chdir('..')
         else:
-            write(which+'_'+images_dirname+'/'+prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
-            write(which+'_'+images_dirname+'/'+prefix+which+'_{0}_top.png'.format(label), config, scale = 100)
+            write(prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
+            write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100)
     print('All images saved to {0}.'.format(which+'_'+images_dirname))
 
 
 def view_config(which : str, index : int):
-    if which == 'scf':
+    if which == 's':
+        which = 'scf'
         prefix = pwi_prefix
         pw = 'pwi'
-    elif which == 'relax':
+    elif which == 'r':
+        which = 'relax'
         prefix = pwo_prefix
         pw = 'pwo'
     file = prefix+which+'_{0}.'.format(index)+pw
@@ -76,7 +79,7 @@ def view_config(which : str, index : int):
         view(config)        
 
 
-def relax_animations(index = -1):
+def relax_animations(povray = False):
 
     print('Reading files...')
     pwo_list=glob.glob(pwo_prefix+'relax_*.pwo')
@@ -85,14 +88,36 @@ def relax_animations(index = -1):
     print('All files read.')
     
     print('Generating animation(s)...')
-    if index == -1:
+    if(not os.path.exists('relax_'+images_dirname)):
+        os.mkdir('relax_'+images_dirname)
+    os.chdir('relax_'+images_dirname)
+
+    if(povray):
         for i, config in enumerate(configs):
-            write('relax_'+images_dirname+'/'+pwo_prefix+'relax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
+            if os.path.exists('temp'):
+                shutil.rmtree('temp')
+            os.mkdir('temp')  
+
+            os.chdir('temp')
+            for j, step in enumerate(config):
+                
+                step_copy = step.copy()
+                step_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
+                write(pwo_prefix+'step_{:04d}.pov'.format(j), 
+                    step, 
+                    format='pov',
+                    radii = 0.65, 
+                    rotation='-10z,-80x', 
+                    povray_settings=dict(canvas_width=3500, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=0.95))
+                    #camera_type='perspective'
+                ).render()
+
+            os.chdir('..')
+            os.system('convert -delay 20 temp/step_*.png '+pwo_prefix+'relax_{0}_pov.gif'.format(labels[i]))
+            shutil.rmtree('temp')
+
     else:
-        if index not in labels:
-            print('Selected configuration not found. Quitting.')
-            sys.exit(1)
-        else:
-            config = configs[labels.index(index)]
-            write('relax_'+images_dirname+'/'+pwo_prefix+'relax_{0}.gif'.format(index), config, rotation='-10z,-80x', interval=200, scale = 100, save_count=None)
+        for i, config in enumerate(configs):
+            write(pwo_prefix+'relax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=150, scale = 100, save_count=None)
+
     print('All animations saved to {0}.'.format('relax_'+images_dirname))

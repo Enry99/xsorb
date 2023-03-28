@@ -10,7 +10,7 @@ from settings import Settings
 from filenames import *
 
 
-def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''): 
+def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None): 
  
     #BEGIN STRUCTURES GENERATION ############################################################################
 
@@ -36,7 +36,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
     for i, ads in enumerate(adsites):
         adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
 
-    distances_from_surf = len(settings.x_rot_angles)*[settings.selected_atom_distance]
+    distances_from_surf = len(settings.x_rot_angles)*[settings.scf_atom_distance]
 
     #Generate all the configs for the various molecular rotations and a list of labels
     all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
@@ -46,7 +46,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
         horiz_rotations=settings.z_rot_angles, 
         no_vert_rotx=settings.no_rot_vert,
         distance_from_surf=distances_from_surf, 
-        min_distance=settings.min_distance, 
+        min_distance=settings.scf_min_distance, 
         save_image=SAVEFIG
         )
 
@@ -83,7 +83,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
         calc.set_fixed_atoms(fixed_slab, slab.reindex_map, settings.fixed_indices_mol, mol.reindex_map, slab.natoms, mol.natoms, settings.fix_slab_xyz, settings.fix_mol_xyz)
         calc.set_system_flags(settings.starting_mag, settings.flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
-        if(SAVEAS): write(filename.split('.')[0]+'.'+file_format, all_mol_on_slab_configs_ase[i])
+        if(saveas_format is not None): write(filename.split('.')[0]+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
 
         csvfile.write(str(i)+','+full_labels[i]+'\n')
 
@@ -96,9 +96,10 @@ def generate(SCF_RUN : bool, SAVEFIG=False, SAVEAS=False, file_format=''):
         launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=scf_outdir, jobname_prefix='scf', pwi_prefix=settings.pwi_prefix, pwo_prefix=settings.pwo_prefix)
 
 
-def final_relax(threshold : float = None, exclude : list[int] = [], indices : list[int] = []):
+def final_relax(threshold : float = None, exclude : list[int] = None, indices : list[int] = None):
 
     settings=Settings()
+    
 
     #Slab import from file
     slab = Slab(settings.slab_filename)
@@ -106,7 +107,7 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
     #Molecule import from file
     mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms)
 
-    if indices: calcs = indices
+    if indices is not None: calcs = indices
     else:  
         print('Collecting energies from scf screening...')
         energies = get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=pwo_prefix+'scf')
@@ -114,6 +115,10 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)
         print('Scf energies collected.')
+
+
+        if exclude is None: exclude = []
+        else: print('Configurations {0} will be excluded, as requested'.format(exclude))
 
         e_min = min([energies[i] for i in [*range(len(energies))] if i not in exclude])
         i_minimum = energies.index(e_min)
@@ -149,8 +154,8 @@ def final_relax(threshold : float = None, exclude : list[int] = [], indices : li
         screw_rotations=settings.x_rot_angles, 
         horiz_rotations=settings.z_rot_angles, 
         no_vert_rotx=settings.no_rot_vert,
-        distance_from_surf=relax_startdist, 
-        min_distance=relax_mindist, 
+        distance_from_surf=settings.rel_atom_distance, 
+        min_distance=settings.rel_min_distance, 
         save_image=False
         )
 

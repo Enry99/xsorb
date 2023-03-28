@@ -180,7 +180,7 @@ class Slab:
                 
                 dz = np.sqrt(min_norm_distance_threshold**2 - (mol_coords[0] - slab_coords[0])**2 - (mol_coords[1] - slab_coords[1])) - (mol_coords[2] - slab_coords[2])
                 mol.translate([0, 0, dz])
-                print("mol was translated further by ", dz)
+                print("The molecule was translated further by {0} to avoid atoms too close.".format(dz))
             #################################################################
 
             structs.append(self.slab_ase + mol)

@@ -15,6 +15,7 @@ from natsort import natsorted
 
 TEST = False #do not actually launch the jobs, simply prints the command
 
+jobscript_filename = 'jobscript' #standard name used in the copied version inside the outdirs
 
 def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str):
     #can be called before all the jobs have finished
@@ -136,7 +137,6 @@ def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_pr
             j_dir = outdirs+'/'+str(label)
             os.mkdir(j_dir)
 
-            jobscript_filename = jobscript.split('/')[-1]
             shutil.copyfile(jobscript, j_dir+'/'+jobscript_filename)
 
             os.chdir(j_dir) #####################
@@ -174,8 +174,7 @@ def _is_completed(pwo : str, which : str):
     return completed
 
 
-def restart_jobs(jobscript : str, which : str, pwi_prefix : str, pwo_prefix : str):
-    #remove jobscript dependence: simply copy the jobscript from path to workingdir naming it jobscript and use this for restart
+def restart_jobs(which : str, pwi_prefix : str, pwo_prefix : str):
     if(which == 'scf'):
         outdirs = 'scf_outdirs'
         pwo_prefix_full = pwo_prefix + 'scf'
@@ -205,7 +204,7 @@ def restart_jobs(jobscript : str, which : str, pwi_prefix : str, pwo_prefix : st
         with open(pwi, 'w') as f:
             f.writelines( lines )    
 
-    jobscript_filename = jobscript.split('/')[-1]
+
     #launch jobs
     for i, label in enumerate(config_labels):        
         os.chdir(outdirs+'/'+label) #####################
