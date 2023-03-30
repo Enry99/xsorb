@@ -125,3 +125,47 @@ def relax_animations(povray = False, witdth_res=3000):
             write(pwo_prefix+'relax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=150, scale = 100, save_count=None)
 
     print('All animations saved to {0}.'.format('relax_'+images_dirname))
+
+
+def plot_energy_evolution():
+
+    settings = Settings()
+    Eslab, Emol = (settings.E_slab_mol[0], settings.E_slab_mol[1])
+
+    print('Reading files...')
+    pwo_list=glob.glob(pwo_prefix+'relax_*.pwo')
+    labels = [int(pwo.split('.pwo')[0].split('_')[-1]) for pwo in pwo_list]
+
+    totens = []
+    for file in pwo_list:
+
+        totens.append([])
+
+        with open(file, 'r') as f:
+            pwo = f.readlines()
+
+        for line in pwo: #make sure to get the last one (useful in relaxations)
+            if '!' in line: 
+                totens[-1].append( (float(line.split()[4]) - (Eslab+Emol)) * rydbergtoev )
+    print('All files read.')
+
+
+    from matplotlib import pyplot as plt
+    plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
+    for i, config_e in enumerate(totens):
+        if(False):#len(config_e) > 10): #skip first 10 steps
+            plt.plot([*range(10, len(config_e))], config_e[10:], '-', label=labels[i])
+            plt.xlim(xmin=10)
+        else:
+            plt.plot(config_e, '-', label=labels[i])
+            plt.xlim(xmin=0)
+            
+    
+    plt.title('Relax energies')
+    plt.xlabel('step')
+    plt.ylabel('energy (eV)')
+    plt.grid(linestyle='dotted')
+    plt.legend(title="Config")
+    plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
+
+    print('plot saved in {0}'.format(energy_plot_filename))
