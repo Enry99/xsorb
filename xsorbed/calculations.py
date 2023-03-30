@@ -93,7 +93,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
     #END OF STRUCTURE GENERATIONS #########################################################################################
     
     if SCF_RUN:
-        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=scf_outdir, jobname_prefix='scf', pwi_prefix=settings.pwi_prefix, pwo_prefix=settings.pwo_prefix)
+        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=scf_outdir, jobname_prefix='scf', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
 
 def final_relax(threshold : float = None, exclude : list[int] = None, indices : list[int] = None):

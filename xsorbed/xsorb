@@ -73,12 +73,12 @@ def cli_parse():
     calc_group = parser.add_argument_group(title='Calculation options')
     #main flags
     main_calc = calc_group.add_mutually_exclusive_group()
-    main_calc.add_argument('-gen', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
-    main_calc.add_argument('-scf', action='store_true', help='launch scf screening')
-    main_calc.add_argument('-rel', action='store_true', help='launch relaxations')
-    main_calc.add_argument('-restart', choices=['scf', 'relax'], help='restart all (unfinished) scf or relax calculations')
+    main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
+    main_calc.add_argument('-s', action='store_true', help='launch scf screening')
+    main_calc.add_argument('-r', action='store_true', help='launch relaxations')
+    main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) scf or relax calculations')
     #optional flags
-    calc_group.add_argument('--save-figs', action='store_true', help='plot also the figures (sites + molecule orientations) when using -gen or -rel')
+    calc_group.add_argument('--save-figs', action='store_true', help='plot also the figures (sites + molecule orientations) when using -g or -r')
     calc_group.add_argument('--saveas', type=str, help='generate also files in the desiered format besides the pwi(s), e.g. cif, xyz, ...')
     calc_group.add_argument('--t', type=float, help='energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
     calc_group.add_argument('--i', nargs='+', type=int, help='select specific configurations (by label) for relaxation')
@@ -112,7 +112,7 @@ def cli_parse():
 
     #Check presence of incompatible commands belonging to different groups
     args_dict = vars(args)
-    calc_command = [ key for key in args_dict if args_dict[key] and (key=='scf' or key=='gen' or key=='rel' or key=='restart') ]
+    calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
     energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er') ]
     visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='scf-images'  
         or key=='relax-images' or key=='relax-gifs' or key=='view') ]
@@ -127,15 +127,15 @@ def cli_parse():
 
     #Check for all incompatible OPTIONAL arguments
     if args.save_figs and not args.g and not args.s:
-        parser.error("--save-figs option can only be used with -gen or -scf")
+        parser.error("--save-figs option can only be used with -g or -s")
     if args.saveas and not args.g and not args.s and not args.r:
-        parser.error("--saveas option can only be used with -gen, -scf or -rel")
+        parser.error("--saveas option can only be used with -g, -s or -r")
     if args.t and not args.r:
-        parser.error("--t option can only be used with -rel")
+        parser.error("--t option can only be used with -r")
     if args.i and not args.r:
-        parser.error("--t option can only be used with -rel")
+        parser.error("--t option can only be used with -r")
     if args.exclude and not args.r:
-        parser.error("--exclude option can only be used with -rel")
+        parser.error("--exclude option can only be used with -r")
     if args.povray and not args.scf_images and not args.relax_images and not args.relax_gifs:
         parser.error("--povray option can only be used with -scf-images or -relax-images or -relax-gifs")
     if args.width_res is not None and not args.povray:
@@ -168,17 +168,17 @@ def main():
     ############################################################################################
 
     #calc
-    if(args.gen):
+    if(args.g):
         generate(SCF_RUN = False, SAVEFIG=args.save_figs, saveas_format=args.saveas)
     
-    elif(args.scf):
+    elif(args.s):
         generate(SCF_RUN = True, SAVEFIG=args.save_figs, saveas_format=args.saveas)
 
-    elif(args.rel):
+    elif(args.r):
         final_relax(args.t, exclude=args.exclude, indices=args.i)
 
     elif(args.restart):
-        restart_jobs(which=args.res, pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+        restart_jobs(which=args.restart, pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
 
 
