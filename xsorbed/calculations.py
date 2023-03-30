@@ -1,6 +1,7 @@
 from ase.io import read, write
 import numpy as np
-import sys
+import os, sys
+import glob
 #
 from slab import Slab, adsorb_both_surfaces
 from molecule import Molecule
@@ -193,3 +194,31 @@ def final_relax(threshold : float = None, exclude : list[int] = None, indices : 
         calc.write_input(all_mol_on_slab_configs_ase[i])
 
     launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=relax_outdir, jobname_prefix='rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+
+
+def saveas(which : str, saveas_format : str):
+
+    if which == 'scf':
+        prefix = pwi_prefix
+        pw = 'pwi'
+    elif which == 'relax':
+        prefix = pwo_prefix
+        pw = 'pwo'
+    print('Reading files...')
+    pw_list=glob.glob(prefix+which+'_*.'+pw)
+    configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
+    print('All files read.')
+
+    print("Saving {0} files to {1} format...".format(which, saveas_format))
+    folder = saveas_format+'/'+which+'/'
+    if not os.path.exists(saveas_format):
+        os.mkdir(saveas_format)
+    if not os.path.exists(folder):
+        os.mkdir(folder)    
+
+    for i, config in enumerate(configs):
+        write(folder+pw_list[i].replace(pw, saveas_format), config)
+
+    print("Files saved to {0}".format(saveas_format+'/'+which) )
+    
+

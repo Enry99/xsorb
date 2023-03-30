@@ -101,7 +101,8 @@ def cli_parse():
     main_visual.add_argument('-scf-images', action='store_true', help='save images of the scf configurations')
     main_visual.add_argument('-relax-images', action='store_true', help='save images of the relaxations')
     main_visual.add_argument('-relax-gifs', action='store_true', help='save gif animations of the relaxations (even if not completed)')
-    main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (format: [s/r][index], e.g. s3)')
+    main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
+    main_visual.add_argument('-savefiles', nargs=2, help='save files in specific format (syntax: [format] [calc_type], e.g. cif relax)')
     #optional flags
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
     visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
@@ -164,7 +165,7 @@ def main():
     import input
     from settings import Settings
     from io_utils import get_energies, restart_jobs
-    from calculations import generate, final_relax
+    from calculations import generate, final_relax, saveas
     from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
     ############################################################################################
 
@@ -222,6 +223,10 @@ def main():
 
     elif(args.view):
         view_config(which=args.view[0], index=int(args.view[1:]))
+
+    elif(args.savefiles is not None):
+        saveas(which=args.savefiles[1], saveas_format=args.savefiles[0])
+
 
 
 if __name__ == '__main__':
