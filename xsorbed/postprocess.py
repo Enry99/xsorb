@@ -2,6 +2,7 @@ from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
 import glob, sys, os, shutil
+from natsort import natsorted
 from slab import Slab
 from settings import Settings
 from filenames import *
@@ -133,12 +134,14 @@ def plot_energy_evolution():
     Eslab, Emol = (settings.E_slab_mol[0], settings.E_slab_mol[1])
 
     print('Reading files...')
-    pwo_list=glob.glob(pwo_prefix+'relax_*.pwo')
+    pwo_list=natsorted(glob.glob(pwo_prefix+'relax_*.pwo'))
     labels = [int(pwo.split('.pwo')[0].split('_')[-1]) for pwo in pwo_list]
 
     totens = []
+    relax_terminated = []
     for file in pwo_list:
 
+        end = False
         totens.append([])
 
         with open(file, 'r') as f:
@@ -147,6 +150,9 @@ def plot_energy_evolution():
         for line in pwo: #make sure to get the last one (useful in relaxations)
             if '!' in line: 
                 totens[-1].append( (float(line.split()[4]) - (Eslab+Emol)) * rydbergtoev )
+            if 'Begin final coordinates' in line:
+                end = True
+        relax_terminated.append(end)
     print('All files read.')
 
 
@@ -158,7 +164,8 @@ def plot_energy_evolution():
             plt.xlim(xmin=10)
         else:
             plt.plot(config_e, '-', label=labels[i])
-            plt.xlim(xmin=0)
+            if (not relax_terminated[i]): plt.plot(len(config_e)-1, config_e[-1], 'x', color='black')
+            #plt.xlim(xmin=0)
             
     
     plt.title('Relax energies')
