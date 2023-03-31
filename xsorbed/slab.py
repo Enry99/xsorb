@@ -14,6 +14,7 @@ from pymatgen.analysis.local_env import MinimumDistanceNN
 from pymatgen.io import ase
 from ase.io import read
 from ase.build.tools import sort
+from ase.data import atomic_numbers, covalent_radii
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -153,7 +154,7 @@ class Slab:
         
         return sel_adsites, adsite_labels
 
-    def generate_adsorption_structures(self, molecule, adsites, min_norm_distance_threshold = 0.5):
+    def generate_adsorption_structures(self, molecule, adsites):
               
         structs = []
 
@@ -161,26 +162,29 @@ class Slab:
             mol = molecule.copy()
             mol.translate(coords)
 
-            #final check on distance, assuming zmol >z atoms #############
+            #final check on distance, assuming zmol
             distances = []
             for mol_atom in mol:
                 for slab_atom in self.slab_ase:
                     distances.append(np.linalg.norm(mol_atom.position - slab_atom.position))
             
             mindist = min(distances)
-            if mindist < min_norm_distance_threshold:
-                i_min = distances.index(mindist)
-                i_mol, j_slab = ( i_min // len(self.slab_ase), i_min % len(mol) )
+            i_min = distances.index(mindist)
+            i_mol, j_slab = ( i_min // len(self.slab_ase), i_min % len(self.slab_ase) )
+            covalent_distance = 0.5 * (covalent_radii[atomic_numbers[self.slab_ase[j_slab].symbol]] + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
+
+            if mindist < covalent_distance:
 
                 mol_coords = mol[i_mol].position
                 slab_coords = self.slab_ase[j_slab].position
                 if(mol_coords[2] < slab_coords[2]): #if mol atom below slab atom
+                    #print('Atom below surface level, translating upwards.')
                     mol.translate( [0, 0, 2*np.abs(mol_coords[2] - slab_coords[2])] )
                     mol_coords = mol[i_mol].position
                 
-                dz = np.sqrt(min_norm_distance_threshold**2 - (mol_coords[0] - slab_coords[0])**2 - (mol_coords[1] - slab_coords[1])) - (mol_coords[2] - slab_coords[2])
+                dz = np.sqrt(covalent_distance**2 - (mol_coords[0] - slab_coords[0])**2 - (mol_coords[1] - slab_coords[1])**2 ) - (mol_coords[2] - slab_coords[2])
                 mol.translate([0, 0, dz])
-                print("The molecule was translated further by {0} to avoid atoms too close.".format(dz))
+                #print("The molecule was translated further by {0} to avoid collisions.".format(dz))
             #################################################################
 
             structs.append(self.slab_ase + mol)
