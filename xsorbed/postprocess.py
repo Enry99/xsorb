@@ -6,6 +6,22 @@ from slab import Slab
 from settings import Settings
 from filenames import *
 
+def read_energy(filename: str, Eslab = 0, Emol = 0):
+    with open(filename, 'r') as f:
+        pwo = f.readlines()
+
+    toten = 0
+    scf_terminated = False
+    for line in pwo: #make sure to get the last one (useful in relaxations)
+        if '!' in line: 
+            toten = line.split()[4]
+        if 'End of self-consistent calculation' in line:
+            scf_terminated = True
+    if(scf_terminated and toten != 0): 
+        return (float(toten) - Eslab - Emol)*rydbergtoev
+    else: return None
+
+
 def plot_adsorption_sites():
 
     settings = Settings()
@@ -29,7 +45,8 @@ def config_images(which : str, povray = False, witdth_res=3000):
         prefix = pwo_prefix
         pw = 'pwo'
     print('Reading files...')
-    pw_list=glob.glob(prefix+which+'_*.'+pw)
+    from natsort import natsorted
+    pw_list=natsorted(glob.glob(prefix+which+'_*.'+pw))
     configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
     print('All files read.')
 
@@ -58,6 +75,37 @@ def config_images(which : str, povray = False, witdth_res=3000):
         else:
             write(prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
             write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100)
+
+
+    if(which=='relax'):
+        os.chdir('..')
+        import numpy as np
+        from matplotlib import pyplot as plt
+        import matplotlib.image as mpimg
+
+        rows_fig = max(int(np.ceil(len(configs)/5)), 1)
+        cols_fig = max(int(np.ceil(len(configs)/rows_fig)), 1)
+        fig = plt.figure(figsize=(1.5 * cols_fig, 5 * rows_fig / 3))
+        fig.subplots_adjust(wspace=0.001)
+        axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs) + 1)]
+
+        print(rows_fig, cols_fig)
+        try:
+            E_slab_mol = Settings().E_slab_mol
+        except: #option in case settings.in or some other input file is no more present.
+            E_slab_mol = []
+    
+        energies = [read_energy(file, *E_slab_mol) for file in pw_list]
+
+        for i, conf in enumerate(configs):
+            label = int(pw_list[i].split('.'+pw)[0].split('_')[-1])
+            img = mpimg.imread('relax_'+images_dirname+'/'+prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
+            axes[i].imshow(img)
+            axes[i].set_title('{0}: {1:.3f} eV'.format(label, energies[i]), fontsize = 7, pad=1)
+            axes[i].set_xticks([])
+            axes[i].set_yticks([])
+        fig.savefig('relax_'+images_dirname+'/'+'relax_overview.png', dpi=1500, bbox_inches='tight')
+
     print('All images saved to {0}.'.format(which+'_'+images_dirname))
 
 
