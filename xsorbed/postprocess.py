@@ -50,7 +50,7 @@ def config_images(which : str, povray = False, witdth_res=3000):
                 format='pov',
                 radii = 0.65, 
                 rotation='-10z,-80x', 
-                povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=0.95))
+                povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=0.7))
                 #camera_type='perspective'
             ).render()
             os.remove(prefix+which+'_{0}_pov.pov'.format(label))
@@ -112,7 +112,7 @@ def relax_animations(povray = False, witdth_res=3000):
                     format='pov',
                     radii = 0.65, 
                     rotation='-10z,-80x', 
-                    povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=0.95))
+                    povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=0.7))
                     #camera_type='perspective'
                 ).render()
 
