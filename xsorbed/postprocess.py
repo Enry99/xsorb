@@ -150,7 +150,7 @@ def plot_energy_evolution():
         for line in pwo: #make sure to get the last one (useful in relaxations)
             if '!' in line: 
                 totens[-1].append( (float(line.split()[4]) - (Eslab+Emol)) * rydbergtoev )
-            if 'Begin final coordinates' in line:
+            if 'Final energy' in line:
                 end = True
         relax_terminated.append(end)
     print('All files read.')
