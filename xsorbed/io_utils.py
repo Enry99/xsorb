@@ -60,7 +60,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
                     toten = line.split()[4]
                 if 'End of self-consistent calculation' in line:
                     scf_terminated = True
-                if 'Begin final coordinates' in line:
+                if 'Final energy' in line:
                     relax_terminated = True
 
 
@@ -104,7 +104,7 @@ def get_z(pwo_filename : str, atom_index : int):
         relax_terminated = False
         first_index = 0
         for i, line in enumerate(pwo):
-            if 'Begin final coordinates' in line:
+            if 'Final energy' in line:
                 relax_terminated = True
                 first_index  = i+3
                 #do not break, so that if more than one relax is present we take the last one
@@ -161,7 +161,7 @@ def _is_completed(pwo : str, which : str):
     if(which == 'scf'):
         searchfor = 'End of self-consistent calculation'
     elif(which == 'relax' or which == 'prerelax'):
-        searchfor = 'Begin final coordinates'
+        searchfor = 'Final energy'
     
     with open(pwo, 'r') as f:
         file = f.readlines()
