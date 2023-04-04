@@ -26,14 +26,14 @@ def read_energy(filename: str, Eslab = 0, Emol = 0):
     else: return None
 
 
-def plot_adsorption_sites():
+def plot_adsorption_sites(ALL = False):
 
     settings = Settings()
     slab = Slab(settings.slab_filename, surface_sites_height=settings.surface_height)
   
     slab.find_adsorption_sites(* {
         "distance":0, 
-        'symm_reduce':settings.symm_reduce, 
+        'symm_reduce': 0 if ALL else settings.symm_reduce, 
         'near_reduce':settings.near_reduce, 
         'no_obtuse_hollow':True}.values(),
          save_image=True)
@@ -200,7 +200,7 @@ def plot_energy_evolution():
         for line in pwo: #make sure to get the last one (useful in relaxations)
             if '!' in line: 
                 totens[-1].append( (float(line.split()[4]) - (Eslab+Emol)) * rydbergtoev )
-            if 'Begin final coordinates' in line:
+            if 'Final energy' in line:
                 end = True
         relax_terminated.append(end)
     print('All files read.')
@@ -213,7 +213,7 @@ def plot_energy_evolution():
             plt.plot([*range(10, len(config_e))], config_e[10:], '-', label=labels[i])
             plt.xlim(xmin=10)
         else:
-            plt.plot(config_e, '-', label=labels[i])
+            plt.plot(config_e, '-', label='{0}: {1:.2f}{2} eV'.format(labels[i], config_e[-1], '' if relax_terminated[i] else '*'))
             if (not relax_terminated[i]): plt.plot(len(config_e)-1, config_e[-1], 'x', color='black')
             #plt.xlim(xmin=0)
             
@@ -222,7 +222,7 @@ def plot_energy_evolution():
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
-    plt.legend(title="Config")
+    plt.legend(title="Config, energy")
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
 
     print('plot saved in {0}'.format(energy_plot_filename))
