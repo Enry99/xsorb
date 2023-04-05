@@ -13,9 +13,11 @@ import os, sys, shutil
 import glob
 from natsort import natsorted
 
+from filenames import *
+
 TEST = False #do not actually launch the jobs, simply prints the command
 
-jobscript_filename = 'jobscript' #standard name used in the copied version inside the outdirs
+
 
 def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str):
     #can be called before all the jobs have finished
@@ -58,7 +60,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
             for line in pwo: #make sure to get the last one (useful in relaxations)
                 if '!' in line: 
                     toten = line.split()[4]
-                if 'End of self-consistent calculation' in line:
+                if 'convergence has been achieved' in line:
                     scf_terminated = True
                 if 'Final energy' in line:
                     relax_terminated = True

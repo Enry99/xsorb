@@ -12,3 +12,4 @@ images_dirname           = 'images'
 energy_plot_filename     = 'relax_energies.png'
 scf_outdir               = 'scf_outdirs'
 relax_outdir             = 'relax_outdirs'
+jobscript_filename       = 'jobscript' #standard name used in the copied version inside the outdirs
