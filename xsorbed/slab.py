@@ -64,7 +64,7 @@ class Slab:
 
         print('Slab loaded.')
 
-    def get_atoms_by_layers(self, layers_list : list[int]):
+    def get_atoms_by_layers(self, layers_list : list):
         atoms_list = []
         for layer in layers_list:
             atoms_list += self.layers[layer]

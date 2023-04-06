@@ -25,7 +25,7 @@ def _is_number(s : str):
         return False
 
 
-def _read_card(lines : list[str], CONVERT = False):
+def _read_card(lines : list, CONVERT = False):
 
     block_dict =  {}
 

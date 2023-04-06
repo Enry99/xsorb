@@ -117,7 +117,7 @@ def get_z(pwo_filename : str, atom_index : int):
             return float(z)
             
 
-def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_prefix : str, pwi_prefix : str, pwo_prefix : str):
+def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_prefix : str, pwi_prefix : str, pwo_prefix : str):
     #NOTE: for this script, the execution of pw.x in the jobscript need to be called with this option:  
     #      -input $1 >> $2, so that it reads the input from file $1 and writes output in file $2    
 
