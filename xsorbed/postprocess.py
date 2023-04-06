@@ -8,7 +8,7 @@ from settings import Settings
 from filenames import *
 
 
-
+RADIUS = 0.8  #radius for bondpairs in povray
 
 def read_energy(filename: str, Eslab = 0, Emol = 0):
     with open(filename, 'r') as f:
@@ -26,14 +26,14 @@ def read_energy(filename: str, Eslab = 0, Emol = 0):
     else: return None
 
 
-def plot_adsorption_sites():
+def plot_adsorption_sites(ALL = False):
 
     settings = Settings()
     slab = Slab(settings.slab_filename, surface_sites_height=settings.surface_height)
   
     slab.find_adsorption_sites(* {
         "distance":0, 
-        'symm_reduce':settings.symm_reduce, 
+        'symm_reduce': 0 if ALL else settings.symm_reduce, 
         'near_reduce':settings.near_reduce, 
         'no_obtuse_hollow':True}.values(),
          save_image=True)
@@ -49,7 +49,6 @@ def config_images(which : str, povray = False, witdth_res=3000):
         prefix = pwo_prefix
         pw = 'pwo'
     print('Reading files...')
-    from natsort import natsorted
     pw_list=natsorted(glob.glob(prefix+which+'_*.'+pw))
     configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
     print('All files read.')
@@ -78,8 +77,7 @@ def config_images(which : str, povray = False, witdth_res=3000):
                 format='pov',
                 radii = 0.65, 
                 rotation='-10z,-80x', 
-                colors=colors,
-                povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=0.75))
+                povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
                 #camera_type='perspective'
             ).render()
             os.remove(prefix+which+'_{0}_pov.pov'.format(label))
@@ -180,8 +178,7 @@ def relax_animations(povray = False, witdth_res=3000):
                     format='pov',
                     radii = 0.65, 
                     rotation='-10z,-80x', 
-                    colors=colors,
-                    povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=0.7))
+                    povray_settings=dict(canvas_width=witdth_res, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=RADIUS))
                     #camera_type='perspective'
                 ).render()
 
@@ -232,7 +229,7 @@ def plot_energy_evolution():
             plt.plot([*range(10, len(config_e))], config_e[10:], '-', label=labels[i])
             plt.xlim(xmin=10)
         else:
-            plt.plot(config_e, '-', label=labels[i])
+            plt.plot(config_e, '-', label='{0}: {1:.2f}{2} eV'.format(labels[i], config_e[-1], '' if relax_terminated[i] else '*'))
             if (not relax_terminated[i]): plt.plot(len(config_e)-1, config_e[-1], 'x', color='black')
             #plt.xlim(xmin=0)
             
@@ -241,7 +238,7 @@ def plot_energy_evolution():
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
-    plt.legend(title="Config")
+    plt.legend(title="Config, energy")
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
 
     print('plot saved in {0}'.format(energy_plot_filename))

@@ -98,6 +98,7 @@ def cli_parse():
     #main flags
     main_visual = visualization_group.add_mutually_exclusive_group()
     main_visual.add_argument('-sites', action='store_true',  help='plot the identified high-symmetry sites sites with labels')
+    main_visual.add_argument('-sites-all', action='store_true',  help='plot ALL the high-symmetry sites sites with labels')
     main_visual.add_argument('-scf-images', action='store_true', help='save images of the scf configurations')
     main_visual.add_argument('-relax-images', action='store_true', help='save images of the relaxations')
     main_visual.add_argument('-relax-gifs', action='store_true', help='save gif animations of the relaxations (even if not completed)')
@@ -116,7 +117,7 @@ def cli_parse():
     args_dict = vars(args)
     calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
     energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er') ]
-    visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='scf-images'  
+    visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='scf-images'  
         or key=='relax-images' or key=='relax-gifs' or key=='view') ]
 
     if calc_command and energy_command:
@@ -182,7 +183,7 @@ def main():
         final_relax(args.t, exclude=args.exclude, indices=args.i)
 
     elif(args.restart):
-        restart_jobs(which=args.restart, pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+        restart_jobs(which='scf' if args.restart == 's' else 'relax', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
 
 
@@ -211,8 +212,8 @@ def main():
 
 
     #visualization
-    elif(args.sites):
-        plot_adsorption_sites()
+    elif(args.sites or args.sites_all):
+        plot_adsorption_sites(ALL = args.sites_all)
 
     elif(args.scf_images):
         config_images(which='scf', povray=args.povray, witdth_res=args.width_res)

@@ -99,6 +99,17 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
 
 def final_relax(threshold : float = None, exclude : list[int] = None, indices : list[int] = None):
 
+    #Check for duplicates in exclude or in indices
+    if indices is not None:
+        if (len(set(indices)) < len(indices)):
+            print('The indices list contain duplicate elements. Quitting.')
+            sys.exit(1)
+    if exclude is not None:
+        if (len(set(exclude)) < len(exclude)):
+            print('The exclude list contain duplicate elements. Quitting.')
+            sys.exit(1)        
+
+
     settings=Settings()
     
 

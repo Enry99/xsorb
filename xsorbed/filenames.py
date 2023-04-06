@@ -12,7 +12,7 @@ images_dirname           = 'images'
 energy_plot_filename     = 'relax_energies.png'
 scf_outdir               = 'scf_outdirs'
 relax_outdir             = 'relax_outdirs'
-
+jobscript_filename       = 'jobscript' #standard name used in the copied version inside the outdirs
 
 #user-defined atomic colors:
 USER_COLORS_DEFS = [
@@ -25,3 +25,4 @@ USER_COLORS_DEFS = [
     [26, [0.40, 0.40, 1.00]],
     [42, [0.70, 0.70, 0.70]],
 ]
+
