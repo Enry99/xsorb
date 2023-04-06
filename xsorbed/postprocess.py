@@ -58,6 +58,14 @@ def config_images(which : str, povray = False, witdth_res=3000):
         os.mkdir(which+'_'+images_dirname)
     os.chdir(which+'_'+images_dirname) 
 
+
+    from ase.data.colors import jmol_colors
+    ATOM_COLORS = jmol_colors.copy()
+    for color in USER_COLORS_DEFS:
+        ATOM_COLORS[color[0]] = color[1]
+    colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
+
+
     for i, config in enumerate(configs):
         label = pw_list[i].split('.'+pw)[0].split('_')[-1]
 
@@ -76,8 +84,8 @@ def config_images(which : str, povray = False, witdth_res=3000):
             os.remove(prefix+which+'_{0}_pov.ini'.format(label))
 
         else:
-            write(prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100)
-            write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100)
+            write(prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors)
+            write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors)
 
 
     if(which=='relax'):
@@ -145,6 +153,14 @@ def relax_animations(povray = False, witdth_res=3000):
         os.mkdir('relax_'+images_dirname)
     os.chdir('relax_'+images_dirname)
 
+
+    from ase.data.colors import jmol_colors
+    ATOM_COLORS = jmol_colors.copy()
+    for color in USER_COLORS_DEFS:
+        ATOM_COLORS[color[0]] = color[1]
+    colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
+
+
     if(povray):
         if witdth_res is None: witdth_res = 3000 
         for i, config in enumerate(configs):
@@ -173,7 +189,7 @@ def relax_animations(povray = False, witdth_res=3000):
 
     else:
         for i, config in enumerate(configs):
-            write(pwo_prefix+'relax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=150, scale = 100, save_count=None)
+            write(pwo_prefix+'relax_{0}.gif'.format(labels[i]), config, rotation='-10z,-80x', interval=150, scale = 100, colors=colors, save_count=None)
 
     print('All animations saved to {0}.'.format('relax_'+images_dirname))
 
