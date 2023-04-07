@@ -40,19 +40,26 @@ def plot_adsorption_sites(ALL = False):
         save_image=True)
 
 
-def config_images(which : str, povray = False, witdth_res=3000):
+def config_images(which : str, povray = False, witdth_res=3000, index : str = None, rotations : str = None, Nbulk : int = None):
 
     if witdth_res is None and povray: witdth_res = 3000 
-    if which == 'scf':
+    if which == 's':
+        which = 'scf'
         prefix = pwi_prefix
         pw = 'pwi'
-    elif which == 'relax':
+    elif which == 'r':
+        which = 'relax'
         prefix = pwo_prefix
         pw = 'pwo'
     print('Reading files...')
     pw_list=natsorted(glob.glob(prefix+which+'_*.'+pw))
     configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
+    labels = [file.split('.'+pw)[0].split('_')[-1] for file in pw_list]
     print('All files read.')
+
+    if index is not None:
+        configs = [configs[labels.index(index)]] #just one
+        labels = [labels[labels.index(index)]]
 
     print('Saving images...')
     if(not os.path.exists(which+'_'+images_dirname)):
@@ -68,28 +75,66 @@ def config_images(which : str, povray = False, witdth_res=3000):
 
 
     for i, config in enumerate(configs):
-        label = pw_list[i].split('.'+pw)[0].split('_')[-1]
+        label = labels[i]
 
         if(povray):
             config_copy = config.copy()
             config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
-            write(prefix+which+'_{0}_pov.pov'.format(label), 
-                config, 
-                format='pov',
-                radii = 0.65, 
-                rotation='-10z,-80x', 
-                povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
-                #camera_type='perspective'
-            ).render()
-            os.remove(prefix+which+'_{0}_pov.pov'.format(label))
-            os.remove(prefix+which+'_{0}_pov.ini'.format(label))
+
+            if rotations is not None: #use specified rotation
+                write(prefix+which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')), 
+                    config, 
+                    format='pov',
+                    radii = 0.65, 
+                    rotation=rotations,
+                    colors=colors,
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
+                    #camera_type='perspective'
+                ).render()
+                os.remove(prefix+which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')))
+                os.remove(prefix+which+'_{0}_{1}_pov.ini'.format(label, rotations.replace(',','_')))
+            else: #front and top view
+                #front view
+                write(prefix+which+'_{0}_pov.pov'.format(label), 
+                    config, 
+                    format='pov',
+                    radii = 0.65, 
+                    rotation='-10z,-80x', 
+                    colors=colors,
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
+                    #camera_type='perspective'
+                ).render()
+                os.remove(prefix+which+'_{0}_pov.pov'.format(label))
+                os.remove(prefix+which+'_{0}_pov.ini'.format(label))
+
+                #top view
+                zmin = min([atom.z for atom in config])
+                zmax = max([atom.z for atom in config])
+                delta_z = zmax - zmin
+                transmittances = [0]*len(config) #[1-(atom.z - zmin)/delta_z for atom in config] #linearization
+
+                textures = ['pale'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
+                write(prefix+which+'_{0}_top_pov.pov'.format(label), 
+                    config, 
+                    format='pov',
+                    radii = 0.65, 
+                    colors=colors,
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, transmittances=transmittances, textures = textures,
+                        camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
+                    #camera_type='perspective'
+                ).render()
+                os.remove(prefix+which+'_{0}_top_pov.pov'.format(label))
+                os.remove(prefix+which+'_{0}_top_pov.ini'.format(label))
 
         else:
-            write(prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors)
-            write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors)
+            if rotations is not None: #use specified rotation
+                write(prefix+which+'_{0}_{1}.png'.format(label, rotations), config, rotation=rotations, scale = 100, colors=colors)
+            else: #front and top view           
+                write(prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors) #front view
+                write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors) #top view
 
 
-    if(which=='relax'):
+    if(which=='relax' and index is None):
         os.chdir('..')
         import numpy as np
         from matplotlib import pyplot as plt
@@ -117,9 +162,9 @@ def config_images(which : str, povray = False, witdth_res=3000):
                 fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
             axes[i].set_xticks([])
             axes[i].set_yticks([])
-        fig.savefig('relax_'+images_dirname+'/'+'relax_overview.png', dpi=1500, bbox_inches='tight')
+        fig.savefig('relax_'+images_dirname+'/'+'relax_overview{0}.png'.format('_pov' if povray else ''), dpi=1500, bbox_inches='tight')
 
-    print('All images saved to {0}.'.format(which+'_'+images_dirname))
+    print('All images saved in {0}.'.format(which+'_'+images_dirname))
 
 
 def view_config(which : str, index : int):
