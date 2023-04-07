@@ -101,7 +101,6 @@ def config_images(which : str, povray = False, witdth_res=3000):
         fig.subplots_adjust(wspace=0.001)
         axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs) + 1)]
 
-        print(rows_fig, cols_fig)
         try:
             E_slab_mol = Settings().E_slab_mol
         except: #option in case settings.in or some other input file is no more present.
@@ -113,7 +112,9 @@ def config_images(which : str, povray = False, witdth_res=3000):
             label = int(pw_list[i].split('.'+pw)[0].split('_')[-1])
             img = mpimg.imread('relax_'+images_dirname+'/'+prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
             axes[i].imshow(img)
-            axes[i].set_title('{0}: {1:.3f} eV'.format(label, energies[i]), fontsize = 7, pad=1)
+            axes[i].set_title('{0:.3f} eV'.format(energies[i]), fontsize = 7, pad=1)
+            axes[i].text(0.018, 0.983, label, bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),transform=axes[i].transAxes, 
+                fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
             axes[i].set_xticks([])
             axes[i].set_yticks([])
         fig.savefig('relax_'+images_dirname+'/'+'relax_overview.png', dpi=1500, bbox_inches='tight')
