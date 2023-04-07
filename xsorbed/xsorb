@@ -159,7 +159,7 @@ def cli_parse():
 
 def main():
 
-    print('xSorb version {0}\n'.format(VERSION))
+    print('xSorb version {0}'.format(VERSION))
     
     args = cli_parse()
 

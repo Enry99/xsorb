@@ -147,7 +147,7 @@ class Slab:
                 elif 'hollow' in adsite_labels[i]:
                     color = 'b'
                 ax.plot(*adsites_xy[i], color=color, marker="x", markersize=3, mew=0.5, linestyle="", zorder=500000)
-                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=1, zorder=1000000)
+                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=2, zorder=1000000)
                             
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')
