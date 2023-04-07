@@ -36,7 +36,8 @@ def plot_adsorption_sites(ALL = False):
         'symm_reduce': 0 if ALL else settings.symm_reduce, 
         'near_reduce':settings.near_reduce, 
         'no_obtuse_hollow':True}.values(),
-         save_image=True)
+        selected_sites=settings.selected_sites,
+        save_image=True)
 
 
 def config_images(which : str, povray = False, witdth_res=3000):
@@ -229,8 +230,11 @@ def plot_energy_evolution():
             plt.plot([*range(10, len(config_e))], config_e[10:], '-', label=labels[i])
             plt.xlim(xmin=10)
         else:
-            plt.plot(config_e, '-', label='{0}: {1:.2f}{2} eV'.format(labels[i], config_e[-1], '' if relax_terminated[i] else '*'))
-            if (not relax_terminated[i]): plt.plot(len(config_e)-1, config_e[-1], 'x', color='black')
+            if config_e:
+                plt.plot(config_e, '-', label='{0}: {1:.2f}{2} eV'.format(labels[i], config_e[-1], '' if relax_terminated[i] else '*'))
+                if (not relax_terminated[i]): plt.plot(len(config_e)-1, config_e[-1], 'x', color='black')
+            else:
+                print('Config. {0} job has not reached scf convergence. It will be skipped.'.format(i))
             #plt.xlim(xmin=0)
             
     
