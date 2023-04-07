@@ -137,7 +137,11 @@ class Slab:
             plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.7, decay=0.25)
 
 
-            w,h = fig.get_size_inches()*fig.dpi
+            #w,h = fig.get_size_inches()*fig.dpi
+            w = ax.get_xlim()[1] - ax.get_xlim()[0]
+            print(w)
+            crosses_size = w * 4 / 20
+            print(crosses_size)
             adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in sel_adsites]
             for i, site in enumerate(sel_adsites):
                 if 'ontop' in adsite_labels[i]:
@@ -146,7 +150,7 @@ class Slab:
                     color = 'g'
                 elif 'hollow' in adsite_labels[i]:
                     color = 'b'
-                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=3, mew=0.5, linestyle="", zorder=500000)
+                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=crosses_size, mew=0.5, linestyle="", zorder=500000)
                 ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=1, zorder=1000000)
                             
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')

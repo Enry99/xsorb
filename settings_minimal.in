@@ -1,0 +1,68 @@
+@SETTINGS
+
+&INPUT
+   slab_filename                 = 'slab.pwo'
+   molecule_filename             = 'mol.pwo'
+   jobscript                     = 'job_simple'
+/
+
+
+&STRUCTURE
+
+   molecule_axis                 = atoms 3 14
+
+   selected_atom_index           = 0
+
+   x_rot_angles                  = 0 90 180
+   y_rot_angles                  = 0 90 
+   z_rot_angles                  = 0 90 
+/
+
+@/SETTINGS
+
+
+
+
+@ESPRESSO
+
+&CONTROL
+   calculation      = 'relax'
+   restart_mode     = 'from_scratch'
+   nstep            = 400
+   outdir           = 'WORK'
+   max_seconds      = 86000
+   pseudo_dir       = '/home/pseudo'
+/
+&SYSTEM
+   ecutwfc          = 40
+   ecutrho          = 320
+   occupations      = 'smearing'
+   degauss          = 0.02
+   smearing         = 'gaussian'
+/
+
+
+&ELECTRONS
+   electron_maxstep = 200
+   conv_thr         = 1e-06
+   mixing_mode      = 'local-TF'
+   mixing_beta      = 0.2
+   diagonalization  = 'david'
+/
+&IONS
+   ion_dynamics     = 'bfgs'
+/
+&CELL
+/
+
+ATOMIC_SPECIES
+Fe 55.845 Fe.pbe-nd-rrkjus.UPF
+C  12.011 C.pbe-n-rrkjus_psl.1.0.0.UPF
+H  1.008 H.pbe-rrkjus_psl.1.0.0.UPF
+
+
+K_POINTS gamma
+
+
+
+@/ESPRESSO
