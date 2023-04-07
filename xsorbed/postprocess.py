@@ -36,7 +36,7 @@ def plot_adsorption_sites(ALL = False):
         'symm_reduce': 0 if ALL else settings.symm_reduce, 
         'near_reduce':settings.near_reduce, 
         'no_obtuse_hollow':True}.values(),
-        selected_sites=settings.selected_sites,
+        selected_sites= [] if ALL else settings.selected_sites,
         save_image=True)
 
 
