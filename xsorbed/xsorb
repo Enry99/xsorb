@@ -56,7 +56,7 @@ Python script based on Pymatgen and ASE to build adatom adsorption on slabs calc
 import os, sys
 import argparse
 #
-from filenames import *
+from xsorbed.filenames import *
 ########################################################################################
 
 
@@ -217,16 +217,10 @@ def main():
         plot_adsorption_sites(ALL = args.sites_all)
 
     elif(args.scf_images):
-        from ase.io import read
-        slab_filename = Settings().slab_filename
-        Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
-        config_images(which='s', povray=args.povray, witdth_res=args.width_res, Nbulk=Nbulk)
+        config_images(which='s', povray=args.povray, witdth_res=args.width_res)
 
     elif(args.relax_images):
-        from ase.io import read
-        slab_filename = Settings().slab_filename
-        Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
-        config_images(which='r', povray=args.povray, witdth_res=args.width_res, Nbulk=Nbulk)
+        config_images(which='r', povray=args.povray, witdth_res=args.width_res)
 
     elif(args.render_image):
         config_images(which=args.render_image[0][0], index=args.render_image[0][1:], 

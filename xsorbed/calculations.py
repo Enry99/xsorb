@@ -3,12 +3,12 @@ import numpy as np
 import os, sys
 import glob
 #
-from slab import Slab, adsorb_both_surfaces
-from molecule import Molecule
-from espresso_mod import Espresso_mod
-from io_utils import get_energies, get_z, launch_jobs, restart_jobs
-from settings import Settings
-from filenames import *
+from xsorbed.slab import Slab, adsorb_both_surfaces
+from xsorbed.molecule import Molecule
+from xsorbed.espresso_mod import Espresso_mod
+from xsorbed.io_utils import get_energies, get_z, launch_jobs, restart_jobs
+from xsorbed.settings import Settings
+from xsorbed.filenames import *
 
 
 def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None): 

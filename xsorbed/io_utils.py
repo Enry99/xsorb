@@ -13,7 +13,7 @@ import os, sys, shutil
 import glob
 from natsort import natsorted
 
-from filenames import *
+from xsorbed.filenames import *
 
 TEST = False #do not actually launch the jobs, simply prints the command
 

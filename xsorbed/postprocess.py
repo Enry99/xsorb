@@ -3,9 +3,9 @@ from ase.io.pov import get_bondpairs
 from ase.io import read, write
 import glob, sys, os, shutil
 from natsort import natsorted
-from slab import Slab
-from settings import Settings
-from filenames import *
+from xsorbed.slab import Slab
+from xsorbed.settings import Settings
+from xsorbed.filenames import *
 
 
 RADIUS = 0.8  #radius for bondpairs in povray
@@ -28,7 +28,7 @@ def read_energy(filename: str, Eslab = 0, Emol = 0):
 
 def plot_adsorption_sites(ALL = False):
 
-    settings = Settings()
+    settings = Settings(read_energies=False)
     slab = Slab(settings.slab_filename, surface_sites_height=settings.surface_height)
   
     slab.find_adsorption_sites(* {
@@ -40,7 +40,7 @@ def plot_adsorption_sites(ALL = False):
         save_image=True)
 
 
-def config_images(which : str, povray = False, witdth_res=3000, index : str = None, rotations : str = None, Nbulk : int = None):
+def config_images(which : str, povray = False, witdth_res=3000, index : str = None, rotations : str = None):
 
     if witdth_res is None and povray: witdth_res = 3000 
     if which == 's':
@@ -53,8 +53,27 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         pw = 'pwo'
     print('Reading files...')
     pw_list=natsorted(glob.glob(prefix+which+'_*.'+pw))
-    configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
-    labels = [file.split('.'+pw)[0].split('_')[-1] for file in pw_list]
+    if(not pw_list):
+        print("Files not found. Quitting.")
+        sys.exit(1)
+
+    configs = []
+    labels = []
+    uncompleted = []
+    for file in pw_list:
+        with open(file, 'r') as f:
+            lines = f.readlines()
+        STOP = False
+        for line in lines:
+            if 'convergence NOT achieved' in line:
+                print("Found 'convergence NOT achieved' in {0}, so relaxation was not completed. It will be skipped.".format(file))
+                STOP = True
+                uncompleted.append(file)
+                break
+        if(STOP): continue
+        configs.append(read(file) if pw == 'pwi' else read(file, results_required=False))
+        labels.append(file.split('.'+pw)[0].split('_')[-1])
+
     print('All files read.')
 
     if index is not None:
@@ -72,6 +91,16 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
     for color in USER_COLORS_DEFS:
         ATOM_COLORS[color[0]] = color[1]
     colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
+
+    try:
+        settings = Settings()
+        E_slab_mol = settings.E_slab_mol
+        slab_filename = settings.slab_filename
+        Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
+    except Exception as e:
+        print("Error while reading settings.in: ", e, "Energies will be given as total energies, and top view will not have faded surface atoms.")
+        Nbulk = 0
+        E_slab_mol = [0, 0]
 
 
     for i, config in enumerate(configs):
@@ -145,16 +174,11 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         fig = plt.figure(figsize=(1.5 * cols_fig, 5 * rows_fig / 3))
         fig.subplots_adjust(wspace=0.001)
         axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs) + 1)]
-
-        try:
-            E_slab_mol = Settings().E_slab_mol
-        except: #option in case settings.in or some other input file is no more present.
-            E_slab_mol = []
     
-        energies = [read_energy(file, *E_slab_mol) for file in pw_list]
+        energies = [read_energy(file, *E_slab_mol) for file in pw_list if file not in uncompleted]
 
         for i, conf in enumerate(configs):
-            label = int(pw_list[i].split('.'+pw)[0].split('_')[-1])
+            label = labels[i]
             img = mpimg.imread('relax_'+images_dirname+'/'+prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
             axes[i].imshow(img)
             axes[i].set_title('{0:.3f} eV'.format(energies[i]), fontsize = 7, pad=1)
