@@ -132,7 +132,7 @@ def final_relax(threshold : float = None, exclude : list= None, indices : list =
         if exclude is None: exclude = []
         else: print('Configurations {0} will be excluded, as requested'.format(exclude))
 
-        e_min = min([energies[i] for i in [*range(len(energies))] if i not in exclude])
+        e_min = min([energies[i] for i in [*range(len(energies))]])
         i_minimum = energies.index(e_min)
         calcs = []
         subset_energies = []
