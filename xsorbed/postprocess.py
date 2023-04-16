@@ -81,6 +81,17 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         labels = [labels[labels.index(index)]]
 
     print('Saving images...')
+
+    #try:
+    settings = Settings()
+    E_slab_mol = settings.E_slab_mol
+    slab_filename = settings.slab_filename
+    Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
+    #except Exception as e:
+    #    print("Error while reading settings.in: ", e, "Energies will be given as total energies, and top view will not have faded surface atoms.")
+    #    Nbulk = 0
+    #    E_slab_mol = [0, 0]
+    
     if(not os.path.exists(which+'_'+images_dirname)):
         os.mkdir(which+'_'+images_dirname)
     os.chdir(which+'_'+images_dirname) 
@@ -92,15 +103,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         ATOM_COLORS[color[0]] = color[1]
     colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
 
-    try:
-        settings = Settings()
-        E_slab_mol = settings.E_slab_mol
-        slab_filename = settings.slab_filename
-        Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
-    except Exception as e:
-        print("Error while reading settings.in: ", e, "Energies will be given as total energies, and top view will not have faded surface atoms.")
-        Nbulk = 0
-        E_slab_mol = [0, 0]
+
 
 
     for i, config in enumerate(configs):
