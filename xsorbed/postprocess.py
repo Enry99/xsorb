@@ -96,8 +96,11 @@ def config_images(which : str, povray = False, witdth_res=3000):
         try:
             E_slab_mol = Settings().E_slab_mol
         except: #option in case settings.in or some other input file is no more present.
+            print('It was not possible to retrieve slab and molecule energy, printing the total energies instead.')
             E_slab_mol = []
     
+        print(E_slab_mol)
+
         energies = [read_energy(file, *E_slab_mol) for file in pw_list]
 
         for i, conf in enumerate(configs):
@@ -107,7 +110,7 @@ def config_images(which : str, povray = False, witdth_res=3000):
             axes[i].set_title('{0}: {1:.3f} eV'.format(label, energies[i]), fontsize = 7, pad=1)
             axes[i].set_xticks([])
             axes[i].set_yticks([])
-        fig.savefig('relax_'+images_dirname+'/'+'relax_overview.png', dpi=1500, bbox_inches='tight')
+        fig.savefig('relax_'+images_dirname+'/'+'relax_overview{0}.png'.format('_pov' if povray else ''), dpi=1500, bbox_inches='tight')
 
     print('All images saved to {0}.'.format(which+'_'+images_dirname))
 

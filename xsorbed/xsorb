@@ -101,7 +101,7 @@ def cli_parse():
     main_visual.add_argument('-sites-all', action='store_true',  help='plot ALL the high-symmetry sites sites with labels')
     main_visual.add_argument('-scf-images', action='store_true', help='save images of the scf configurations')
     main_visual.add_argument('-relax-images', action='store_true', help='save images of the relaxations')
-    main_visual.add_argument('-relax-gifs', action='store_true', help='save gif animations of the relaxations (even if not completed)')
+    main_visual.add_argument('-relax-animations', action='store_true', help='save gif animations of the relaxations (even if not completed)')
     main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
     main_visual.add_argument('-savefiles', nargs=2, help='save files in specific format (syntax: [format] [calc_type], e.g. cif relax)')
     #optional flags
@@ -118,7 +118,7 @@ def cli_parse():
     calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
     energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er') ]
     visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='scf-images'  
-        or key=='relax-images' or key=='relax-gifs' or key=='view') ]
+        or key=='relax-images' or key=='relax-animations' or key=='view') ]
 
     if calc_command and energy_command:
         parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], energy_command[0]))
@@ -139,8 +139,8 @@ def cli_parse():
         parser.error("--t option can only be used with -r")
     if args.exclude and not args.r:
         parser.error("--exclude option can only be used with -r")
-    if args.povray and not args.scf_images and not args.relax_images and not args.relax_gifs:
-        parser.error("--povray option can only be used with -scf-images or -relax-images or -relax-gifs")
+    if args.povray and not args.scf_images and not args.relax_images and not args.relax_animation:
+        parser.error("--povray option can only be used with -scf-images or -relax-images or -relax-animations")
     if args.width_res is not None and not args.povray:
         parser.error("--width-res can be specified only for povray rendering")
 
@@ -219,7 +219,7 @@ def main():
     elif(args.relax_images):
         config_images(which='relax', povray=args.povray, witdth_res=args.width_res)
 
-    elif(args.relax_gifs):
+    elif(args.relax_animations):
         relax_animations(povray=args.povray, witdth_res=args.width_res)
 
     elif(args.view):
