@@ -102,8 +102,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
     for color in USER_COLORS_DEFS:
         ATOM_COLORS[color[0]] = color[1]
     colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
-
-
+    colors_top = [ ATOM_COLORS[atom.number] if atom.index >= Nbulk else jmol_colors[atom.number] for atom in configs[0] ]
 
 
     for i, config in enumerate(configs):
@@ -150,7 +149,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
                     config, 
                     format='pov',
                     radii = 0.65, 
-                    colors=colors,
+                    colors=colors_top,
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, transmittances=transmittances, textures = textures,
                         camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
                     #camera_type='perspective'
