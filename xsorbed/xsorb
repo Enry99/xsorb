@@ -56,7 +56,7 @@ Python script based on Pymatgen and ASE to build adatom adsorption on slabs calc
 import os, sys
 import argparse
 #
-from filenames import *
+from xsorbed.filenames import *
 ########################################################################################
 
 
@@ -101,7 +101,8 @@ def cli_parse():
     main_visual.add_argument('-sites-all', action='store_true',  help='plot ALL the high-symmetry sites sites with labels')
     main_visual.add_argument('-scf-images', action='store_true', help='save images of the scf configurations')
     main_visual.add_argument('-relax-images', action='store_true', help='save images of the relaxations')
-    main_visual.add_argument('-relax-animations', action='store_true', help='save gif animations of the relaxations (even if not completed)')
+    main_visual.add_argument('-render-image', nargs=2, help='select which image to render and the rotations list for the camera (syntax: [s/r][index] [rotations], e.g. r12 -10z,-80x)')
+    main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the relaxations in gif (default) or mp4 format (for povray)')
     main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
     main_visual.add_argument('-savefiles', nargs=2, help='save files in specific format (syntax: [format] [calc_type], e.g. cif relax)')
     #optional flags
@@ -139,7 +140,7 @@ def cli_parse():
         parser.error("--t option can only be used with -r")
     if args.exclude and not args.r:
         parser.error("--exclude option can only be used with -r")
-    if args.povray and not args.scf_images and not args.relax_images and not args.relax_animation:
+    if args.povray and not args.scf_images and not args.relax_images and not args.relax_animations and not args.render_image:
         parser.error("--povray option can only be used with -scf-images or -relax-images or -relax-animations")
     if args.width_res is not None and not args.povray:
         parser.error("--width-res can be specified only for povray rendering")
@@ -159,6 +160,8 @@ def cli_parse():
 
 def main():
 
+    print('xSorb version {0}'.format(VERSION))
+    
     args = cli_parse()
 
     #import statements##########################################################################
@@ -214,10 +217,14 @@ def main():
         plot_adsorption_sites(ALL = args.sites_all)
 
     elif(args.scf_images):
-        config_images(which='scf', povray=args.povray, witdth_res=args.width_res)
+        config_images(which='s', povray=args.povray, witdth_res=args.width_res)
 
     elif(args.relax_images):
-        config_images(which='relax', povray=args.povray, witdth_res=args.width_res)
+        config_images(which='r', povray=args.povray, witdth_res=args.width_res)
+
+    elif(args.render_image):
+        config_images(which=args.render_image[0][0], index=args.render_image[0][1:], 
+            rotations = args.render_image[1], povray=args.povray, witdth_res=args.width_res)
 
     elif(args.relax_animations):
         relax_animations(povray=args.povray, witdth_res=args.width_res)

@@ -1,10 +1,10 @@
 import sys
 import numpy as np
-import input
+from xsorbed import input
 
 class Settings:
 
-    def __init__(self, settings_filename : str = "settings.in") -> None:
+    def __init__(self, settings_filename : str = "settings.in", read_energies = True) -> None:
 
         #preset variables:######################################################################
 
@@ -55,8 +55,8 @@ class Settings:
             'axis_vector'              : ' ',
             'scf_atom_distance'        : 2.0,
             'scf_min_distance'         : 1.0,
-            'rel_atom_distance'        : 1.0,
-            'rel_min_distance'         : 0.5,
+            'rel_atom_distance'        : 2.0,
+            'rel_min_distance'         : 1.0,
             'no_rot_vert'              : '.true.',
             'fixed_indices_slab'       : ' ',
             'fixed_layers_slab'        : ' ',
@@ -87,7 +87,7 @@ class Settings:
             print("If you specify the tag E_slab_mol you must provide TWO values. Quitting.")
             sys.exit(1)
 
-        if(not self.E_slab_mol):
+        if(not self.E_slab_mol and read_energies):
             #try to read E_salb_mol directly from files (if files are completed pwos)
             if(self.slab_filename.split('.')[-1] == 'pwo' 
                 and self.molecule_filename.split('.')[-1] == 'pwo'

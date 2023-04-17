@@ -16,6 +16,7 @@ from ase.io import read
 from ase.build.tools import sort
 from ase.data import atomic_numbers, covalent_radii
 from matplotlib import pyplot as plt
+import matplotlib.patheffects as PathEffects
 import numpy as np
 
 
@@ -64,7 +65,7 @@ class Slab:
 
         print('Slab loaded.')
 
-    def get_atoms_by_layers(self, layers_list : list[int]):
+    def get_atoms_by_layers(self, layers_list : list):
         atoms_list = []
         for layer in layers_list:
             atoms_list += self.layers[layer]
@@ -137,7 +138,12 @@ class Slab:
             plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.7, decay=0.25)
 
 
-            w,h = fig.get_size_inches()*fig.dpi
+            #w,h = fig.get_size_inches()*fig.dpi
+            w = ax.get_xlim()[1] - ax.get_xlim()[0]
+
+            crosses_size = 3   * 25 / w
+            fontsize     = 1.5 * 25 / w
+            mew          = 0.5 * 25 / w
             adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in sel_adsites]
             for i, site in enumerate(sel_adsites):
                 if 'ontop' in adsite_labels[i]:
@@ -146,8 +152,8 @@ class Slab:
                     color = 'g'
                 elif 'hollow' in adsite_labels[i]:
                     color = 'b'
-                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=3, mew=0.5, linestyle="", zorder=500000)
-                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=1, zorder=1000000)
+                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=crosses_size, mew=mew, linestyle="", zorder=500000)
+                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=fontsize, path_effects=[PathEffects.withStroke(linewidth=0.25,foreground="w")], zorder=1000000)
                             
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')

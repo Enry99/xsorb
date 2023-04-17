@@ -13,9 +13,11 @@ import os, sys, shutil
 import glob
 from natsort import natsorted
 
+from xsorbed.filenames import *
+
 TEST = False #do not actually launch the jobs, simply prints the command
 
-jobscript_filename = 'jobscript' #standard name used in the copied version inside the outdirs
+
 
 def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str):
     #can be called before all the jobs have finished
@@ -58,7 +60,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
             for line in pwo: #make sure to get the last one (useful in relaxations)
                 if '!' in line: 
                     toten = line.split()[4]
-                if 'End of self-consistent calculation' in line:
+                if 'convergence has been achieved' in line:
                     scf_terminated = True
                 if 'Final energy' in line:
                     relax_terminated = True
@@ -115,7 +117,7 @@ def get_z(pwo_filename : str, atom_index : int):
             return float(z)
             
 
-def launch_jobs(jobscript : str, pwi_list : list[str], outdirs : str, jobname_prefix : str, pwi_prefix : str, pwo_prefix : str):
+def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_prefix : str, pwi_prefix : str, pwo_prefix : str):
     #NOTE: for this script, the execution of pw.x in the jobscript need to be called with this option:  
     #      -input $1 >> $2, so that it reads the input from file $1 and writes output in file $2    
 

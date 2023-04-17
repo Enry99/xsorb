@@ -5,6 +5,7 @@
 #SBATCH --mem=30G                 # Memory per node (in MB). Default 200M per CPU
 #SBATCH --job-name="job"
 #SBATCH --output=a%j.out
+#SBATCH --error=a%j.err
 
 source /home/software/materia/intel_lib/setvars.sh --force
 export PW=/home/software/materia/qe-6.7.0/bin/pw.x

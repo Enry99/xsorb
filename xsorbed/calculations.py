@@ -3,12 +3,12 @@ import numpy as np
 import os, sys
 import glob
 #
-from slab import Slab, adsorb_both_surfaces
-from molecule import Molecule
-from espresso_mod import Espresso_mod
-from io_utils import get_energies, get_z, launch_jobs, restart_jobs
-from settings import Settings
-from filenames import *
+from xsorbed.slab import Slab, adsorb_both_surfaces
+from xsorbed.molecule import Molecule
+from xsorbed.espresso_mod import Espresso_mod
+from xsorbed.io_utils import get_energies, get_z, launch_jobs, restart_jobs
+from xsorbed.settings import Settings
+from xsorbed.filenames import *
 
 
 def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None): 
@@ -97,7 +97,18 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
         launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=scf_outdir, jobname_prefix='scf', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
 
-def final_relax(threshold : float = None, exclude : list[int] = None, indices : list[int] = None):
+def final_relax(threshold : float = None, exclude : list= None, indices : list = None):
+
+    #Check for duplicates in exclude or in indices
+    if indices is not None:
+        if (len(set(indices)) < len(indices)):
+            print('The indices list contain duplicate elements. Quitting.')
+            sys.exit(1)
+    if exclude is not None:
+        if (len(set(exclude)) < len(exclude)):
+            print('The exclude list contain duplicate elements. Quitting.')
+            sys.exit(1)        
+
 
     settings=Settings()
     
@@ -121,7 +132,7 @@ def final_relax(threshold : float = None, exclude : list[int] = None, indices : 
         if exclude is None: exclude = []
         else: print('Configurations {0} will be excluded, as requested'.format(exclude))
 
-        e_min = min([energies[i] for i in [*range(len(energies))] if i not in exclude])
+        e_min = min([energies[i] for i in [*range(len(energies))]])
         i_minimum = energies.index(e_min)
         calcs = []
         subset_energies = []
