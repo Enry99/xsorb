@@ -66,11 +66,14 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         STOP = False
         for line in lines:
             if 'convergence NOT achieved' in line:
-                print("Found 'convergence NOT achieved' in {0}, so relaxation was not completed. It will be skipped.".format(file))
-                STOP = True
-                uncompleted.append(file)
-                break
-        if(STOP): continue
+                STOP = True            
+            if 'bfgs converged' in line:
+                STOP = False
+                break          
+        if(STOP): 
+            print("Found 'convergence NOT achieved' in {0}, so relaxation was not completed. It will be skipped.".format(file))
+            uncompleted.append(file)
+            continue
         configs.append(read(file) if pw == 'pwi' else read(file, results_required=False))
         labels.append(file.split('.'+pw)[0].split('_')[-1])
 
