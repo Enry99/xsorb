@@ -174,11 +174,17 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         from matplotlib import pyplot as plt
         import matplotlib.image as mpimg
 
-        rows_fig = max(int(np.ceil(len(configs)/5)), 1)
-        cols_fig = max(int(np.ceil(len(configs)/rows_fig)), 1)
-        fig = plt.figure(figsize=(1.5 * cols_fig, 5 * rows_fig / 3))
+        #calculate aspect ratio for one image:
+        img = mpimg.imread('relax_'+images_dirname+'/'+prefix+which+'_{0}{1}.png'.format(labels[0], '_pov' if povray else ''))
+        ar = float(img.shape[1]) / float(img.shape[0]) #width/height
+
+        n_rows_fig = max(int(np.ceil(len(configs)/5.)), 1)
+        n_cols_fig = max(int(np.ceil(len(configs)/float(n_rows_fig))), 1)
+        height = n_rows_fig *  2
+        width  = n_cols_fig * ar *  2
+        fig = plt.figure(figsize=(width, height))
         fig.subplots_adjust(wspace=0.001)
-        axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs) + 1)]
+        axes = [fig.add_subplot(n_rows_fig,n_cols_fig,i) for i in range(1,len(configs) + 1)]
     
         energies = [read_energy(file, *E_slab_mol) for file in pw_list if file not in uncompleted]
 
@@ -186,7 +192,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
             label = labels[i]
             img = mpimg.imread('relax_'+images_dirname+'/'+prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
             axes[i].imshow(img)
-            axes[i].set_title('{0:.3f} eV'.format(energies[i]), fontsize = 7, pad=1)
+            axes[i].set_title('{0:.2f} eV'.format(energies[i]), fontsize = 7, pad=1)
             axes[i].text(0.018, 0.983, label, bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),transform=axes[i].transAxes, 
                 fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
             axes[i].set_xticks([])
