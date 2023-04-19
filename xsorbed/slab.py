@@ -129,6 +129,9 @@ class Slab:
                         adsite_labels.append('bridge_{0:.2f},{1:.3f},{2:.3f},'.format(distance, *site[:2]))
                     else: adsite_labels.append('bridge,{0:.3f},{1:.3f},'.format(*site[:2]))
         
+        
+        print('Adsorption sites found.')
+
         if(save_image): #save png to visualize the identified sites
             print("Saving image to {0}".format(figname))
             sop = get_rot(self.asf.slab)
@@ -158,7 +161,9 @@ class Slab:
             ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')
 
-        print('Adsorption sites found.')
+            print("Image saved.")
+
+        
         
         return sel_adsites, adsite_labels
 
