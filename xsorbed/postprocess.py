@@ -180,10 +180,10 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
 
         n_rows_fig = max(int(np.ceil(len(configs)/5.)), 1)
         n_cols_fig = max(int(np.ceil(len(configs)/float(n_rows_fig))), 1)
-        height = n_rows_fig *  2
-        width  = n_cols_fig * ar *  2
+        height = n_rows_fig * 2
+        width  = n_cols_fig * ar * 2
         fig = plt.figure(figsize=(width, height))
-        fig.subplots_adjust(wspace=0.001)
+        fig.subplots_adjust(wspace=0.1)
         axes = [fig.add_subplot(n_rows_fig,n_cols_fig,i) for i in range(1,len(configs) + 1)]
     
         energies = [read_energy(file, *E_slab_mol) for file in pw_list if file not in uncompleted]

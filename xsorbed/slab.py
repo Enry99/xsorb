@@ -144,9 +144,9 @@ class Slab:
             #w,h = fig.get_size_inches()*fig.dpi
             w = ax.get_xlim()[1] - ax.get_xlim()[0]
 
-            crosses_size = 3   * 25 / w
+            crosses_size = 4   * 25 / w
             fontsize     = 1.5 * 25 / w
-            mew          = 0.5 * 25 / w
+            mew          = 1 * 25 / w
             adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in sel_adsites]
             for i, site in enumerate(sel_adsites):
                 if 'ontop' in adsite_labels[i]:
