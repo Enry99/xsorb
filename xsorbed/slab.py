@@ -98,7 +98,7 @@ class Slab:
         
 
         adsite_labels = []
-        nn = MinimumDistanceNN()
+        nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are at the center of a non-perfeclty equilater triangle
         surf_coords = [s.coords for s in self.asf.surface_sites]
         nonsurf_sites_indices = [i for i in range(len(self.asf.slab.sites)) if not np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
         slab = self.asf.slab.copy()
@@ -106,7 +106,7 @@ class Slab:
         for i in range(len(slab)): slab[i].z = 0
         #run over all the slab_adsites, classifiying them by checking if the
         #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'        
-        for site in sel_adsites:
+        for i, site in enumerate(sel_adsites):
             #dummy structure just to place one atom in the site
             coords = site.tolist()
             coords[2] = 0.2
@@ -117,17 +117,17 @@ class Slab:
 
             if any((site == x).all() for x in adsites['ontop']):
                 first_nn_species = nn_list[0].species_string
-                adsite_labels.append('ontop_{0},{1:.3f},{2:.3f},'.format(first_nn_species, *site[:2]))   
+                adsite_labels.append('{0} ontop_{1},{2:.3f},{3:.3f},'.format(i, first_nn_species, *site[:2]))   
             elif any((site == x).all() for x in adsites['hollow']):
-                adsite_labels.append('hollow_c{0},{1:.3f},{2:.3f},'.format(coord_n, *site[:2])) 
+                adsite_labels.append('{0} hollow_c{1},{2:.3f},{3:.3f},'.format(i, coord_n, *site[:2])) 
             else:
                 if(coord_n>=4): #attemps to fix the problem of fake bridges for 4-fold sites
-                    adsite_labels.append('hollow_c{0},{1:.3f},{2:.3f},'.format(coord_n, *site[:2]))
+                    adsite_labels.append('{0} hollow_c{1},{2:.3f},{3:.3f},'.format(i, coord_n, *site[:2]))
                 else:
                     if len(nn_list) >=2:
                         distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
-                        adsite_labels.append('bridge_{0:.2f},{1:.3f},{2:.3f},'.format(distance, *site[:2]))
-                    else: adsite_labels.append('bridge,{0:.3f},{1:.3f},'.format(*site[:2]))
+                        adsite_labels.append('{0} bridge_{1:.2f},{2:.3f},{3:.3f},'.format(i, distance, *site[:2]))
+                    else: adsite_labels.append('{0} bridge,{1:.3f},{2:.3f},'.format(i, *site[:2]))
         
         
         print('Adsorption sites found.')

@@ -17,7 +17,7 @@ jobscript_filename       = 'jobscript' #standard name used in the copied version
 #user-defined atomic colors:
 USER_COLORS_DEFS = [
     [1,  [1.00, 1.00, 1.00]],
-    [6,  [0.20, 0.20, 0.25]],
+    [6,  [0.35, 0.35, 0.40]],
     [7,  [0.50, 0.75, 1.00]],
     [8,  [0.70, 0.00, 0.00]],
     [14, [1.00, 1.00, 0.22]],

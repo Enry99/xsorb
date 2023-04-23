@@ -105,8 +105,8 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
     for color in USER_COLORS_DEFS:
         ATOM_COLORS[color[0]] = color[1]
     colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
-    colors_top = [ ATOM_COLORS[atom.number] if atom.index >= Nbulk else jmol_colors[atom.number] for atom in configs[0] ]
-
+    colors_top = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in configs[0] ]
+    #colors = colors_top   #only for hexene on C, remove for publication
 
     for i, config in enumerate(configs):
         label = labels[i]
@@ -133,7 +133,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
                     config, 
                     format='pov',
                     radii = 0.65, 
-                    rotation='-10z,-80x', 
+                    rotation='-5z,-85x', 
                     colors=colors,
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
                     #camera_type='perspective'
@@ -152,7 +152,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
                     config, 
                     format='pov',
                     radii = 0.65, 
-                    colors=colors_top,
+                    colors=colors,
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, transmittances=transmittances, textures = textures,
                         camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
                     #camera_type='perspective'
