@@ -133,8 +133,8 @@ def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_prefix 
         if(os.path.isfile(input_file)): # unnecessary, this check is also done before calling the function
 
             if(os.path.isfile(output_file)): 
-                print(output_file+' already present, possibly from a running calculation. Quitting.')
-                sys.exit(1)
+                print(output_file+' already present, possibly from a running calculation. It will be skipped.')
+                continue
 
             j_dir = outdirs+'/'+str(label)
             os.mkdir(j_dir)
