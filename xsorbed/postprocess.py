@@ -104,12 +104,30 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
     ATOM_COLORS = jmol_colors.copy()
     for color in USER_COLORS_DEFS:
         ATOM_COLORS[color[0]] = color[1]
-    colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
-    colors_top = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in configs[0] ]
-    #colors = colors_top   #only for hexene on C, remove for publication
+
+    from ase.build import make_supercell
+    Nbulk_original = Nbulk
 
     for i, config in enumerate(configs):
         label = labels[i]
+
+        #section to repeat the bulk if mol is partially outside###############
+        #TODO: mettere un check se la molecola è davvero fuori
+        #TODO: generalize by considering translation by cell vector, for non-cubic cell
+        #TODO: generalize for x,y direction in both ends
+        if(False):
+            mol = config[Nbulk_original:]
+            slab = config[:Nbulk_original]
+            slab.translate(-config.cell[:][1])
+            slab = make_supercell(slab, [[1,0,0], [0,2,0], [0,0,1]], wrap=False)
+            del slab[[atom.index for atom in slab if atom.y < -0.25*config.cell[:][1][1]]]  
+            Nbulk = len(slab)
+            config = slab + mol
+        #######################################################################
+
+        colors = [ATOM_COLORS[atom.number] for atom in config]
+        colors_top = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in config ]
+        colors = colors_top   #only for hexene on C, remove for publication        
 
         if(povray):
             config_copy = config.copy()
