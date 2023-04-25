@@ -2,17 +2,19 @@ VERSION                  = '0.9'
 
 rydbergtoev = 13.605703976
 
+hybrid_screening_thresholds = [1e-3, 1e-2]
+
 #just a collection of the preset (non-user-defined) filenames
-pwi_prefix               = ''
-pwo_prefix               = ''
-scf_labels_filename      = 'scf_site_labels.csv'
-scf_energies_filename    = 'scf_energies.csv'
-relax_energies_filename  = 'relax_energies.csv'
-images_dirname           = 'images'
-energy_plot_filename     = 'relax_energies.png'
-scf_outdir               = 'scf_outdirs'
-relax_outdir             = 'relax_outdirs'
-jobscript_filename       = 'jobscript' #standard name used in the copied version inside the outdirs
+pwi_prefix                  = ''
+pwo_prefix                  = ''
+labels_filename             = 'site_labels.csv'
+screening_energies_filename = 'screening_energies.csv'
+relax_energies_filename     = 'relax_energies.csv'
+images_dirname              = 'images'
+energy_plot_filename        = 'relax_energies.png'
+screening_outdir            = 'screening_outdirs'
+relax_outdir                = 'relax_outdirs'
+jobscript_filename          = 'jobscript' #standard name used in the copied version inside the outdirs
 
 #user-defined atomic colors:
 USER_COLORS_DEFS = [

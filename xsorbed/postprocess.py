@@ -44,7 +44,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
 
     if witdth_res is None and povray: witdth_res = 3000 
     if which == 's':
-        which = 'scf'
+        which = 'screening'
         prefix = pwi_prefix
         pw = 'pwi'
     elif which == 'r':
@@ -204,7 +204,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
 
 def view_config(which : str, index : int):
     if which == 's':
-        which = 'scf'
+        which = 'screening'
         prefix = pwi_prefix
         pw = 'pwi'
     elif which == 'r':
@@ -315,7 +315,7 @@ def plot_energy_evolution():
                 plt.plot(config_e, '-', label='{0}: {1:.2f}{2} eV'.format(labels[i], config_e[-1], '' if relax_terminated[i] else '*'))
                 if (not relax_terminated[i]): plt.plot(len(config_e)-1, config_e[-1], 'x', color='black')
             else:
-                print('Config. {0} job has not reached scf convergence. It will be skipped.'.format(i))
+                print('Config. {0} job has not reached scf convergence. It will be skipped.'.format(labels[i]))
             #plt.xlim(xmin=0)
             
     

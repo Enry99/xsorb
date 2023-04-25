@@ -19,7 +19,7 @@ TEST = False #do not actually launch the jobs, simply prints the command
 
 
 
-def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str):
+def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str, HYBRID = False):
     #can be called before all the jobs have finished
 
     rydbergtoev = 13.605703976
@@ -39,11 +39,11 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
             line.append('Eads_rel(eV)\n')
         else:
             line.append('Etot_rel(eV)\n')
-    else: #scf case
+    else: #screening case
         if E_slab_mol:
-            line.append('Eads_scf(eV)\n')
+            line.append('Eads_scr(eV)\n')
         else:
-            line.append('Etot_scf(eV)\n')
+            line.append('Etot_scr(eV)\n')
     data[0] = ','.join(line)
 
 
@@ -81,7 +81,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
                 line = data[config_label+1].split(',')
                 line[-1] = line[-1].split('\n')[0]
                 line.append('{:.3f}'.format(toten))
-                if "relax" in pwo_prefix and not relax_terminated:
+                if ("relax" in pwo_prefix  or HYBRID) and not relax_terminated:
                     print(file.split('/')[-1] + ' relaxation has not reached final configuration. The energy will be marked with a *')
                     line[-1]+='*'
                 
@@ -160,10 +160,10 @@ def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_prefix 
 
 
 def _is_completed(pwo : str, which : str):
-    if(which == 'scf'):
-        searchfor = 'End of self-consistent calculation'
-    elif(which == 'relax' or which == 'prerelax'):
-        searchfor = 'Final energy'
+    #if(which == 'scf'):
+    #    searchfor = 'End of self-consistent calculation'
+    #elif(which == 'relax' or which == 'prerelax'):
+    searchfor = 'Final energy'
     
     with open(pwo, 'r') as f:
         file = f.readlines()
@@ -177,9 +177,9 @@ def _is_completed(pwo : str, which : str):
 
 
 def restart_jobs(which : str, pwi_prefix : str, pwo_prefix : str):
-    if(which == 'scf'):
-        outdirs = 'scf_outdirs'
-        pwo_prefix_full = pwo_prefix + 'scf'
+    if(which == 'screening'):
+        outdirs = screening_outdir
+        pwo_prefix_full = pwo_prefix + 'screening'
     elif(which == 'relax'):
         outdirs = 'relax_outdirs'
         pwo_prefix_full = pwo_prefix + 'relax'

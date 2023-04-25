@@ -11,7 +11,7 @@ from xsorbed.settings import Settings
 from xsorbed.filenames import *
 
 
-def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None): 
+def generate(RUN : bool, HYBRID : bool = False, etot_forc_conv = [1e-3, 1e-2], SAVEFIG=False, saveas_format=None): 
  
     #BEGIN STRUCTURES GENERATION ############################################################################
 
@@ -37,7 +37,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
     for i, ads in enumerate(adsites):
         adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
 
-    distances_from_surf = len(settings.x_rot_angles)*[settings.scf_atom_distance]
+    distances_from_surf = len(settings.x_rot_angles)*[settings.screening_atom_distance]
 
     #Generate all the configs for the various molecular rotations and a list of labels
     all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
@@ -47,7 +47,7 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
         horiz_rotations=settings.z_rot_angles, 
         no_vert_rotx=settings.no_rot_vert,
         distance_from_surf=distances_from_surf, 
-        min_distance=settings.scf_min_distance, 
+        min_distance=settings.screening_min_distance, 
         save_image=SAVEFIG
         )
 
@@ -61,18 +61,21 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
     print('All slab+adsorbate cells generated.')
        
     print('Writing pwi(s)...')
-    csvfile=open(scf_labels_filename, 'w')
+    csvfile=open(labels_filename, 'w')
     csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
 
-    if SCF_RUN or 'calculation' not in settings.espresso_settings_dict['CONTROL']: 
-        settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'scf'})
+    if RUN: 
+        settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax' if HYBRID else 'scf' })
     settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
 
+    if HYBRID:
+        settings.espresso_settings_dict['CONTROL'].update({'etot_conv_thr' : etot_forc_conv[0]})
+        settings.espresso_settings_dict['CONTROL'].update({'forc_conv_thr' : etot_forc_conv[1]})
     
     pwi_names = []
 
     for i in np.arange(len(all_mol_on_slab_configs_ase)):
-        filename = pwi_prefix+'scf_'+str(i)+'.pwi'
+        filename = pwi_prefix+'screening_'+str(i)+'.pwi'
         pwi_names.append(filename)
         calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
@@ -93,8 +96,8 @@ def generate(SCF_RUN : bool, SAVEFIG=False, saveas_format=None):
     print('All pwi(s) written.')
     #END OF STRUCTURE GENERATIONS #########################################################################################
     
-    if SCF_RUN:
-        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=scf_outdir, jobname_prefix='scf', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+    if RUN:
+        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=screening_outdir, jobname_prefix='screening', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
 
 
 def final_relax(threshold : float = None, exclude : list= None, indices : list = None):
@@ -120,13 +123,13 @@ def final_relax(threshold : float = None, exclude : list= None, indices : list =
     mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms)
 
     if indices is not None: calcs = indices
-    else:  
-        print('Collecting energies from scf screening...')
-        energies = get_energies(scf_labels_filename, scf_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=pwo_prefix+'scf')
-        if None in energies:
+    else:
+        print('Collecting energies from screening...')
+        energies = get_energies(labels_filename, screening_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=pwo_prefix+'screening')
+        if None in energies: #TODO: sistemare!!!! per ora non differenzia lo screening ibrido e richiede solo che si sia raggiunta la conv scf
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)
-        print('Scf energies collected.')
+        print('screening energies collected.')
 
 
         if exclude is None: exclude = []
@@ -181,7 +184,7 @@ def final_relax(threshold : float = None, exclude : list= None, indices : list =
 
     pwi_names = []
     for i in calcs:       
-        #struct_ase = read(pwi_prefix+'scf_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
+        #struct_ase = read(pwi_prefix+'screening_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
         fixed_indices_molecule = slab.natoms + np.array(settings.fixed_indices_mol)
 
@@ -209,7 +212,7 @@ def final_relax(threshold : float = None, exclude : list= None, indices : list =
 
 def saveas(which : str, saveas_format : str):
 
-    if which == 'scf':
+    if which == 'screening':
         prefix = pwi_prefix
         pw = 'pwi'
     elif which == 'relax':
