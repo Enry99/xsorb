@@ -191,7 +191,7 @@ def main():
 
     elif(args.hs is not None):
         if not args.hs: args.hs = hybrid_screening_thresholds
-        generate(RUN = False, HYBRID=True, etot_forc_conv = args.hs, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+        generate(RUN = True, HYBRID=True, etot_forc_conv = args.hs, SAVEFIG=args.save_figs, saveas_format=args.saveas)
 
     elif(args.r):
         final_relax(args.t, exclude=args.exclude, indices=args.i)
