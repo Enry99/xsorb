@@ -126,8 +126,16 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         #######################################################################
 
         colors = [ATOM_COLORS[atom.number] for atom in config]
-        colors_top = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in config ]
-        colors = colors_top   #only for hexene on C, remove for publication        
+
+        #fading color for lower layers in top view
+        zmax = max([atom.z for atom in config if atom.index < Nbulk])
+        zmin = min([atom.z for atom in config if atom.index < Nbulk])
+        delta = zmax - zmin
+        import numpy as np
+        colors_top = [ ATOM_COLORS[atom.number] + (np.array([1,1,1]) - ATOM_COLORS[atom.number])*(zmax - atom.z)/delta if atom.index < Nbulk else ATOM_COLORS[atom.number] for atom in config ]
+
+        colors_special = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in config ]
+        #colors = colors_special   #only for hexene on C, remove for publication        
 
         if(povray):
             config_copy = config.copy()
@@ -165,12 +173,12 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
                 delta_z = zmax - zmin
                 transmittances = [0]*len(config) #[1-(atom.z - zmin)/delta_z for atom in config] #linearization
 
-                textures = ['pale'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
+                textures = ['ase3'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
                 write(prefix+which+'_{0}_top_pov.pov'.format(label), 
                     config, 
                     format='pov',
                     radii = 0.65, 
-                    colors=colors,
+                    colors=colors_top,
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, transmittances=transmittances, textures = textures,
                         camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
                     #camera_type='perspective'
