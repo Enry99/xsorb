@@ -104,12 +104,38 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
     ATOM_COLORS = jmol_colors.copy()
     for color in USER_COLORS_DEFS:
         ATOM_COLORS[color[0]] = color[1]
-    colors = [ATOM_COLORS[atom.number] for atom in configs[0]]
-    colors_top = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in configs[0] ]
-    #colors = colors_top   #only for hexene on C, remove for publication
+
+    from ase.build import make_supercell
+    Nbulk_original = Nbulk
 
     for i, config in enumerate(configs):
         label = labels[i]
+
+        #section to repeat the bulk if mol is partially outside###############
+        #TODO: mettere un check se la molecola è davvero fuori
+        #TODO: generalize by considering translation by cell vector, for non-cubic cell
+        #TODO: generalize for x,y direction in both ends
+        if(False):
+            mol = config[Nbulk_original:]
+            slab = config[:Nbulk_original]
+            slab.translate(-config.cell[:][1])
+            slab = make_supercell(slab, [[1,0,0], [0,2,0], [0,0,1]], wrap=False)
+            del slab[[atom.index for atom in slab if atom.y < -0.25*config.cell[:][1][1]]]  
+            Nbulk = len(slab)
+            config = slab + mol
+        #######################################################################
+
+        colors = [ATOM_COLORS[atom.number] for atom in config]
+
+        #fading color for lower layers in top view
+        zmax = max([atom.z for atom in config if atom.index < Nbulk])
+        zmin = min([atom.z for atom in config if atom.index < Nbulk])
+        delta = zmax - zmin
+        import numpy as np
+        colors_top = [ ATOM_COLORS[atom.number] + (np.array([1,1,1]) - ATOM_COLORS[atom.number])*(zmax - atom.z)/delta if atom.index < Nbulk else ATOM_COLORS[atom.number] for atom in config ]
+
+        colors_special = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in config ]
+        #colors = colors_special   #only for hexene on C, remove for publication        
 
         if(povray):
             config_copy = config.copy()
@@ -147,12 +173,12 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
                 delta_z = zmax - zmin
                 transmittances = [0]*len(config) #[1-(atom.z - zmin)/delta_z for atom in config] #linearization
 
-                textures = ['pale'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
+                textures = ['ase3'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
                 write(prefix+which+'_{0}_top_pov.pov'.format(label), 
                     config, 
                     format='pov',
                     radii = 0.65, 
-                    colors=colors,
+                    colors=colors_top,
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, transmittances=transmittances, textures = textures,
                         camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
                     #camera_type='perspective'
