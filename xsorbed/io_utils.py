@@ -40,6 +40,7 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
         else:
             line.append('Etot_rel(eV)\n')
     else: #screening case
+        line.append('E_0 (eV)')
         if E_slab_mol:
             line.append('Eads_scr(eV)\n')
         else:
@@ -60,8 +61,9 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
             for line in pwo: #make sure to get the last one (useful in relaxations)
                 if '!' in line: 
                     toten = line.split()[4]
+                    if not scf_terminated: toten0 = toten #scf_terminated becomes true in the next line, so we take the first step
                 if 'convergence has been achieved' in line:
-                    scf_terminated = True
+                    scf_terminated = True                   
                 if 'Final energy' in line:
                     relax_terminated = True
 
@@ -71,16 +73,25 @@ def get_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_p
                 config_label = int( (file.split('.pwo')[0]).split('_')[-1] )                
 
                 toten = float(toten)
+                toten0 = float(toten0)
                 if E_slab_mol:
                     toten -= (E_slab_mol[0]+E_slab_mol[1])
+                    toten0 -= (E_slab_mol[0]+E_slab_mol[1])
                 
                 toten *= rydbergtoev
-                energies[i] = toten
+                toten0 *= rydbergtoev
+
+                if HYBRID:
+                    if relax_terminated:
+                        energies[i] = toten
+                else: #for scf screening
+                    energies[i] = toten
 
 
                 line = data[config_label+1].split(',')
                 line[-1] = line[-1].split('\n')[0]
-                line.append('{:.3f}'.format(toten))
+                if "relax" not in pwo_prefix: line.append('{:.2f}'.format(toten0))
+                line.append('{:.2f}'.format(toten))
                 if ("relax" in pwo_prefix  or HYBRID) and not relax_terminated:
                     print(file.split('/')[-1] + ' relaxation has not reached final configuration. The energy will be marked with a *')
                     line[-1]+='*'
@@ -147,7 +158,7 @@ def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_prefix 
 
                 for i, line in enumerate(lines):
                     if "job-name" in line:
-                        lines[i] = line.split('=')[0] + '="' + jobname_prefix + '_' + label +'"\n'
+                        lines[i] = line.split('=')[0] + '="' + label + '_' + jobname_prefix +'"\n'
                         break
         
             with open(jobscript_filename, 'w') as f:

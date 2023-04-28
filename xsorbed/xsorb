@@ -74,16 +74,18 @@ def cli_parse():
     #main flags
     main_calc = calc_group.add_mutually_exclusive_group()
     main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
-    main_calc.add_argument('-s', action='store_true', help='launch scf screening')
-    main_calc.add_argument('-hs', nargs='*', type=float, help='launch hybrid screening (prerelax)')
+    main_calc.add_argument('-s', nargs='*', type=float, help='launch hybrid screening (prerelax)')
+    main_calc.add_argument('-scf', action='store_true', help='launch scf screening')
     main_calc.add_argument('-r', action='store_true', help='launch relaxations')
     main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) screening or relax calculations')
     #optional flags
+    relax_options = calc_group.add_mutually_exclusive_group()
+    relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum for the final relaxation)')
+    relax_options.add_argument('--t', type=float, help='energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
+    relax_options.add_argument('--i', nargs='+', type=int, help='select specific configurations (by label) for relaxation')
+    calc_group.add_argument('--exclude', nargs='+', type=int, help='exclude selected configurations from the final relaxation')
     calc_group.add_argument('--save-figs', action='store_true', help='plot also the figures (sites + molecule orientations) when using -g or -r')
     calc_group.add_argument('--saveas', type=str, help='generate also files in the desiered format besides the pwi(s), e.g. cif, xyz, ...')
-    calc_group.add_argument('--t', type=float, help='energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
-    calc_group.add_argument('--i', nargs='+', type=int, help='select specific configurations (by label) for relaxation')
-    calc_group.add_argument('--exclude', nargs='+', type=int, help='exclude selected configurations from the final relaxation when using threshold --t')
 
 
 
@@ -92,7 +94,7 @@ def cli_parse():
     main_energy = energy_group.add_mutually_exclusive_group()
     main_energy.add_argument('-es', action='store_true', help='save screening energies to csv')
     main_energy.add_argument('-er', action='store_true', help='save relax energies to csv')
-    main_energy.add_argument('-plot-energies', action='store_true', help='save image with energies evolution during relax')
+    main_energy.add_argument('-plot-energies', nargs='?', default='r', const='r', help='save image with energies evolution during relax')
 
 
     visualization_group = parser.add_argument_group(title='Visualization options')
@@ -117,7 +119,7 @@ def cli_parse():
 
     #Check presence of incompatible commands belonging to different groups
     args_dict = vars(args)
-    calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='hs' or key=='g' or key=='r' or key=='restart') ]
+    calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='scf' or key=='g' or key=='r' or key=='restart') ]
     energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er') ]
     visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='screening-images'  
         or key=='relax-images' or key=='relax-animations' or key=='view') ]
@@ -131,16 +133,19 @@ def cli_parse():
   
 
     #Check for all incompatible OPTIONAL arguments
-    if args.save_figs and not args.g and not args.s and not args.hs:
-        parser.error("--save-figs option can only be used with -g or -s")
-    if args.saveas and not args.g and not args.s and not args.hs and not args.r:
-        parser.error("--saveas option can only be used with -g, -s or -r")
+    if args.save_figs and not args.g and not args.s and not args.scf:
+        parser.error("--save-figs option can only be used with -g or -s or -scf")
+    if args.saveas and not args.g and not args.s and not args.scf and not args.r:
+        parser.error("--saveas option can only be used with -g, -s, -scf or -r")
+    if args.n and not args.r:
+        parser.error("--n option can only be used with -r")
     if args.t and not args.r:
         parser.error("--t option can only be used with -r")
     if args.i and not args.r:
         parser.error("--t option can only be used with -r")
     if args.exclude and not args.r:
         parser.error("--exclude option can only be used with -r")
+    #TODO: add option to regenerate the files for relax instead of reading the prerelaxed pwos
     if args.povray and not args.screening_images and not args.relax_images and not args.relax_animations: # and not args.render_image:
         parser.error("--povray option can only be used with -screening-images or -relax-images or -relax-animations")
     if args.width_res is not None and not args.povray:
@@ -156,8 +161,8 @@ def cli_parse():
         except:
             parser.error('-view must be followed by a string in the form [s/r][int] e.g. s3 (with int >=0)')
 
-    if args.hs is not None:
-        if len(args.hs) != 0 and len(args.hs) != 2:
+    if args.s is not None:
+        if len(args.s) != 0 and len(args.s) != 2:
             parser.error('-hs command requires either no argument (the default 1e-3 and 1e-2 will be used) or TWO arguments.')
 
     return args
@@ -185,16 +190,16 @@ def main():
     #calc
     if(args.g):
         generate(RUN = False, SAVEFIG=args.save_figs, saveas_format=args.saveas)
-    
-    elif(args.s):
+
+    elif(args.s is not None):
+        if not args.s: args.s = hybrid_screening_thresholds
+        generate(RUN = True, HYBRID=True, etot_forc_conv = args.s, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+
+    elif(args.scf):
         generate(RUN = True, SAVEFIG=args.save_figs, saveas_format=args.saveas)
 
-    elif(args.hs is not None):
-        if not args.hs: args.hs = hybrid_screening_thresholds
-        generate(RUN = True, HYBRID=True, etot_forc_conv = args.hs, SAVEFIG=args.save_figs, saveas_format=args.saveas)
-
     elif(args.r):
-        final_relax(args.t, exclude=args.exclude, indices=args.i)
+        final_relax(args.n, args.t, exclude=args.exclude, indices=args.i)
 
     elif(args.restart):
         restart_jobs(which='screening' if args.restart == 's' else 'relax', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
@@ -207,7 +212,7 @@ def main():
             E_slab_mol = Settings().E_slab_mol
         except: #option in case settings.in or some other input file is no more present.
             E_slab_mol = []
-        get_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'screening')
+        get_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'screening', HYBRID=True)
 
     elif(args.er):
         try:
@@ -221,8 +226,8 @@ def main():
         else:    
             get_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'relax')
     
-    elif(args.plot_energies):
-        plot_energy_evolution()
+    elif(args.plot_energies is not None):
+        plot_energy_evolution(which='screening' if args.plot_energies == 's' else 'relax')
 
 
     #visualization
