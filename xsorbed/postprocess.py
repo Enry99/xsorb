@@ -302,13 +302,13 @@ def relax_animations(povray = False, witdth_res=3000):
     print('All animations saved to {0}.'.format('relax_'+images_dirname))
 
 
-def plot_energy_evolution():
+def plot_energy_evolution(which='relax'):
 
     settings = Settings()
     Eslab, Emol = (settings.E_slab_mol[0], settings.E_slab_mol[1])
 
     print('Reading files...')
-    pwo_list=natsorted(glob.glob(pwo_prefix+'relax_*.pwo'))
+    pwo_list=natsorted(glob.glob(pwo_prefix+which+'_*.pwo'))
     labels = [int(pwo.split('.pwo')[0].split('_')[-1]) for pwo in pwo_list]
 
     totens = []
@@ -350,6 +350,7 @@ def plot_energy_evolution():
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
     plt.legend(title="Config, energy")
+    energy_plot_filename = '{0}_energies.png'.format(which)
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
 
     print('plot saved in {0}'.format(energy_plot_filename))
