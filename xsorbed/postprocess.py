@@ -132,10 +132,10 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
         zmin = min([atom.z for atom in config if atom.index < Nbulk])
         delta = zmax - zmin
         import numpy as np
-        colors_top = [ ATOM_COLORS[atom.number] + (np.array([1,1,1]) - ATOM_COLORS[atom.number])*(zmax - atom.z)/delta if atom.index < Nbulk else ATOM_COLORS[atom.number] for atom in config ]
 
         colors_special = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in config ]
-        #colors = colors_special   #only for hexene on C, remove for publication        
+        colors = colors_special   #only for hexene on C, remove for publication
+        colors_top = [ colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta if atom.index < Nbulk else colors[atom.index] for atom in config ]
 
         if(povray):
             config_copy = config.copy()
@@ -173,7 +173,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
                 delta_z = zmax - zmin
                 transmittances = [0]*len(config) #[1-(atom.z - zmin)/delta_z for atom in config] #linearization
 
-                textures = ['ase3'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
+                textures = ['pale'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
                 write(prefix+which+'_{0}_top_pov.pov'.format(label), 
                     config, 
                     format='pov',
@@ -191,7 +191,7 @@ def config_images(which : str, povray = False, witdth_res=3000, index : str = No
                 write(prefix+which+'_{0}_{1}.png'.format(label, rotations), config, rotation=rotations, scale = 100, colors=colors)
             else: #front and top view           
                 write(prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors) #front view
-                write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors) #top view
+                write(prefix+which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors_top) #top view
 
 
     if(which=='relax' and index is None):
