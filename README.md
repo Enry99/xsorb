@@ -3,7 +3,6 @@
 xSorb is a lightweight, flexible and user-friendly tool to generate and run ab initio calculations of molecules adsorbed over surfaces. 
 Relying on Quantum Espresso for ab initio calculations and on two well-established Python libraries (ASE and Pymatgen) to generate the structures, it allows to produce and explore a large number of adsorption configurations of a molecule on a surface, finally identifying the most stable configuration  and computing the associated adsorption energy.
 
---------------
 # Installation
 
 ## Download and setup
@@ -48,7 +47,6 @@ For the animations with povray, the [`ffmpeg`](https://ffmpeg.org/) package is a
 
 Note however that this is not mandatory, and you can still generate static images and animations by using ase's own renderer, although with a lower image quality.
 
----------------
 # Program use
 
 The program works through a command-line interface (CLI) by running:  
