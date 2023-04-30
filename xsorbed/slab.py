@@ -5,7 +5,7 @@
 Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
 
-Small helper class to deal with the slab
+Small helper class to handle the slab
 
 """
 
@@ -72,7 +72,7 @@ class Slab:
         return atoms_list
 
 
-    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False, selected_sites : list = []):
+    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, selected_sites : list = [], ALL=False,  save_image = False ):
         '''
         Returns a list of cartesian coordinates of the adsites, and a list of labels ('ontop', x, y).
         Optionally it saves a figure with the sites on the surface.
@@ -85,7 +85,7 @@ class Slab:
 
         print('Finding adsorption sites...')
 
-        if symm_reduce_thr == 0 and not selected_sites:
+        if ALL:
             figname = 'adsorption_sites_all.png'
         else:
             figname = 'adsorption_sites.png'
@@ -138,15 +138,17 @@ class Slab:
 
             fig = plt.figure(figsize=(4,3))
             ax = fig.add_subplot(111)
-            plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.7, decay=0.25)
+            #ax.xaxis.set_tick_params(labelsize=5)
+            #ax.yaxis.set_tick_params(labelsize=5)
+            plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.52, decay=0.25)
 
 
             #w,h = fig.get_size_inches()*fig.dpi
             w = ax.get_xlim()[1] - ax.get_xlim()[0]
 
-            crosses_size = 4   * 25 / w
-            fontsize     = 1.5 * 25 / w
-            mew          = 1 * 25 / w
+            crosses_size = 6.0  * 25. / w
+            fontsize     = 2.0 * 25. / w
+            mew          = 1.0 * 25. / w
             adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in sel_adsites]
             for i, site in enumerate(sel_adsites):
                 if 'ontop' in adsite_labels[i]:
@@ -158,7 +160,7 @@ class Slab:
                 ax.plot(*adsites_xy[i], color=color, marker="x", markersize=crosses_size, mew=mew, linestyle="", zorder=500000)
                 ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=fontsize, path_effects=[PathEffects.withStroke(linewidth=0.25,foreground="w")], zorder=1000000)
                             
-            ax.set_title('Adsites: r=ontop, g=bridge, b=hollow')
+            #ax.set_title('r=ontop, g=bridge, b=hollow')
             fig.savefig(figname, dpi=1500, bbox_inches='tight')
 
             print("Image saved.")
@@ -175,7 +177,7 @@ class Slab:
             mol = molecule.copy()
             mol.translate(coords)
 
-            #final check on distance, assuming zmol
+            #final check on distance#########################################
             distances = []
             for mol_atom in mol:
                 for slab_atom in self.slab_ase:
@@ -205,7 +207,7 @@ class Slab:
         return structs
 
 
-#NOTE!!!: CURRENTLY NOT WORKING
+#NOTE!!!: CURRENTLY NOT WORKING, might be implemented in the future
 def adsorb_both_surfaces(all_mol_on_slab_configs_pymat : list): 
     new_adslabs = []
     

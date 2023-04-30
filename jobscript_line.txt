@@ -1,0 +1,7 @@
+Example of the line that executes Quantum Espresso in the jobscript file:
+the important part is $1 >> $2 for the input files, since the names are
+replaced by the program
+
+###############################################################
+srun pw.x -input $1 >> $2
+###############################################################

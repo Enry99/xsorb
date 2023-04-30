@@ -3,7 +3,7 @@
 &INPUT
    slab_filename                 = 'slab.pwo'
    molecule_filename             = 'mol.pwo'
-   jobscript                     = 'job_simple'
+   jobscript                     = 'jobscript' sbatch
 /
 
 
@@ -29,7 +29,6 @@
    calculation      = 'relax'
    restart_mode     = 'from_scratch'
    nstep            = 400
-   outdir           = 'WORK'
    max_seconds      = 86000
    pseudo_dir       = '/home/pseudo'
 /
