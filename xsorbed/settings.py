@@ -1,15 +1,21 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+@author: Enrico Pedretti
+
+Small helper class to collect the settings read from settings.in
+
+"""
+
+
 import sys
 import numpy as np
-from xsorbed import input
+import input
 
 class Settings:
 
     def __init__(self, settings_filename : str = "settings.in", read_energies = True) -> None:
-
-        #preset variables:######################################################################
-
-        #########################################################################################
-
 
         #variables read from settings.in
         script_settings_dict, self.espresso_settings_dict, self.atomic_species, self.kpoints, self.last_dump = input.read_input_file(settings_filename)
@@ -26,7 +32,7 @@ class Settings:
         #check existence of mandatory flags in blocks
         mandatory_flags = {
             'INPUT' : ['slab_filename','molecule_filename', 'jobscript'], 
-            'STRUCTURE' : ['selected_atom_index', 'x_rot_angles', 'y_rot_angles', 'z_rot_angles'], 
+            'STRUCTURE' : ['selected_atom_index', 'molecule_axis', 'x_rot_angles', 'y_rot_angles', 'z_rot_angles'], 
             }
         for block in mandatory_flags:
             for flag in mandatory_flags[block]:
@@ -34,10 +40,21 @@ class Settings:
                     print("Mandatory flag {0} not found in block {1} while reading settings.in.".format(flag, block))
                     sys.exit(1)
 
+        script_settings_dict['INPUT']['jobscript'] = [x.strip("'") for x in script_settings_dict['INPUT']['jobscript'].split()]
+        script_settings_dict['STRUCTURE']['molecule_axis'] = [x.strip("'") for x in script_settings_dict['STRUCTURE']['molecule_axis'].split()]
 
-        if 'molecule_axis_atoms' in script_settings_dict['STRUCTURE'] and 'axis_vector' in script_settings_dict['STRUCTURE']:
-            print("You can specify the molecule axis either by 'molecule_axis_atoms' or 'axis_vector', not both.")
+        if script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'atoms':
+            if len(script_settings_dict['STRUCTURE']['molecule_axis'][1:]) != 2:
+                print("Error: you must specify two integers as indices of the two atoms for the molecule axis.")
+                sys.exit(1)
+        elif script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'vector':
+            if len(script_settings_dict['STRUCTURE']['molecule_axis'][1:]) != 3:
+                print("Error: you must specify three numbers for the vector representing the molecule axis.")
+                sys.exit(1)            
+        else:
+            print("Error: molecule_axis must be specified with 'atoms' or 'vector'")
             sys.exit(1)
+
         if 'fixed_indices_slab' in script_settings_dict['STRUCTURE'] and 'fixed_layers_slab' in script_settings_dict['STRUCTURE']:
             print("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")
             sys.exit(1)
@@ -51,17 +68,15 @@ class Settings:
             'layers_height'            : 0.5,
             'selected_sites'           : ' ',
             'mol_subset_atoms'         : ' ',
-            'molecule_axis_atoms'      : ' ',
-            'axis_vector'              : ' ',
             'screening_atom_distance'  : 2.0,
             'screening_min_distance'   : 1.5,
-            'rel_atom_distance'        : 2.0,
-            'rel_min_distance'         : 1.5,
-            'no_rot_vert'              : '.true.',
+            'relax_atom_distance'      : 2.0,
+            'relax_min_distance'       : 1.5,
+            'no_x_rot_vert'            : '.false.',
             'fixed_indices_slab'       : ' ',
             'fixed_layers_slab'        : ' ',
             'fixed_indices_mol'        : ' ',
-            'fix_slab_xyz'             : '0 0 1',
+            'fix_slab_xyz'             : '0 0 0',
             'fix_mol_xyz'              : '0 0 1',
         }
         for flag in optional_flags_list:
@@ -78,7 +93,8 @@ class Settings:
         #&INPUT:
         self.slab_filename          = script_settings_dict['INPUT']['slab_filename']
         self.molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
-        self.jobscript              = script_settings_dict['INPUT']['jobscript']
+        self.jobscript              = script_settings_dict['INPUT']['jobscript'][0]
+        self.sbatch_command         = script_settings_dict['INPUT']['jobscript'][1]
         self.E_slab_mol = np.array(
             script_settings_dict['INPUT']['E_slab_mol'].split(), dtype=float
             ).tolist() if 'E_slab_mol' in script_settings_dict['INPUT'] else []
@@ -108,17 +124,19 @@ class Settings:
         self.selected_sites         = np.array(script_settings_dict['STRUCTURE']['selected_sites'].split(), dtype=int).tolist()
 
         self.mol_subset_atoms       = np.array(script_settings_dict['STRUCTURE']['mol_subset_atoms'].split(), dtype=int).tolist()
-        self.molecule_axis_atoms    = np.array(script_settings_dict['STRUCTURE']['molecule_axis_atoms'].split(), dtype=int).tolist()
-        self.axis_vector            = np.array(script_settings_dict['STRUCTURE']['axis_vector'].split(), dtype=float).tolist()
+        self.molecule_axis_atoms    = np.array(script_settings_dict['STRUCTURE']['molecule_axis'][1:], dtype=int
+                                               ).tolist() if script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'atoms' else []
+        self.axis_vector            = np.array(script_settings_dict['STRUCTURE']['molecule_axis'][1:], dtype=float
+                                               ).tolist() if script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'vector' else []
         self.selected_atom_index    = int(script_settings_dict['STRUCTURE']['selected_atom_index'])
         self.screening_atom_distance= float(script_settings_dict['STRUCTURE']['screening_atom_distance'])
         self.screening_min_distance = float(script_settings_dict['STRUCTURE']['screening_min_distance'])
-        self.rel_atom_distance      = float(script_settings_dict['STRUCTURE']['rel_atom_distance'])
-        self.rel_min_distance       = float(script_settings_dict['STRUCTURE']['rel_min_distance'])                
+        self.relax_atom_distance    = float(script_settings_dict['STRUCTURE']['relax_atom_distance'])
+        self.relax_min_distance     = float(script_settings_dict['STRUCTURE']['relax_min_distance'])                
         self.x_rot_angles           = np.array(script_settings_dict['STRUCTURE']['x_rot_angles'].split(), dtype=float).tolist()
         self.y_rot_angles           = np.array(script_settings_dict['STRUCTURE']['y_rot_angles'].split(), dtype=float).tolist()  
         self.z_rot_angles           = np.array(script_settings_dict['STRUCTURE']['z_rot_angles'].split(), dtype=float).tolist()          
-        self.no_rot_vert            = True if 'true' in script_settings_dict['STRUCTURE']['no_rot_vert'].lower() else False
+        self.no_x_rot_vert          = True if 'true' in script_settings_dict['STRUCTURE']['no_x_rot_vert'].lower() else False
 
         self.fixed_indices_slab     = np.array(script_settings_dict['STRUCTURE']['fixed_indices_slab'].split(), dtype=int).tolist()
         self.fixed_layers_slab      = np.array(script_settings_dict['STRUCTURE']['fixed_layers_slab'].split(), dtype=int).tolist()
@@ -137,6 +155,9 @@ class Settings:
             self.kpoints[1] = np.array(self.kpoints[1], dtype=int).tolist()
             self.kpoints[2] = np.array(self.kpoints[2], dtype=int).tolist()
 
+
+        #Espresso &CONTROL
+        self.espresso_settings_dict['CONTROL'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
 
         #Espresso &SYSTEM (correction to bugs in ase function to write pwis)
         self.starting_mag = [None]*len(self.pseudopotentials) #this needs special treatment because it must be overwritten, while the others are just appended
@@ -169,6 +190,8 @@ class Settings:
             'near_reduce':self.near_reduce, 
             'no_obtuse_hollow':True}
 
+        #import json
+        #print(json.dumps(self.__dict__, indent=4))
 
     def _read_energy(self, filename : str):
         with open(filename, 'r') as f:

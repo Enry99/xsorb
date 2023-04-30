@@ -9,14 +9,15 @@ and return them as two dictionaries (script settings and Espresso settings)
 
 """
 
-import sys
-
 #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, as they are read from the input structures
 #
-#NOTE 3(possible TODO): This code does not yet support the following Espresso blocks:
+#NOTE 2(possible TODO): This code does not yet support the following Espresso blocks:
 #OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS, HUBBARD
 
-#functions
+
+import sys
+
+
 def _is_number(s : str):
     try:
         float(s)
@@ -68,7 +69,7 @@ def read_input_file(filename: str):
         for line in file:
             
             if line.isspace() or line.strip()[0] == '!' or line.strip()[0] == '#':
-                if(ATOMIC_SPECIES): ATOMIC_SPECIES = False
+                if(line.isspace() and ATOMIC_SPECIES): ATOMIC_SPECIES = False
                 continue #skip empty / comment lines
             if(ATOMIC_SPECIES):
                 if ('ATOMIC_POSITIONS' in line or 
@@ -144,7 +145,7 @@ def read_input_file(filename: str):
                     atomic_species.append(line.split())
                     continue
 
-                if('K_POINTS' in line or 'kpoints' in line):
+                if('K_POINTS' in line or 'k_points' in line):
                     KPOINTS = True
                     gamma_or_auto = line.split()[1].strip().lower()
                     kpoints.append(gamma_or_auto)

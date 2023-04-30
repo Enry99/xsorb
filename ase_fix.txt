@@ -1,5 +1,5 @@
 in file ASE_PATH/ase/ase/io/espresso.py
-in line 273 (or around that in other version), substitute:
+in line 273, substitute:
 
                 magmoms = [
                     float(mag_line.split()[5]) for mag_line

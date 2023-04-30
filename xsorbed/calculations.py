@@ -4,15 +4,15 @@ import os, sys
 from natsort import natsorted
 import glob
 #
-from xsorbed.slab import Slab, adsorb_both_surfaces
-from xsorbed.molecule import Molecule
-from xsorbed.espresso_mod import Espresso_mod
-from xsorbed.io_utils import get_energies, get_z, launch_jobs, restart_jobs
-from xsorbed.settings import Settings
-from xsorbed.filenames import *
+from slab import Slab, adsorb_both_surfaces
+from molecule import Molecule
+from espresso_mod import Espresso_mod
+from io_utils import get_energies, launch_jobs
+from settings import Settings
+from filenames import *
 
 
-def generate(RUN : bool, HYBRID : bool = False, etot_forc_conv = [1e-3, 1e-2], SAVEFIG=False, saveas_format=None): 
+def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_format=None): 
  
     #BEGIN STRUCTURES GENERATION ############################################################################
 
@@ -43,10 +43,10 @@ def generate(RUN : bool, HYBRID : bool = False, etot_forc_conv = [1e-3, 1e-2], S
     #Generate all the configs for the various molecular rotations and a list of labels
     all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
         atom_index=settings.selected_atom_index,  
-        vert_rotations=settings.y_rot_angles,
-        screw_rotations=settings.x_rot_angles, 
-        horiz_rotations=settings.z_rot_angles, 
-        no_vert_rotx=settings.no_rot_vert,
+        y_rot_angles=settings.y_rot_angles,
+        x_rot_angles=settings.x_rot_angles, 
+        z_rot_angles=settings.z_rot_angles, 
+        no_x_rot_vert=settings.no_x_rot_vert,
         distance_from_surf=distances_from_surf, 
         min_distance=settings.screening_min_distance, 
         save_image=SAVEFIG
@@ -66,18 +66,24 @@ def generate(RUN : bool, HYBRID : bool = False, etot_forc_conv = [1e-3, 1e-2], S
     csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
 
     if RUN: 
-        settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax' if HYBRID else 'scf' })
-    settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
-
-    if HYBRID:
+        settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax' })
         settings.espresso_settings_dict['CONTROL'].update({'etot_conv_thr' : etot_forc_conv[0]})
         settings.espresso_settings_dict['CONTROL'].update({'forc_conv_thr' : etot_forc_conv[1]})
         settings.espresso_settings_dict['IONS'].update({'upscale': 1})
+    settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
+
+    if saveas_format is not None:
+        folder = saveas_format+'/screening/'
+        if not os.path.exists(saveas_format):
+            os.mkdir(saveas_format)
+        if not os.path.exists(folder):
+            os.mkdir(folder)  
+
     
     pwi_names = []
 
     for i in np.arange(len(all_mol_on_slab_configs_ase)):
-        filename = pwi_prefix+'screening_'+str(i)+'.pwi'
+        filename = pw_files_prefix+'screening_'+str(i)+'.pwi'
         pwi_names.append(filename)
         calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
@@ -89,7 +95,7 @@ def generate(RUN : bool, HYBRID : bool = False, etot_forc_conv = [1e-3, 1e-2], S
         calc.set_fixed_atoms(fixed_slab, slab.reindex_map, settings.fixed_indices_mol, mol.reindex_map, slab.natoms, mol.natoms, settings.fix_slab_xyz, settings.fix_mol_xyz)
         calc.set_system_flags(settings.starting_mag, settings.flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
-        if(saveas_format is not None): write(filename.split('.')[0]+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
+        if(saveas_format is not None): write(folder+filename.split('.')[0]+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
 
         csvfile.write(str(i)+','+full_labels[i]+'\n')
 
@@ -99,12 +105,10 @@ def generate(RUN : bool, HYBRID : bool = False, etot_forc_conv = [1e-3, 1e-2], S
     #END OF STRUCTURE GENERATIONS #########################################################################################
     
     if RUN:
-        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=screening_outdir, jobname_prefix='scr', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=screening_outdir, jobname_title='scr')
 
 
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False):
-
-    FROM_HYBRID = True #TODO: vedere come generalizzare per lo screening scf puro
     
     if n_configs is None and threshold is None: n_configs = N_relax_default
     
@@ -124,7 +128,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     if indices is not None: calcs = indices
     else:
         print('Collecting energies from screening...')
-        energies = get_energies(labels_filename, screening_energies_filename, E_slab_mol=settings.E_slab_mol, pwo_prefix=pwo_prefix+'screening', HYBRID=FROM_HYBRID)
+        energies = get_energies(E_slab_mol=settings.E_slab_mol, pwo_prefix='screening')
         if None in energies: #TODO: sistemare!!!! per ora non differenzia lo screening ibrido e richiede solo che si sia raggiunta la conv scf
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)
@@ -146,17 +150,15 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
                     calcs.append(i)
         elif threshold is not None:
             e_min = min(energies)
-            i_minimum = energies.index(e_min)
             for i, energy in enumerate(energies):
                 if i in exclude: continue
                 if energy - e_min <= threshold:
                     calcs.append(i)
                     subset_energies.append(energy)
-            #sort them by minimum energy, in order to launch first the minimum
+            #sort them by minimum energy, in order to launch first the minimum. TODO: do this also for the --n case
             sorted_indices = np.argsort(subset_energies, kind='stable').tolist()
             calcs = [calcs[i] for i in sorted_indices]
 
-    #print(calcs)
 
     settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
     settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
@@ -179,12 +181,12 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
         all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
             atom_index=settings.selected_atom_index,  
-            vert_rotations=settings.y_rot_angles,
-            screw_rotations=settings.x_rot_angles, 
-            horiz_rotations=settings.z_rot_angles, 
-            no_vert_rotx=settings.no_rot_vert,
-            distance_from_surf=settings.rel_atom_distance, 
-            min_distance=settings.rel_min_distance, 
+            y_rot_angles=settings.y_rot_angles,
+            x_rot_angles=settings.x_rot_angles, 
+            z_rot_angles=settings.z_rot_angles, 
+            no_x_rot_vert=settings.no_x_rot_vert,
+            distance_from_surf=settings.relax_atom_distance, 
+            min_distance=settings.relax_min_distance, 
             save_image=False
             )
 
@@ -196,7 +198,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
         full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
         print('All slab+adsorbate cells generated.')
     else:
-        files = natsorted(glob.glob( pwi_prefix + "screening_*.pwo" ))        
+        files = natsorted(glob.glob( pw_files_prefix + "screening_*.pwo" ))        
         all_mol_on_slab_configs_ase = [read(filename=file, results_required=False) for file in files]
 
  
@@ -207,7 +209,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
         fixed_indices_molecule = slab.natoms + np.array(settings.fixed_indices_mol)
 
-        filename = pwi_prefix+'relax_'+str(i)+'.pwi'
+        filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
         pwi_names.append(filename)
         calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
@@ -227,19 +229,22 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
         calc.write_input(all_mol_on_slab_configs_ase[i])
 
     #print(pwi_names)
-    launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=relax_outdir, jobname_prefix='rel', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+    launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=relax_outdir, jobname_title='rel')
 
 
-def saveas(which : str, saveas_format : str):
+def saveas(which : str, i_or_f : str, saveas_format : str):
 
-    if which == 'screening':
-        prefix = pwi_prefix
+    if i_or_f == 'i':
         pw = 'pwi'
-    elif which == 'relax':
-        prefix = pwo_prefix
+    elif i_or_f == 'f':
         pw = 'pwo'
+    else: 
+        raise RuntimeError("Wrong arguments: passed '{0} {1}', expected 'screening i/f' or 'relax i/f'".format(which, i_or_f))
+    if which != 'screening' and which != 'relax':
+        raise RuntimeError("Wrong argument: passed '{0}', expected 'screening' or 'relax'".format(which))
+
     print('Reading files...')
-    pw_list=glob.glob(prefix+which+'_*.'+pw)
+    pw_list=glob.glob(pw_files_prefix+which+'_*.'+pw)
     configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
     print('All files read.')
 

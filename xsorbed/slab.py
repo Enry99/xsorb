@@ -5,7 +5,7 @@
 Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
 
-Small helper class to deal with the slab
+Small helper class to handle the slab
 
 """
 
@@ -72,7 +72,7 @@ class Slab:
         return atoms_list
 
 
-    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, save_image = False, selected_sites : list = []):
+    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, selected_sites : list = [], ALL=False,  save_image = False ):
         '''
         Returns a list of cartesian coordinates of the adsites, and a list of labels ('ontop', x, y).
         Optionally it saves a figure with the sites on the surface.
@@ -85,7 +85,7 @@ class Slab:
 
         print('Finding adsorption sites...')
 
-        if symm_reduce_thr == 0 and not selected_sites:
+        if ALL:
             figname = 'adsorption_sites_all.png'
         else:
             figname = 'adsorption_sites.png'
@@ -177,7 +177,7 @@ class Slab:
             mol = molecule.copy()
             mol.translate(coords)
 
-            #final check on distance, assuming zmol
+            #final check on distance#########################################
             distances = []
             for mol_atom in mol:
                 for slab_atom in self.slab_ase:
@@ -207,7 +207,7 @@ class Slab:
         return structs
 
 
-#NOTE!!!: CURRENTLY NOT WORKING
+#NOTE!!!: CURRENTLY NOT WORKING, might be implemented in the future
 def adsorb_both_surfaces(all_mol_on_slab_configs_pymat : list): 
     new_adslabs = []
     

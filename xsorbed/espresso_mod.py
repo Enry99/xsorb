@@ -4,7 +4,7 @@
 Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
 
-Subclass Espresso to modify write pwi in order to fix atoms xy only
+Subclass of class Espresso to modify pwi written by ASE
 
 """
 
@@ -25,10 +25,6 @@ class Espresso_mod(Espresso):
     def set_fixed_atoms(self, slab_atoms_indices: list, slab_remapping: list, mol_atom_indices: list, mol_remapping: list, natoms_slab : int, natoms_mol : int, fix_slab_xyz : list = [0,0,0], fix_mol_xyz : list = [0,0,1]):
         '''
         Sets the indices of the atoms that need to be fixed during dynamics.
-        Args: 
-            slab_atoms_indices: list of the slab atoms indices to be fixed
-            mol_atom_index: index of the atom of the mol to be fixed (index in the slab+mol cell)
-            FixZ_slab, FixZ_molecule: fix also the z coordinate
         '''
 
         self.slab_atoms_indices = slab_atoms_indices.copy()
@@ -80,13 +76,18 @@ class Espresso_mod(Espresso):
         with open(self.filename, 'r') as file:
             data = file.readlines()
 
+
+        ASE_DID_WRITE_MAGNETIZATIONS = False
         for i, mag in enumerate(self.starting_mag):
 
+            found = False
             for j, line in enumerate(data):
                 if 'starting_magnetization({0})'.format(i+1) in line:
-                    line_index = j         
+                    line_index = j
+                    found = True
+                    ASE_DID_WRITE_MAGNETIZATIONS = True     
             
-            if mag is not None:
+            if found and mag is not None:
                 data[line_index] = '   starting_magnetization({0}) = {1}\n'.format(i+1, mag)
 
         in_SYSTEM = False
@@ -96,9 +97,18 @@ class Espresso_mod(Espresso):
             if('/' in line and in_SYSTEM):
                 j0 = j
                 break
-        
+
+        if not ASE_DID_WRITE_MAGNETIZATIONS:
+            for i, mag in enumerate(self.starting_mag):
+                if mag is not None:
+                    data.insert(j0, '   starting_magnetization({0}) = {1}\n'.format(i+1, mag)) 
+                    j0 += 1
+
         for i, flag in enumerate(self.flags_i):
-            data.insert(j0+i, '   {0} = {1}\n'.format(flag[0], flag[1]))
+            data.insert(j0, '   {0} = {1}\n'.format(flag[0], flag[1]))
+            j0 += 1
+
+
         
         with open(self.filename, 'w') as file:
             file.writelines( data )

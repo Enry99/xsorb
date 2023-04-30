@@ -7,48 +7,11 @@ Created on Fri 6 Feb 2023
 @author: Enrico Pedretti
 @author: Paolo Restuccia
 
-Python script based on Pymatgen and ASE to build adatom adsorption on slabs calculated with Quantum ESPRESSO
+Xsorb is a lightweight, flexible and user-friendly tool to generate and run ab initio calculations of molecules adsorbed over substrates,
+relying on Quantum Espresso for DFT calculations and on ASE & Pymatgen to generate the adsorption structures
 
-
-# @Brief summary of the program:
-# -Reads slab from file (many types supported, e.g. pwi/pwo, .xyz, .cif, POSCAR ...). The slab is assumed to be already relaxed.
-
-# -Reads molecule from file. You must provide the indices of the two atoms that will define the x axis direction, or directly specify
-#   the vector that will be taken as the x axis for the rotations.
-#   It is also possible to select only a subset of the atoms by specifying the indices in the file. This can be useful to create fragments.
-
-# -Finds all adsorption sites on the surface, optionally saves a .png with the identified sites.
-#    If too many sites are identified, try to adjust (increase) the two threshold parameters 
-#    'symm_reduce' and 'near_reduce' in the sites_find_args dictionary. 
-#    Optionally you can also manually select the sites by specifying them with the indices plotted in the 
-#    image generated with the option -sites. Note that by setting symm_reduce = 0 the program finds
-#    ALL the high-symmetry sites, from which you can choose those that you want. 
-
-# -Generates all the desired orientations of the molecule after translating to the origin the selected atom of the molecule, 
-#    which will be later placed above the slab in the adsorption sites. 
-#    NOTE: the selected atom index must be the one in the input file,
-#    even if only a subset of the molecule is selected. The rotations are performed in the following order:
-#    1) rotations along x axis ("screw")
-#    2) rotations along y axis ("verticality": 0 = molecule horizontal, 90 = molecule vertical)
-#    3) rotations along z axis (rotations in the horizontal plane)
-#    
-#    Optionally saves a .png with all the orientations viewed from above.
-
-# -Generates configurations for all orientations placing the selected atom above all adsorption sites. Each configuration is labeled by an integer index.
-#    In order to identify the labels, a table is written into a .csv containing label, xrot_angle, yrot_angle, z_rot_angle, site_type, x_site, y_site, z_site
-
-# -Writes the .pwi for all the generated configurations and submits all the jobs in parallel for the scf screening.
-#    Optionally it is possible to just generate the .pwi(s) without launching the jobs (useful for checking the generated
-#    configurations before starting the calculations)
-#    Optionally writes also the xsf files for visualization (so you can open them also with VESTA)
-
-# -After the scf screening is completed, the scf energies can be extracted and are saved into a .csv
-
-# -Finally, the configurations close to the energy minimum (within a threshold) calculated
-#    with the scf screening can be relaxed to find the adsorption energies.
-
-# -The parameters of the scripts (and of Espresso) must be set in the settings.in file, for which a template example
-#    with all the mandatory and optional flags is provided.
+More info on the program's usage can be found at:
+https://gitlab.com/triboteam/xsorbed/-/wikis/home
 
 """
 
@@ -56,7 +19,7 @@ Python script based on Pymatgen and ASE to build adatom adsorption on slabs calc
 import os, sys
 import argparse
 #
-from xsorbed.filenames import *
+from filenames import *
 ########################################################################################
 
 
@@ -74,18 +37,18 @@ def cli_parse():
     #main flags
     main_calc = calc_group.add_mutually_exclusive_group()
     main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
-    main_calc.add_argument('-s', nargs='*', type=float, help='launch hybrid screening (prerelax)')
-    main_calc.add_argument('-scf', action='store_true', help='launch scf screening')
-    main_calc.add_argument('-r', action='store_true', help='launch relaxations')
+    main_calc.add_argument('-s', nargs='*', type=float, help='launch screening. Optional arguments: e_tot_conv_thr forc_conv_thr (default 5e-3 5e-2)')
+    main_calc.add_argument('-r', action='store_true', help='launch final relaxations')
     main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) screening or relax calculations')
     #optional flags
     relax_options = calc_group.add_mutually_exclusive_group()
-    relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum for the final relaxation)')
+    relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum) for the final relaxation')
     relax_options.add_argument('--t', type=float, help='energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
     relax_options.add_argument('--i', nargs='+', type=int, help='select specific configurations (by label) for relaxation')
     calc_group.add_argument('--exclude', nargs='+', type=int, help='exclude selected configurations from the final relaxation')
+    calc_group.add_argument('--regenerate', action='store_true', default=False, help='re-generate structures for final relaxations instead of reading the positions from screening')
     calc_group.add_argument('--save-figs', action='store_true', help='plot also the figures (sites + molecule orientations) when using -g or -r')
-    calc_group.add_argument('--saveas', type=str, help='generate also files in the desiered format besides the pwi(s), e.g. cif, xyz, ...')
+    calc_group.add_argument('--saveas', type=str, help='generate also files in the desired format besides the pwi(s), e.g. cif, xyz, ...')
 
 
 
@@ -93,8 +56,9 @@ def cli_parse():
     #main flags
     main_energy = energy_group.add_mutually_exclusive_group()
     main_energy.add_argument('-es', action='store_true', help='save screening energies to csv')
-    main_energy.add_argument('-er', action='store_true', help='save relax energies to csv')
-    main_energy.add_argument('-plot-energies', nargs='?', default='r', const='r', help='save image with energies evolution during relax')
+    main_energy.add_argument('-er', action='store_true', help='save final relax energies to csv')
+    main_energy.add_argument('-plot-energies-scr', action='store_true', help='save image with energies evolution during screening')
+    main_energy.add_argument('-plot-energies', action='store_true', help='save image with energies evolution during final relax')
 
 
     visualization_group = parser.add_argument_group(title='Visualization options')
@@ -102,12 +66,12 @@ def cli_parse():
     main_visual = visualization_group.add_mutually_exclusive_group()
     main_visual.add_argument('-sites', action='store_true',  help='plot the identified high-symmetry sites sites with labels')
     main_visual.add_argument('-sites-all', action='store_true',  help='plot ALL the high-symmetry sites sites with labels')
-    main_visual.add_argument('-screening-images', action='store_true', help='save images of the screening configurations')
-    main_visual.add_argument('-relax-images', action='store_true', help='save images of the relaxations')
+    main_visual.add_argument('-screening-images', nargs=1, choices=['i', 'f'], help="save images of the screening configurations. Option: 'i'/'f' for initial or final positions")
+    main_visual.add_argument('-relax-images', nargs=1, choices=['i', 'f'], help="save images of the relaxations. Option: 'i'/'f' for initial or final positions")
     #main_visual.add_argument('-render-image', nargs=2, help='select which image to render and the rotations list for the camera (syntax: [s/r][index] [rotations], e.g. r12 -10z,-80x)')
     main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the relaxations in gif (default) or mp4 format (for povray)')
     main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
-    main_visual.add_argument('-savefiles', nargs=2, help='save files in specific format (syntax: [format] [calc_type], e.g. cif relax)')
+    main_visual.add_argument('-savefiles', nargs=3, help='save files in specific format (syntax: [format] [calc_type] [i/f], e.g. cif screening i or xyz relax f)')
     #optional flags
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
     visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
@@ -119,10 +83,10 @@ def cli_parse():
 
     #Check presence of incompatible commands belonging to different groups
     args_dict = vars(args)
-    calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='scf' or key=='g' or key=='r' or key=='restart') ]
-    energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er') ]
+    calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
+    energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er' or key=='plot_energies_scr' or key=='plot_energies') ]
     visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='screening-images'  
-        or key=='relax-images' or key=='relax-animations' or key=='view') ]
+        or key=='relax-images' or key=='relax-animations' or key=='view' or key=='savefiles') ]
 
     if calc_command and energy_command:
         parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], energy_command[0]))
@@ -133,19 +97,20 @@ def cli_parse():
   
 
     #Check for all incompatible OPTIONAL arguments
-    if args.save_figs and not args.g and not args.s and not args.scf:
-        parser.error("--save-figs option can only be used with -g or -s or -scf")
-    if args.saveas and not args.g and not args.s and not args.scf and not args.r:
-        parser.error("--saveas option can only be used with -g, -s, -scf or -r")
+    if args.save_figs and not args.g and not args.s:
+        parser.error("--save-figs option can only be used with -g or -s")
+    if args.saveas and not args.g and not args.s and not args.r:
+        parser.error("--saveas option can only be used with -g, -s or -r")
     if args.n and not args.r:
         parser.error("--n option can only be used with -r")
     if args.t and not args.r:
         parser.error("--t option can only be used with -r")
     if args.i and not args.r:
-        parser.error("--t option can only be used with -r")
+        parser.error("--i option can only be used with -r")
     if args.exclude and not args.r:
         parser.error("--exclude option can only be used with -r")
-    #TODO: add option to regenerate the files for relax instead of reading the prerelaxed pwos
+    if args.regenerate and not args.r:
+        parser.error("--regenerate option can only be used with -r")
     if args.povray and not args.screening_images and not args.relax_images and not args.relax_animations: # and not args.render_image:
         parser.error("--povray option can only be used with -screening-images or -relax-images or -relax-animations")
     if args.width_res is not None and not args.povray:
@@ -163,7 +128,7 @@ def cli_parse():
 
     if args.s is not None:
         if len(args.s) != 0 and len(args.s) != 2:
-            parser.error('-hs command requires either no argument (the default 1e-3 and 1e-2 will be used) or TWO arguments.')
+            parser.error('-s command requires either no argument (the default 5e-3 and 5e-2 will be used) or TWO arguments.')
 
     return args
 
@@ -180,9 +145,8 @@ def main():
 
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
-    import input
     from settings import Settings
-    from io_utils import get_energies, restart_jobs
+    from io_utils import write_energies, restart_jobs
     from calculations import generate, final_relax, saveas
     from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
     ############################################################################################
@@ -193,16 +157,13 @@ def main():
 
     elif(args.s is not None):
         if not args.s: args.s = hybrid_screening_thresholds
-        generate(RUN = True, HYBRID=True, etot_forc_conv = args.s, SAVEFIG=args.save_figs, saveas_format=args.saveas)
-
-    elif(args.scf):
-        generate(RUN = True, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+        generate(RUN = True, etot_forc_conv = args.s, SAVEFIG=args.save_figs, saveas_format=args.saveas)
 
     elif(args.r):
-        final_relax(args.n, args.t, exclude=args.exclude, indices=args.i)
+        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, indices=args.i, REGENERATE=args.regenerate)
 
     elif(args.restart):
-        restart_jobs(which='screening' if args.restart == 's' else 'relax', pwi_prefix=pwi_prefix, pwo_prefix=pwo_prefix)
+        restart_jobs(which='screening' if args.restart == 's' else 'relax')
 
 
 
@@ -212,7 +173,7 @@ def main():
             E_slab_mol = Settings().E_slab_mol
         except: #option in case settings.in or some other input file is no more present.
             E_slab_mol = []
-        get_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'screening', HYBRID=True)
+        write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
 
     elif(args.er):
         try:
@@ -220,14 +181,14 @@ def main():
         except: #option in case settings.in or some other input file is no more present.
             E_slab_mol = []
         if not os.path.isfile(screening_energies_filename):
-            get_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'screening')
-            get_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'relax')
-            os.remove(screening_energies_filename)
-        else:    
-            get_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pwo_prefix+'relax')
+            write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
+        write_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'relax')
     
-    elif(args.plot_energies is not None):
-        plot_energy_evolution(which='screening' if args.plot_energies == 's' else 'relax')
+    elif(args.plot_energies_scr):
+        plot_energy_evolution(which='screening')
+    
+    elif(args.plot_energies):
+        plot_energy_evolution(which='relax')
 
 
     #visualization
@@ -235,10 +196,10 @@ def main():
         plot_adsorption_sites(ALL = args.sites_all)
 
     elif(args.screening_images):
-        config_images(which='s', povray=args.povray, witdth_res=args.width_res)
+        config_images(which='screening', i_or_f = args.screening_images[0],  povray=args.povray, witdth_res=args.width_res)
 
     elif(args.relax_images):
-        config_images(which='r', povray=args.povray, witdth_res=args.width_res)
+        config_images(which='relax', i_or_f = args.relax_images[0], povray=args.povray, witdth_res=args.width_res)
 
     #elif(args.render_image):
     #    config_images(which=args.render_image[0][0], index=args.render_image[0][1:], 
@@ -251,7 +212,7 @@ def main():
         view_config(which=args.view[0], index=int(args.view[1:]))
 
     elif(args.savefiles is not None):
-        saveas(which=args.savefiles[1], saveas_format=args.savefiles[0])
+        saveas(which=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])
 
 
 
