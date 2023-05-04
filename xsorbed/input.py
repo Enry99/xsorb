@@ -38,6 +38,9 @@ def _read_card(lines : list, CONVERT = False):
         val = val.strip()
         val = val.strip("'")
 
+        key = key.lower()
+        val = val.lower()
+
         if(CONVERT):
             if (_is_number(val)):
                 if val.isnumeric(): val = int(val)
@@ -72,16 +75,16 @@ def read_input_file(filename: str):
                 if(line.isspace() and ATOMIC_SPECIES): ATOMIC_SPECIES = False
                 continue #skip empty / comment lines
             if(ATOMIC_SPECIES):
-                if ('ATOMIC_POSITIONS' in line or 
-                'K_POINTS' in line or 
-                'ADDITIONAL_K_POINTS' in line or 
-                'CELL_PARAMETERS' in line or 
-                'CONSTRAINTS' in line or 
-                'OCCUPATIONS' in line or 
-                'ATOMIC_VELOCITIES' in line or 
-                'ATOMIC_FORCES' in line or 
-                'SOLVENTS' in line or 
-                'HUBBARD' in line):
+                if ('ATOMIC_POSITIONS' in line.upper() or 
+                'K_POINTS' in line.upper() or 
+                'ADDITIONAL_K_POINTS' in line.upper() or 
+                'CELL_PARAMETERS' in line.upper() or 
+                'CONSTRAINTS' in line.upper() or 
+                'OCCUPATIONS' in line.upper() or 
+                'ATOMIC_VELOCITIES' in line.upper() or 
+                'ATOMIC_FORCES' in line.upper() or 
+                'SOLVENTS' in line.upper() or 
+                'HUBBARD' in line.upper()):
                     ATOMIC_SPECIES = False
 
             
@@ -90,17 +93,17 @@ def read_input_file(filename: str):
             if('!' in line):
                 line = line.split('!')[0]
             
-            if "@ESPRESSO" in line:
+            if "@ESPRESSO" in line.upper():
                 espresso_block = True
                 continue
-            if "@SETTINGS" in line:
+            if "@SETTINGS" in line.upper():
                 settings_block = True
                 continue
 
-            if "@/ESPRESSO" in line:
+            if "@/ESPRESSO" in line.upper():
                 espresso_block = False
                 continue
-            if "@/SETTINGS" in line:
+            if "@/SETTINGS" in line.upper():
                 settings_block = False
                 continue
 
@@ -138,14 +141,14 @@ def read_input_file(filename: str):
 
 
 
-                if('ATOMIC_SPECIES' in line or 'atomic_species' in line):
+                if('ATOMIC_SPECIES' in line.upper()):
                     ATOMIC_SPECIES = True
                     continue
                 if(ATOMIC_SPECIES):
                     atomic_species.append(line.split())
                     continue
 
-                if('K_POINTS' in line or 'k_points' in line):
+                if('K_POINTS' in line.upper()):
                     KPOINTS = True
                     gamma_or_auto = line.split()[1].strip().lower()
                     kpoints.append(gamma_or_auto)

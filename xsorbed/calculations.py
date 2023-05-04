@@ -38,7 +38,6 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
     for i, ads in enumerate(adsites):
         adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
 
-    distances_from_surf = len(settings.x_rot_angles)*[settings.screening_atom_distance]
 
     #Generate all the configs for the various molecular rotations and a list of labels
     all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
@@ -46,8 +45,8 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
         y_rot_angles=settings.y_rot_angles,
         x_rot_angles=settings.x_rot_angles, 
         z_rot_angles=settings.z_rot_angles, 
-        no_x_rot_vert=settings.no_x_rot_vert,
-        distance_from_surf=distances_from_surf, 
+        vert_angles_list=settings.vertical_angles,
+        distance_from_surf=settings.screening_atom_distance, 
         min_distance=settings.screening_min_distance, 
         save_image=SAVEFIG
         )
@@ -184,7 +183,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
             y_rot_angles=settings.y_rot_angles,
             x_rot_angles=settings.x_rot_angles, 
             z_rot_angles=settings.z_rot_angles, 
-            no_x_rot_vert=settings.no_x_rot_vert,
+            vert_angles_list=settings.vertical_angles,
             distance_from_surf=settings.relax_atom_distance, 
             min_distance=settings.relax_min_distance, 
             save_image=False

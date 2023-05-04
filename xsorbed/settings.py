@@ -55,6 +55,26 @@ class Settings:
             print("Error: molecule_axis must be specified with 'atoms' or 'vector'")
             sys.exit(1)
 
+        print(script_settings_dict['STRUCTURE']['vertical_angles'])
+        if 'vertical_angles' in script_settings_dict['STRUCTURE']:
+            script_settings_dict['STRUCTURE']['vertical_angles'] = [x.strip("'") for x in script_settings_dict['STRUCTURE']['vertical_angles'].split()]
+            if (script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'x' 
+                and script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'z'
+                and script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'none'
+                and script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'list'):
+                    print("Error: vertical_angles requires either 'x', 'z', 'none' or 'list' [list of custom angles].")
+                    sys.exit(1)             
+
+            if (script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'x' 
+                or script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'z'
+                or script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'none') and len(script_settings_dict['STRUCTURE']['vertical_angles']) > 1 :
+                    print("Error: the specified mode for vertical_angles does not support additional arguments.")
+                    sys.exit(1) 
+            if(script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'list' and len(script_settings_dict['STRUCTURE']['vertical_angles']) == 1):
+                    print("Error: the specified mode for vertical_angles requires at least one angle (e.g. 0)")
+                    sys.exit(1)
+        else: script_settings_dict['STRUCTURE']['vertical_angles'] = ['x']
+
         if 'fixed_indices_slab' in script_settings_dict['STRUCTURE'] and 'fixed_layers_slab' in script_settings_dict['STRUCTURE']:
             print("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")
             sys.exit(1)
@@ -72,7 +92,6 @@ class Settings:
             'screening_min_distance'   : 1.5,
             'relax_atom_distance'      : 2.0,
             'relax_min_distance'       : 1.5,
-            'no_x_rot_vert'            : '.false.',
             'fixed_indices_slab'       : ' ',
             'fixed_layers_slab'        : ' ',
             'fixed_indices_mol'        : ' ',
@@ -135,8 +154,17 @@ class Settings:
         self.relax_min_distance     = float(script_settings_dict['STRUCTURE']['relax_min_distance'])                
         self.x_rot_angles           = np.array(script_settings_dict['STRUCTURE']['x_rot_angles'].split(), dtype=float).tolist()
         self.y_rot_angles           = np.array(script_settings_dict['STRUCTURE']['y_rot_angles'].split(), dtype=float).tolist()  
-        self.z_rot_angles           = np.array(script_settings_dict['STRUCTURE']['z_rot_angles'].split(), dtype=float).tolist()          
-        self.no_x_rot_vert          = True if 'true' in script_settings_dict['STRUCTURE']['no_x_rot_vert'].lower() else False
+        self.z_rot_angles           = np.array(script_settings_dict['STRUCTURE']['z_rot_angles'].split(), dtype=float).tolist()
+
+        if script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'x':            
+            self.vertical_angles    = self.x_rot_angles
+        elif script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'z':
+            self.vertical_angles    = self.z_rot_angles
+        elif script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'none':
+            self.vertical_angles    = np.array([0.])
+        else:
+            self.vertical_angles    = np.array(script_settings_dict['STRUCTURE']['vertical_angles'][1:], dtype=float).tolist()
+         
 
         self.fixed_indices_slab     = np.array(script_settings_dict['STRUCTURE']['fixed_indices_slab'].split(), dtype=int).tolist()
         self.fixed_layers_slab      = np.array(script_settings_dict['STRUCTURE']['fixed_layers_slab'].split(), dtype=int).tolist()
@@ -192,6 +220,7 @@ class Settings:
 
         #import json
         #print(json.dumps(self.__dict__, indent=4))
+        print(self.vertical_angles)
 
     def _read_energy(self, filename : str):
         with open(filename, 'r') as f:
