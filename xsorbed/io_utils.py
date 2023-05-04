@@ -194,7 +194,7 @@ def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_title :
 
                 for i, line in enumerate(lines):
                     if "job-name" in line:
-                        lines[i] = line.split('=')[0] + '="' + '_' + jobname_title + label + '"\n'
+                        lines[i] = line.split('=')[0] + '="' + jobname_title + '_' + label + '"\n'
                         break
         
             with open(jobscript_filename, 'w') as f:
