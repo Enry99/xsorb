@@ -140,7 +140,7 @@ class Slab:
             ax = fig.add_subplot(111)
             #ax.xaxis.set_tick_params(labelsize=5)
             #ax.yaxis.set_tick_params(labelsize=5)
-            plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=0.52, decay=0.25)
+            plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=1.0, decay=0.25)
 
 
             #w,h = fig.get_size_inches()*fig.dpi

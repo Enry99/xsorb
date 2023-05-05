@@ -39,7 +39,7 @@ def _read_card(lines : list, CONVERT = False):
         val = val.strip("'")
 
         key = key.lower()
-        val = val.lower()
+        #val = val.lower()
 
         if(CONVERT):
             if (_is_number(val)):

@@ -55,7 +55,6 @@ class Settings:
             print("Error: molecule_axis must be specified with 'atoms' or 'vector'")
             sys.exit(1)
 
-        print(script_settings_dict['STRUCTURE']['vertical_angles'])
         if 'vertical_angles' in script_settings_dict['STRUCTURE']:
             script_settings_dict['STRUCTURE']['vertical_angles'] = [x.strip("'") for x in script_settings_dict['STRUCTURE']['vertical_angles'].split()]
             if (script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'x' 
@@ -220,7 +219,6 @@ class Settings:
 
         #import json
         #print(json.dumps(self.__dict__, indent=4))
-        print(self.vertical_angles)
 
     def _read_energy(self, filename : str):
         with open(filename, 'r') as f:
