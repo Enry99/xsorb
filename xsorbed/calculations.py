@@ -216,14 +216,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
                     kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None)
         if(settings.fixed_layers_slab): fixed_slab = slab.get_atoms_by_layers(settings.fixed_layers_slab)
         else: fixed_slab = settings.fixed_indices_slab
-        calc.set_fixed_atoms(
-            fixed_slab,
-            slab.reindex_map, 
-            fixed_indices_molecule,
-            mol.reindex_map, 
-            slab.natoms, 
-            mol.natoms,
-            settings.fix_slab_xyz, settings.fix_mol_xyz)
+        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, settings.fixed_indices_mol, mol.reindex_map, slab.natoms, mol.natoms, settings.fix_slab_xyz, settings.fix_mol_xyz)
         calc.set_system_flags(settings.starting_mag, settings.flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
 
