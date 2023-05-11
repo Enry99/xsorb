@@ -37,6 +37,8 @@ class Slab:
         zmin = min(self.slab_ase.positions[:,2])
         if(zmin < 1):
             self.slab_ase.translate([0,0,1-zmin])
+        #translate so that the slab does not have atoms outside the cell
+        #self.slab_ase.wrap(pbc=True)
         
 
         #identification of the layers##################################
@@ -58,7 +60,16 @@ class Slab:
         #NOTE: here we used np.argsort to get the indices, while ase.sort (which uses sorted library) to actually sort the elements.
         # Check if same result (possible problems with very similar numbers)         
         ###############################################################      
-    
+
+        #small trick to find sites closer to each other. CURRENTLY NOT WORKING
+        #slab_ase_rounded = self.slab_ase.copy() #to find sites close to each other
+        #slab_ase_rounded.positions = np.round(slab_ase_rounded.positions, decimals = 2)
+        #scaled_positions = slab_ase_rounded.get_scaled_positions()
+        #for i, pos in enumerate(scaled_positions):
+            #slab_ase_rounded.positions[i][2] += 0.005*(2 - abs(0.5-pos[0]) - abs(0.5-pos[1]))
+        #slab_pymat_rounded = ase.AseAtomsAdaptor.get_structure(self.slab_ase_rounded)
+        #self.asf = AdsorbateSiteFinder(slab_pymat_rounded, height=surface_sites_height)
+
         self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
         self.slab_pymat = ase.AseAtomsAdaptor.get_structure(self.slab_ase)
         self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height)

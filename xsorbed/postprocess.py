@@ -229,7 +229,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=1500, in
                 fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
             axes[i].set_xticks([])
             axes[i].set_yticks([])
-        fig.savefig('{0}_{1}/{0}_overview{0}.png'.format(which, images_dirname ,'_pov' if povray else ''), dpi=1500, bbox_inches='tight')
+        fig.savefig('{0}_{1}/{0}_overview{2}.png'.format(which, images_dirname ,'_pov' if povray else ''), dpi=1000, bbox_inches='tight')
 
     print('All images saved in {0}.'.format(which+'_'+images_dirname))
 
