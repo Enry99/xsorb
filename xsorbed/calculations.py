@@ -206,7 +206,6 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     for i in calcs:       
         #struct_ase = read(pwi_prefix+'screening_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
-        fixed_indices_molecule = slab.natoms + np.array(settings.fixed_indices_mol)
 
         filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
         pwi_names.append(filename)
