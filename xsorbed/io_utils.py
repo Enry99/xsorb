@@ -184,7 +184,7 @@ def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_title :
                 continue
 
             j_dir = outdirs+'/'+str(label)
-            os.mkdir(j_dir)
+            if not os.path.exists(j_dir): os.mkdir(j_dir)
 
             shutil.copyfile(jobscript, j_dir+'/'+jobscript_filename)
 

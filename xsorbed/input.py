@@ -63,6 +63,7 @@ def read_input_file(filename: str):
         kpoints = []  #syntax: ['gamma'/'automatic', [kx,ky,kz], [koffx,koffy,koffz]]
         atomic_species = []  #syntax: [[Fe, 1.000, Fe.pbe-n-rrkjus_psl.1.0.0.UPF], ...]
         last_dump = [] #other lines not in the two main blocks
+        text = []
         in_card = False
         ATOMIC_SPECIES = False
         KPOINTS = False
@@ -70,6 +71,8 @@ def read_input_file(filename: str):
         settings_block = False
 
         for line in file:
+
+            text.append(line)
             
             if line.isspace() or line.strip()[0] == '!' or line.strip()[0] == '#':
                 if(line.isspace() and ATOMIC_SPECIES): ATOMIC_SPECIES = False
@@ -178,4 +181,4 @@ def read_input_file(filename: str):
         print('Atomic_species not read correctly. Quitting.')
         sys.exit(1)
 
-    return script_settings_dict, espresso_settings_dict, atomic_species, kpoints, last_dump
+    return script_settings_dict, espresso_settings_dict, atomic_species, kpoints, last_dump, text

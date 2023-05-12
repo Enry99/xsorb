@@ -1,0 +1,37 @@
+
+{"H_OH" : 
+   {
+      "A" : 
+      {
+         "mol_subset_atoms"        : [0,1],
+         "selected_atom_index"     : 0,
+         "molecule_axis"           : "atoms 0 1",
+         "x_rot_angles"            : [0],
+         "y_rot_angles"            : [0, 90, -90],   
+         "z_rot_angles"            : [0, 90],
+         "vertical_angles"         : "none",
+
+         "screening_atom_distance" : 1.5,
+         "screening_min_distance"  : 1.0,
+
+         "fixed_indices_mol"       : 0,
+         "fix_mol_xyz"             : [0,0,1]
+      },
+
+      "B" : 
+      {
+         "selected_atom_index"     : 0,
+         "molecule_axis"           : "axis 1 0 0",
+         "x_rot_angles"            : [0],
+         "y_rot_angles"            : [0],   
+         "z_rot_angles"            : [0],
+         "vertical_angles"         : "none",
+
+         "screening_atom_distance" : 1.5,
+         "screening_min_distance"  : 1.0,
+
+         "fixed_indices_mol"       : 0,
+         "fix_mol_xyz"             : [0,0,1]
+      }
+   }
+}

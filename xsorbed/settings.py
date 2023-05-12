@@ -18,7 +18,7 @@ class Settings:
     def __init__(self, settings_filename : str = "settings.in", read_energies = True) -> None:
 
         #variables read from settings.in
-        script_settings_dict, self.espresso_settings_dict, self.atomic_species, self.kpoints, self.last_dump = input.read_input_file(settings_filename)
+        script_settings_dict, self.espresso_settings_dict, self.atomic_species, self.kpoints, self.last_dump, self.text = input.read_input_file(settings_filename)
     
 
         #check for existence of the main blocks

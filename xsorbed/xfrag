@@ -2,16 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-Created on Fri 6 Feb 2023
+Created on Thu 11 May 2023
 
 @author: Enrico Pedretti
-@author: Paolo Restuccia
 
-Xsorb is a lightweight, flexible and user-friendly tool to generate and run ab initio calculations of molecules adsorbed over substrates,
-relying on Quantum Espresso for DFT calculations and on ASE & Pymatgen to generate the adsorption structures
-
-More info on the program's usage can be found at:
-https://gitlab.com/triboteam/xsorbed/-/wikis/home
+Dissociation analysis
 
 """
 
@@ -27,7 +22,7 @@ from filenames import *
 def cli_parse():
 
     parser = argparse.ArgumentParser(
-        description='Select one of the commands below. The program will read further input informations from the file "settings.in"'
+        description='Select one of the commands below. The program will read further input informations from the files "fragments.in" and "settings.in"'
         )
 
     parser.add_argument('--v', '--version', action='version', version='%(prog)s '+VERSION)
@@ -47,8 +42,6 @@ def cli_parse():
     relax_options.add_argument('--i', nargs='+', type=int, help='select specific configurations (by label) for relaxation')
     calc_group.add_argument('--exclude', nargs='+', type=int, help='exclude selected configurations from the final relaxation')
     calc_group.add_argument('--regenerate', action='store_true', default=False, help='re-generate structures for final relaxations instead of reading the positions from screening')
-    calc_group.add_argument('--save-figs', action='store_true', help='plot also the figures (sites + molecule orientations) when using -g or -r')
-    calc_group.add_argument('--saveas', type=str, help='generate also files in the desired format besides the pwi(s), e.g. cif, xyz, ...')
 
 
 
@@ -66,15 +59,6 @@ def cli_parse():
     main_visual = visualization_group.add_mutually_exclusive_group()
     main_visual.add_argument('-sites', action='store_true',  help='plot the identified high-symmetry sites sites with labels')
     main_visual.add_argument('-sites-all', action='store_true',  help='plot ALL the high-symmetry sites sites with labels')
-    main_visual.add_argument('-screening-images', nargs=1, choices=['i', 'f'], help="save images of the screening configurations. Option: 'i'/'f' for initial or final positions")
-    main_visual.add_argument('-relax-images', nargs=1, choices=['i', 'f'], help="save images of the relaxations. Option: 'i'/'f' for initial or final positions")
-    #main_visual.add_argument('-render-image', nargs=2, help='select which image to render and the rotations list for the camera (syntax: [s/r][index] [rotations], e.g. r12 -10z,-80x)')
-    main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the relaxations in gif (default) or mp4 format (for povray)')
-    main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
-    main_visual.add_argument('-savefiles', nargs=3, help='save files in specific format (syntax: [format] [calc_type] [i/f], e.g. cif screening i or xyz relax f)')
-    #optional flags
-    visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
-    visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
 
 
     #parsing the command line
@@ -135,15 +119,20 @@ def cli_parse():
 
 def main():
 
-    print('xSorb version {0}'.format(VERSION))
+    print('xSorb version {0}, xFrag module.'.format(VERSION))
 
     if(len(sys.argv) == 1): 
         print("No command provided. The program will now terminate.")
         return 1
     
+
+    from fragments import read_fragments
+    read_fragments()
+
+    return 0
     args = cli_parse()
 
-    print('Importing dependencies... (it might take a while).')
+
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
     from settings import Settings
