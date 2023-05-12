@@ -107,9 +107,9 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
         launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=screening_outdir, jobname_title='scr')
 
 
-def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False):
+def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False, BY_SITE = False):
     
-    if n_configs is None and threshold is None: n_configs = N_relax_default
+    if n_configs is None and threshold is None: n_configs = N_relax_default if not BY_SITE else 1
     
     #Check for duplicates in exclude or in indices
     if indices is not None:
@@ -128,7 +128,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     else:
         print('Collecting energies from screening...')
         energies = get_energies(E_slab_mol=settings.E_slab_mol, pwo_prefix='screening')
-        if None in energies: #TODO: sistemare!!!! per ora non differenzia lo screening ibrido e richiede solo che si sia raggiunta la conv scf
+        if None in energies:
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)
         print('screening energies collected.')
@@ -139,24 +139,53 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
 
         calcs = []
-        subset_energies = []
-        if n_configs is not None:
+
+        if(BY_SITE):
+            site_labels = []
+            with open('site_labels.csv', 'r') as f:
+                file = f.readlines()
+
+                for line in file:
+                    if 'site' in line: continue
+                    site_labels.append(int(line.split(',')[4].split(' ')[0]))        
+            sites = set(site_labels)
+            site_labels = np.array(site_labels) 
+            samesite_indices = [np.where(site_labels == site) for site in sites] #config labels associated to same site
+
+            for indices_of_site in samesite_indices:
+                energies_site = [energies[j] for j in indices_of_site[0] ]
+                config_labels_site = [j for j in indices_of_site[0] ]
+               
+                sorted_indices = np.argsort(energies_site, kind='stable').tolist()
+                if n_configs is not None:                  
+                    if(n_configs > len(sorted_indices)):
+                        print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n')
+                        sys.exit(1)
+                    for n, i in enumerate(sorted_indices):
+                        if config_labels_site[i] in exclude: continue
+                        if n < n_configs:
+                            calcs.append(config_labels_site[i])
+                elif threshold is not None:
+                    e_min = min(energies_site)
+                    calcs += [config_labels_site[i] for i in sorted_indices if energies_site[i] - e_min <= threshold and config_labels_site[i] not in exclude]
+
+
+        else:
             sorted_indices = np.argsort(energies, kind='stable').tolist()
-            #print(sorted_indices)
-            for i in sorted_indices:
-                if i in exclude: continue
-                if len(calcs)<n_configs:
-                    calcs.append(i)
-        elif threshold is not None:
-            e_min = min(energies)
-            for i, energy in enumerate(energies):
-                if i in exclude: continue
-                if energy - e_min <= threshold:
-                    calcs.append(i)
-                    subset_energies.append(energy)
-            #sort them by minimum energy, in order to launch first the minimum. TODO: do this also for the --n case
-            sorted_indices = np.argsort(subset_energies, kind='stable').tolist()
-            calcs = [calcs[i] for i in sorted_indices]
+            if n_configs is not None:           
+                if(n_configs > len(sorted_indices)):
+                    print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n')
+                    sys.exit(1)
+                for i in sorted_indices:
+                    if i in exclude: continue
+                    if len(calcs)<n_configs:
+                        calcs.append(i)
+            elif threshold is not None:
+                e_min = min(energies)
+                calcs += [i for i in sorted_indices if energies[i] - e_min <= threshold and i not in exclude]
+    
+        print(calcs)
+        return
 
 
     settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
@@ -206,7 +235,6 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     for i in calcs:       
         #struct_ase = read(pwi_prefix+'screening_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
-        fixed_indices_molecule = slab.natoms + np.array(settings.fixed_indices_mol)
 
         filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
         pwi_names.append(filename)
