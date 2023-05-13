@@ -15,7 +15,7 @@ from natsort import natsorted
 
 from filenames import *
 
-TEST = False #do not actually launch the jobs, simply prints the command
+TEST = True #do not actually launch the jobs, simply prints the command
 
 
 def get_energies(E_slab_mol : list, pwo_prefix : str):

@@ -31,6 +31,8 @@ def cli_parse():
     calc_group = parser.add_argument_group(title='Calculation options')
     #main flags
     main_calc = calc_group.add_mutually_exclusive_group()
+    main_calc.add_argument('-generate-fragments', action='store_true', help='generate the input files of all framgents in fragments.json, wihtout launching calculations')
+    main_calc.add_argument('-relax-fragments', action='store_true', help='generate the input files of all framgents listed in fragments.json and launch calculations')
     main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
     main_calc.add_argument('-s', nargs='*', type=float, help='launch screening. Optional arguments: e_tot_conv_thr forc_conv_thr (default 5e-3 5e-2)')
     main_calc.add_argument('-r', action='store_true', help='launch final relaxations')
@@ -39,27 +41,13 @@ def cli_parse():
     relax_options = calc_group.add_mutually_exclusive_group()
     relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum) for the final relaxation')
     relax_options.add_argument('--t', type=float, help='energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
-    relax_options.add_argument('--i', nargs='+', type=int, help='select specific configurations (by label) for relaxation')
-    calc_group.add_argument('--exclude', nargs='+', type=int, help='exclude selected configurations from the final relaxation')
-    calc_group.add_argument('--regenerate', action='store_true', default=False, help='re-generate structures for final relaxations instead of reading the positions from screening')
-
+    calc_group.add_argument('--by-site', action='store_true', default=False, help='Select the most favorable configurations for full relax site-by-site site instead of overall')
 
 
     energy_group = parser.add_argument_group(title='Energies collection options')  
     #main flags
     main_energy = energy_group.add_mutually_exclusive_group()
-    main_energy.add_argument('-es', action='store_true', help='save screening energies to csv')
-    main_energy.add_argument('-er', action='store_true', help='save final relax energies to csv')
-    main_energy.add_argument('-plot-energies-scr', action='store_true', help='save image with energies evolution during screening')
-    main_energy.add_argument('-plot-energies', action='store_true', help='save image with energies evolution during final relax')
-
-
-    visualization_group = parser.add_argument_group(title='Visualization options')
-    #main flags
-    main_visual = visualization_group.add_mutually_exclusive_group()
-    main_visual.add_argument('-sites', action='store_true',  help='plot the identified high-symmetry sites sites with labels')
-    main_visual.add_argument('-sites-all', action='store_true',  help='plot ALL the high-symmetry sites sites with labels')
-
+    main_energy.add_argument('-deltae', action='store_true', help='collect dissociation energies dE for all the (fully optimized) combinations (adsorbed molecule -> adsorbed fragments)')
 
     #parsing the command line
     args = parser.parse_args()
@@ -67,49 +55,21 @@ def cli_parse():
 
     #Check presence of incompatible commands belonging to different groups
     args_dict = vars(args)
-    calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
-    energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er' or key=='plot_energies_scr' or key=='plot_energies') ]
-    visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='screening-images'  
-        or key=='relax-images' or key=='relax-animations' or key=='view' or key=='savefiles') ]
+    calc_command = [ key for key in args_dict if args_dict[key] and (key == 'generate-fragments' or key == 'relax-fragments' or key=='s' or key=='g' or key=='r' or key=='restart') ]
+    energy_command = [ key for key in args_dict if args_dict[key] and (key=='deltae') ]
 
     if calc_command and energy_command:
-        parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], energy_command[0]))
-    elif calc_command and visual_command:
-        parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], visual_command[0]))
-    elif energy_command and visual_command:
-        parser.error("argument -{1}: not allowed with argument -{0}".format(energy_command[0], visual_command[0]))
-  
+        parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], energy_command[0]))  
 
     #Check for all incompatible OPTIONAL arguments
-    if args.save_figs and not args.g and not args.s:
-        parser.error("--save-figs option can only be used with -g or -s")
-    if args.saveas and not args.g and not args.s and not args.r:
-        parser.error("--saveas option can only be used with -g, -s or -r")
     if args.n and not args.r:
         parser.error("--n option can only be used with -r")
     if args.t and not args.r:
         parser.error("--t option can only be used with -r")
-    if args.i and not args.r:
-        parser.error("--i option can only be used with -r")
-    if args.exclude and not args.r:
-        parser.error("--exclude option can only be used with -r")
-    if args.regenerate and not args.r:
-        parser.error("--regenerate option can only be used with -r")
-    if args.povray and not args.screening_images and not args.relax_images and not args.relax_animations: # and not args.render_image:
-        parser.error("--povray option can only be used with -screening-images or -relax-images or -relax-animations")
-    if args.width_res is not None and not args.povray:
-        parser.error("--width-res can be specified only for povray rendering")
+    if args.by_site and not args.r:
+        parser.error("--by-site option can only be used with -r")
 
     #Final check on values that are not already dealt with by argparse
-    if(args.view):
-        if args.view[0] != 's' and args.view[0] != 'r':
-            parser.error('-view must be followed by a string in the form [s/r][int] e.g. s3')
-        try:
-            i = int(args.view[1:])
-            if(i<0): raise RuntimeError("Index cannot be negative")
-        except:
-            parser.error('-view must be followed by a string in the form [s/r][int] e.g. s3 (with int >=0)')
-
     if args.s is not None:
         if len(args.s) != 0 and len(args.s) != 2:
             parser.error('-s command requires either no argument (the default 5e-3 and 5e-2 will be used) or TWO arguments.')
@@ -126,84 +86,38 @@ def main():
         return 1
     
 
-    from fragments import read_fragments
-    read_fragments()
-
-    return 0
     args = cli_parse()
 
 
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
-    from settings import Settings
-    from io_utils import write_energies, restart_jobs
-    from calculations import generate, final_relax, saveas
-    from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
+    from fragments import setup_fragments_screening, isolated_fragments, final_relax_fragments, restart_jobs_fragments
     ############################################################################################
 
     #calc
-    if(args.g):
-        generate(RUN = False, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+    if(args.generate_fragments):
+        isolated_fragments(RUN=False) 
+
+    elif(args.relax_fragments):
+        isolated_fragments(RUN=True)
+
+    elif(args.g):
+        setup_fragments_screening(RUN=False)
 
     elif(args.s is not None):
         if not args.s: args.s = hybrid_screening_thresholds
-        generate(RUN = True, etot_forc_conv = args.s, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+        setup_fragments_screening(RUN=True, etot_forc_conv = args.s)
 
     elif(args.r):
-        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, indices=args.i, REGENERATE=args.regenerate)
+        final_relax_fragments(n_configs=args.n, threshold=args.t, BY_SITE=args.by_site)
 
     elif(args.restart):
-        restart_jobs(which='screening' if args.restart == 's' else 'relax')
-
+        restart_jobs_fragments(which='screening' if args.restart == 's' else 'relax')
 
 
     #energies
-    elif(args.es):
-        try:
-            E_slab_mol = Settings().E_slab_mol
-        except: #option in case settings.in or some other input file is no more present.
-            E_slab_mol = []
-        write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
-
-    elif(args.er):
-        try:
-            E_slab_mol = Settings().E_slab_mol
-        except: #option in case settings.in or some other input file is no more present.
-            E_slab_mol = []
-        if not os.path.isfile(screening_energies_filename):
-            write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
-        write_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'relax')
-    
-    elif(args.plot_energies_scr):
-        plot_energy_evolution(which='screening')
-    
-    elif(args.plot_energies):
-        plot_energy_evolution(which='relax')
-
-
-    #visualization
-    elif(args.sites or args.sites_all):
-        plot_adsorption_sites(ALL = args.sites_all)
-
-    elif(args.screening_images):
-        config_images(which='screening', i_or_f = args.screening_images[0],  povray=args.povray, witdth_res=args.width_res)
-
-    elif(args.relax_images):
-        config_images(which='relax', i_or_f = args.relax_images[0], povray=args.povray, witdth_res=args.width_res)
-
-    #elif(args.render_image):
-    #    config_images(which=args.render_image[0][0], index=args.render_image[0][1:], 
-    #        rotations = args.render_image[1], povray=args.povray, witdth_res=args.width_res)
-
-    elif(args.relax_animations):
-        relax_animations(povray=args.povray, witdth_res=args.width_res)
-
-    elif(args.view):
-        view_config(which=args.view[0], index=int(args.view[1:]))
-
-    elif(args.savefiles is not None):
-        saveas(which=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])
-
+    elif(args.deltae):
+        pass
 
 
 if __name__ == '__main__':

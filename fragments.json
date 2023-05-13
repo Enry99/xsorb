@@ -1,7 +1,8 @@
 
-{"H_OH" : 
+{
+   "fragments" : 
    {
-      "A" : 
+      "OH" : 
       {
          "mol_subset_atoms"        : [0,1],
          "selected_atom_index"     : 0,
@@ -18,8 +19,9 @@
          "fix_mol_xyz"             : [0,0,1]
       },
 
-      "B" : 
+      "H" : 
       {
+         "mol_subset_atoms"        : [2],
          "selected_atom_index"     : 0,
          "molecule_axis"           : "axis 1 0 0",
          "x_rot_angles"            : [0],
@@ -33,5 +35,9 @@
          "fixed_indices_mol"       : 0,
          "fix_mol_xyz"             : [0,0,1]
       }
-   }
+   },
+
+   "combinations": [
+      ["H", "OH"]
+   ]
 }

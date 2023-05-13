@@ -10,13 +10,120 @@ Helper to handle generation of molecular fragments
 
 """
 
-import json, os
+#TODO: specificare lista di frammenti singoli, usare un'altra impostazione che dice come accoppiarli
+# questo risolverebbe il problema di fare calcoli duplicati, es. dissociazione dei vari idrogeni dalla molecola
+
+#TODO: lasciare SEMPRE la possibilità di definire un frammento tramite il suo complementare (molto comodo es. per togliere un idrogeno dai vari atomi)
+
+
+import json, os, shutil, copy
 from settings import Settings
 from molecule import Molecule
+from espresso_mod import Espresso_mod
+from calculations import generate, final_relax
+from io_utils import write_energies, restart_jobs
+from filenames import *
 from slab import Slab
 
 
-def read_fragments():
+TEST = True
+
+def isolated_fragments(RUN = False):
+    with open("fragments.json", "r") as f:
+        fragments_dict = json.load(f)
+
+    settings = Settings()
+
+    if not os.path.exists('fragments'): os.mkdir('fragments')
+    for fragment_name in fragments_dict["fragments"]:
+
+        if not os.path.exists('fragments/'+fragment_name): os.mkdir('fragments/'+fragment_name)
+        
+        #create complementary
+        #fragments_dict["fragments"][fragment_name]["mol_subset_atoms"] = [i for i in range(mol.natoms) if i not in fragments_dict[fragment_name][names_AB[0]]["mol_subset_atoms"]]
+
+        
+        mol_subset_atoms = fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]
+        mol = Molecule(settings.molecule_filename, atoms_subset=mol_subset_atoms)      
+
+        fragment_species = set([atom.symbol for atom in mol.mol_ase])            
+        absent_species = [species for species in settings.pseudopotentials if species not in fragment_species]
+
+        pseudos_subset = copy.deepcopy(settings.pseudopotentials)
+        for species in absent_species:
+            pseudos_subset.pop(species)
+
+
+        absent_indices = []
+        for i, pot in enumerate(settings.pseudopotentials):
+            if pot in absent_species: absent_indices.append(i)
+
+        starting_mag_subset = []
+        for i, mag in enumerate(settings.starting_mag):
+            if i not in absent_indices:
+                starting_mag_subset.append(mag)
+        
+        delta_n = []
+        missing_counter = 0
+        for j, species in enumerate(settings.pseudopotentials):
+            if species in absent_species:
+                missing_counter += 1
+            delta_n.append(missing_counter)
+
+
+        flags_i_subset      = []
+        settings_flags_i = copy.deepcopy(settings.flags_i)
+        for flag in settings_flags_i:
+            i_flag = int(flag[0].split('(')[1].split(')')[0])
+            if i_flag-1 not in absent_indices:
+                #print(i_flag)
+                flag[0] = flag[0].replace('({0})'.format(i_flag), '({0})'.format(i_flag - delta_n[i_flag-1]))
+                flags_i_subset.append(flag)
+
+        calc = Espresso_mod(pseudopotentials=pseudos_subset, 
+                input_data=settings.espresso_settings_dict,
+                filename='fragments/'+fragment_name+'/'+fragment_name+'.pwi',
+                kpts = None,   #TODO: handle case where gamma is not right, here we assume that the input cell for the molecule was big enough
+                koffset= None)
+        calc.set_system_flags(starting_mag_subset, flags_i_subset)
+        calc.write_input(mol.mol_ase)
+
+
+        if(RUN):
+            sbatch_command = settings.sbatch_command 
+
+            main_dir = os.getcwd()
+
+            input_file = fragment_name+'.pwi'
+            output_file = input_file.replace("pwi", "pwo")
+
+            if(os.path.isfile(output_file)): 
+                print(output_file+' already present, possibly from a running calculation. It will be skipped.')
+                continue
+
+            j_dir = 'fragments/'+fragment_name
+            shutil.copyfile(settings.jobscript, j_dir + '/'+jobscript_filename)
+
+            os.chdir(j_dir) #####################
+            with open(jobscript_filename, 'r') as f:
+                lines = f.readlines()
+
+                for i, line in enumerate(lines):
+                    if "job-name" in line:
+                        lines[i] = line.split('=')[0] + '="' + fragment_name + '"\n'
+                        break
+        
+            with open(jobscript_filename, 'w') as f:
+                f.writelines( lines )
+
+
+            if(TEST): print(sbatch_command+" " + jobscript_filename + ' ' +input_file + ' '+output_file)
+            else: os.system(sbatch_command+" " + jobscript_filename + ' ' +input_file + ' '+output_file)  #launchs the jobscript in j_dir from j_dir
+            os.chdir(main_dir) ####################
+
+
+
+def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thresholds, save_figs=False, saveas_format=None):
     with open("fragments.json", "r") as f:
         fragments_dict = json.load(f)
 
@@ -34,44 +141,57 @@ def read_fragments():
 
     if not os.path.exists('fragments'): os.mkdir('fragments')
 
-    for fragment_name in fragments_dict.keys():
-        if not os.path.exists('fragments/'+fragment_name): os.mkdir('fragments/'+fragment_name)
+    #TODO: check if ALL fragments exist in folders, otherwise ERROR! you need to generate/relax the fragments first
 
-        names_AB = list(fragments_dict[fragment_name].keys())
+    main_dir = os.getcwd()
 
-        fragments_dict[fragment_name][names_AB[1]]["mol_subset_atoms"] = [i for i in range(mol.natoms) if i not in fragments_dict[fragment_name][names_AB[0]]["mol_subset_atoms"]]
+    for fragment_name in fragments_dict["fragments"]:
 
-        for name in names_AB:
-            if not os.path.exists('fragments/{0}/{1}'.format(fragment_name, name)): os.mkdir('fragments/{0}/{1}'.format(fragment_name, name))
+        os.chdir(main_dir)
 
-            settings_lines_AB = settings_lines.copy()
+        print('\n--------------------\nFragment {}:'.format(fragment_name))
+    
+        if not os.path.exists('fragments/{0}/{1}'.format(fragment_name, settings.slab_filename)): shutil.copyfile(settings.slab_filename, 'fragments/{0}/{1}'.format(fragment_name, settings.slab_filename))
 
+        #only edit settings.in if not already present. This allows to fine-tune some parameters for specific fragments after -g, before -s
+        if not os.path.exists('fragments/{0}/settings.in'.format(fragment_name)): 
+    
+            settings_lines_frag = copy.deepcopy(settings_lines)
 
-            for flag in fragments_dict[fragment_name][name]:  
+            for i, line in enumerate(settings_lines_frag):
+                if "molecule_filename" in line:
+                    l = line.split('=')[:2]
+                    l[1] = "'{0}.{1}'".format(fragment_name, 'pwo' if os.path.exists('fragments/'+fragment_name+'.pwo') else 'pwi')
+                    line = '= '.join(l)+'\n'
+                    settings_lines_frag[i] = line
+    
+
+            for flag in fragments_dict["fragments"][fragment_name]: 
+                if flag ==  "mol_subset_atoms": continue
                 found = False              
-                for i, line in enumerate(settings_lines_AB):
+                for i, line in enumerate(settings_lines_frag):
                     
                     if flag in line:
                         l = line.split('=')[:2]
                         l[0] = '   '+flag.ljust(30)
-                        if isinstance(fragments_dict[fragment_name][name][flag], list):
-                            l[1] = ' '.join(str(x) for x in fragments_dict[fragment_name][name][flag])                        
+                        if isinstance(fragments_dict["fragments"][fragment_name][flag], list):
+                            l[1] = ' '.join(str(x) for x in fragments_dict["fragments"][fragment_name][flag])                        
                         else:
-                            l[1] = str(fragments_dict[fragment_name][name][flag])
+                            l[1] = str(fragments_dict["fragments"][fragment_name][flag])
                         line = '= '.join(l)+'\n'
-                        settings_lines_AB[i] = line
+                        settings_lines_frag[i] = line
                         found = True
                         break
                 if not found:
-                    if isinstance(fragments_dict[fragment_name][name][flag], list):
-                        l = ' '.join(str(x) for x in fragments_dict[fragment_name][name][flag])                        
+                    if isinstance(fragments_dict["fragments"][fragment_name][flag], list):
+                        l = ' '.join(str(x) for x in fragments_dict["fragments"][fragment_name][flag])                        
                     else:
-                        l = str(fragments_dict[fragment_name][name][flag])
-                    settings_lines_AB.insert(STRUCTURE_line_i, '   '+flag.ljust(30)+' = '+l+'\n')
+                        l = str(fragments_dict["fragments"][fragment_name][flag])
+                    settings_lines_frag.insert(STRUCTURE_line_i, '   '+flag.ljust(30)+' = '+l+'\n')
 
 
             slab_species = set(slab.slab_ase.get_chemical_symbols())
-            fragment_species = set([atom.symbol for atom in mol.mol_ase if atom.index in fragments_dict[fragment_name][name]["mol_subset_atoms"]])            
+            fragment_species = set([atom.symbol for atom in mol.mol_ase if atom.index in fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]])            
             absent_species = [species for species in settings.pseudopotentials if (species not in fragment_species and species not in slab_species)]
             absent_indices = []
             for i, pot in enumerate(settings.pseudopotentials):
@@ -81,24 +201,64 @@ def read_fragments():
             #remove undesired lines
             pseudos = list(settings.pseudopotentials.keys())
             for species in absent_species:
-                for i, line in enumerate(settings_lines_AB):
+                for i, line in enumerate(settings_lines_frag):
                     if settings.pseudopotentials[species] in line:
-                        del settings_lines_AB[i]
+                        del settings_lines_frag[i]
                     if '({0})'.format(pseudos.index(species)+1) in line:
-                        del settings_lines_AB[i]
+                        del settings_lines_frag[i]
 
             #reindex flags of the format (i)
-            j = 0
-            for i, line in enumerate(settings_lines_AB):
-                for index in absent_indices:
-                    j-=1
-                    if '({0})'.format(i) in line:
-                        settings_lines_AB[i].replace('({0})'.format(index), '({0})'.format(index-j))
+            missing_counter = 0
+            for j, species in enumerate(pseudos):
+                if species in absent_species:
+                    missing_counter += 1
+                    continue
+                for i, line in enumerate(settings_lines_frag):           
+                    if '({0})'.format(j+1) in line:
+                        settings_lines_frag[i] = line.replace('({0})'.format(j+1), '({0})'.format(j+1 - missing_counter))
 
-            with open('fragments/{0}/{1}'.format(fragment_name, name)+'/settings.in', 'w') as f:
-                f.writelines(settings_lines_AB)
+            with open('fragments/{0}'.format(fragment_name)+'/settings.in', 'w') as f:
+                f.writelines(settings_lines_frag)
 
-    #Settings().    
+
+        
+        j_dir = 'fragments/'+fragment_name
+        if not os.path.exists(j_dir + '/'+jobscript_filename) : shutil.copyfile(settings.jobscript, j_dir + '/'+jobscript_filename)
+
+        os.chdir(j_dir)
+        generate(RUN = RUN, etot_forc_conv = etot_forc_conv, SAVEFIG=save_figs, saveas_format=saveas_format)
+        os.chdir(main_dir)
 
     #print(json.dumps(fragments_dict, indent=3))
 
+def final_relax_fragments(n_configs, threshold, BY_SITE):
+
+    with open("fragments.json", "r") as f:
+        fragments_dict = json.load(f)
+
+    main_dir = os.getcwd()
+    for fragment_name in fragments_dict["fragments"]:
+
+        os.chdir(main_dir)
+
+        j_dir = 'fragments/'+fragment_name
+        os.chdir(j_dir)
+        final_relax(n_configs=n_configs, threshold=threshold, BY_SITE=BY_SITE)
+        os.chdir(main_dir)
+        
+
+def restart_jobs_fragments(which):
+
+    with open("fragments.json", "r") as f:
+        fragments_dict = json.load(f)
+
+    main_dir = os.getcwd()
+    for fragment_name in fragments_dict["fragments"]:
+
+        os.chdir(main_dir)
+
+        j_dir = 'fragments/'+fragment_name
+        os.chdir(j_dir)
+        restart_jobs(which='screening' if which == 's' else 'relax')
+        os.chdir(main_dir)
+    

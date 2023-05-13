@@ -148,7 +148,6 @@ def main():
     
     args = cli_parse()
 
-    print('Importing dependencies... (it might take a while).')
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
     from settings import Settings
