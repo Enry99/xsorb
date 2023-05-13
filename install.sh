@@ -9,6 +9,7 @@ echo "xsorb already found on PATH. Please remove it from .bashrc if you want to 
 fi
 
 chmod +x xsorbed/xsorb
+chmod +x xsorbed/xfrag
 
 
 source ~/.bashrc

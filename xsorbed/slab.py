@@ -27,7 +27,7 @@ class Slab:
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
 
-        print('\nLoading slab...')
+        print('Loading slab...')
 
         self.slab_ase = read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename)
         self.natoms   = len(self.slab_ase)

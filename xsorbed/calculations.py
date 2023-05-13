@@ -183,9 +183,6 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
             elif threshold is not None:
                 e_min = min(energies)
                 calcs += [i for i in sorted_indices if energies[i] - e_min <= threshold and i not in exclude]
-    
-        print(calcs)
-        return
 
 
     settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})

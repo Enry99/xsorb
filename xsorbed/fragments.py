@@ -26,7 +26,7 @@ from filenames import *
 from slab import Slab
 
 
-TEST = True
+TEST = False
 
 def isolated_fragments(RUN = False):
     with open("fragments.json", "r") as f:
@@ -153,6 +153,8 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
     
         if not os.path.exists('fragments/{0}/{1}'.format(fragment_name, settings.slab_filename)): shutil.copyfile(settings.slab_filename, 'fragments/{0}/{1}'.format(fragment_name, settings.slab_filename))
 
+        shutil.copyfile(settings.jobscript, 'fragments/{0}/{1}'.format(fragment_name, jobscript_filename))
+
         #only edit settings.in if not already present. This allows to fine-tune some parameters for specific fragments after -g, before -s
         if not os.path.exists('fragments/{0}/settings.in'.format(fragment_name)): 
     
@@ -161,7 +163,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
             for i, line in enumerate(settings_lines_frag):
                 if "molecule_filename" in line:
                     l = line.split('=')[:2]
-                    l[1] = "'{0}.{1}'".format(fragment_name, 'pwo' if os.path.exists('fragments/'+fragment_name+'.pwo') else 'pwi')
+                    l[1] = "'{0}.{1}'".format(fragment_name, 'pwo' if os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)) else 'pwi')
                     line = '= '.join(l)+'\n'
                     settings_lines_frag[i] = line
     
@@ -241,6 +243,8 @@ def final_relax_fragments(n_configs, threshold, BY_SITE):
 
         os.chdir(main_dir)
 
+        print('\n--------------------\nFragment {}:'.format(fragment_name))
+
         j_dir = 'fragments/'+fragment_name
         os.chdir(j_dir)
         final_relax(n_configs=n_configs, threshold=threshold, BY_SITE=BY_SITE)
@@ -256,6 +260,8 @@ def restart_jobs_fragments(which):
     for fragment_name in fragments_dict["fragments"]:
 
         os.chdir(main_dir)
+
+        print('\n--------------------\nFragment {}:'.format(fragment_name))
 
         j_dir = 'fragments/'+fragment_name
         os.chdir(j_dir)
