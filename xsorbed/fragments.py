@@ -10,13 +10,10 @@ Helper to handle generation of molecular fragments
 
 """
 
-#TODO: specificare lista di frammenti singoli, usare un'altra impostazione che dice come accoppiarli
-# questo risolverebbe il problema di fare calcoli duplicati, es. dissociazione dei vari idrogeni dalla molecola
-
 #TODO: lasciare SEMPRE la possibilità di definire un frammento tramite il suo complementare (molto comodo es. per togliere un idrogeno dai vari atomi)
 
 
-import json, os, shutil, copy
+import json, os, shutil, copy, sys
 from settings import Settings
 from molecule import Molecule
 from espresso_mod import Espresso_mod
@@ -34,16 +31,23 @@ def isolated_fragments(RUN = False):
 
     settings = Settings()
 
+    mol_whole = Molecule(settings.molecule_filename)
+
     if not os.path.exists('fragments'): os.mkdir('fragments')
     for fragment_name in fragments_dict["fragments"]:
 
         if not os.path.exists('fragments/'+fragment_name): os.mkdir('fragments/'+fragment_name)
         
         #create complementary
-        #fragments_dict["fragments"][fragment_name]["mol_subset_atoms"] = [i for i in range(mol.natoms) if i not in fragments_dict[fragment_name][names_AB[0]]["mol_subset_atoms"]]
-
+        if "mol_subset_atoms" in fragments_dict["fragments"][fragment_name] and "mol_subset_atoms_compl" in fragments_dict["fragments"][fragment_name]:
+            print("You can specify a fragment either by its atoms or by the complementary atoms of the whole molecule, not both. Quitting.")
+            sys.exit(1)
+         
+        if "mol_subset_atoms_compl" in fragments_dict["fragments"][fragment_name]:
+            mol_subset_atoms = [i for i in range(mol_whole.natoms) if i not in fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]]
+        else:
+            mol_subset_atoms = fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]
         
-        mol_subset_atoms = fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]
         mol = Molecule(settings.molecule_filename, atoms_subset=mol_subset_atoms)      
 
         fragment_species = set([atom.symbol for atom in mol.mol_ase])            
@@ -128,8 +132,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
         fragments_dict = json.load(f)
 
     settings = Settings()
-    slab = Slab(settings.slab_filename)
-    mol = Molecule(settings.molecule_filename)
+    slab = Slab(settings.slab_filename)  
  
     settings_lines = settings.text
 
@@ -150,6 +153,9 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
         os.chdir(main_dir)
 
         print('\n--------------------\nFragment {}:'.format(fragment_name))
+
+        mol_frag_name = "'{0}.{1}'".format(fragment_name, 'pwo' if os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)) else 'pwi')
+        mol = Molecule(mol_frag_name)
     
         if not os.path.exists('fragments/{0}/{1}'.format(fragment_name, settings.slab_filename)): shutil.copyfile(settings.slab_filename, 'fragments/{0}/{1}'.format(fragment_name, settings.slab_filename))
 
@@ -163,7 +169,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
             for i, line in enumerate(settings_lines_frag):
                 if "molecule_filename" in line:
                     l = line.split('=')[:2]
-                    l[1] = "'{0}.{1}'".format(fragment_name, 'pwo' if os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)) else 'pwi')
+                    l[1] = mol_frag_name
                     line = '= '.join(l)+'\n'
                     settings_lines_frag[i] = line
     
@@ -193,7 +199,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
 
 
             slab_species = set(slab.slab_ase.get_chemical_symbols())
-            fragment_species = set([atom.symbol for atom in mol.mol_ase if atom.index in fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]])            
+            fragment_species = set([atom.symbol for atom in mol.mol_ase])            
             absent_species = [species for species in settings.pseudopotentials if (species not in fragment_species and species not in slab_species)]
             absent_indices = []
             for i, pot in enumerate(settings.pseudopotentials):
