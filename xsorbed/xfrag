@@ -91,7 +91,7 @@ def main():
 
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
-    from fragments import setup_fragments_screening, isolated_fragments, final_relax_fragments, restart_jobs_fragments
+    from fragments import setup_fragments_screening, isolated_fragments, final_relax_fragments, restart_jobs_fragments, get_diss_energies
     ############################################################################################
 
     #calc
@@ -117,7 +117,7 @@ def main():
 
     #energies
     elif(args.deltae):
-        pass
+        get_diss_energies()
 
 
 if __name__ == '__main__':

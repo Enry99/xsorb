@@ -18,7 +18,7 @@ from filenames import *
 TEST = False #do not actually launch the jobs, simply prints the command
 
 
-def get_energies(E_slab_mol : list, pwo_prefix : str):
+def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax'):
 
     files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
 

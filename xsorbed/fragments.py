@@ -6,11 +6,9 @@ Created on Thu 11 May 2023
 
 @author: Enrico Pedretti
 
-Helper to handle generation of molecular fragments
+Generation of molecular fragments and dissociation energies calculation
 
 """
-
-#TODO: lasciare SEMPRE la possibilità di definire un frammento tramite il suo complementare (molto comodo es. per togliere un idrogeno dai vari atomi)
 
 
 import json, os, shutil, copy, sys
@@ -18,12 +16,13 @@ from settings import Settings
 from molecule import Molecule
 from espresso_mod import Espresso_mod
 from calculations import generate, final_relax
-from io_utils import write_energies, restart_jobs
+from io_utils import get_energies, restart_jobs
 from filenames import *
 from slab import Slab
 
 
 TEST = False
+
 
 def isolated_fragments(RUN = False):
     with open("fragments.json", "r") as f:
@@ -124,7 +123,6 @@ def isolated_fragments(RUN = False):
             if(TEST): print(sbatch_command+" " + jobscript_filename + ' ' +input_file + ' '+output_file)
             else: os.system(sbatch_command+" " + jobscript_filename + ' ' +input_file + ' '+output_file)  #launchs the jobscript in j_dir from j_dir
             os.chdir(main_dir) ####################
-
 
 
 def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thresholds, save_figs=False, saveas_format=None):
@@ -239,6 +237,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
 
     #print(json.dumps(fragments_dict, indent=3))
 
+
 def final_relax_fragments(n_configs, threshold, BY_SITE):
 
     with open("fragments.json", "r") as f:
@@ -273,4 +272,59 @@ def restart_jobs_fragments(which):
         os.chdir(j_dir)
         restart_jobs(which='screening' if which == 's' else 'relax')
         os.chdir(main_dir)
+
+
+def get_diss_energies():
+
+    from natsort import natsorted
+    import glob
+
+    with open("fragments.json", "r") as f:
+        fragments_dict = json.load(f)
     
+    
+    whole_mol_energy = get_energies(pwo_prefix='relax')
+
+    fragments_data = {}
+    for fragment_name in fragments_dict["fragments"]:
+        
+        fragments_data.update({fragment_name : {} })
+
+        #get total energy of each fragment, each with the label and position
+        site_labels = []
+        with open('fragments/{}/site_labels.csv'.format(fragment_name), 'r') as f:
+            file = f.readlines()
+
+            for line in file:
+                if 'site' in line: continue
+                site_labels.append(int(line.split(',')[4].split(' ')[0]))
+
+        energies = get_energies(pwo_prefix='fragments/{}/relax'.format(fragment_name))
+
+        i_min = energies.index(min(energies))
+        
+        files = natsorted(glob.glob( 'fragments/{}/relax'.format(fragment_name) ))
+
+        name_min = files[i_min]
+        label_min = int(name_min.split('_')[-1])
+
+        fragments_data[fragment_name]["energy"] = min(energies)
+        fragments_data[fragment_name]["site"] = site_labels[label_min]
+        
+
+    
+    text = []
+
+
+    for combination in fragments_dict["combinations"]:        
+        
+        fragments_toten = sum([ fragments_data[frag]["energy"] for frag in combination])
+        diss_en = fragments_toten - whole_mol_energy
+
+        fragments_names = ' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in combination])
+
+        text.append('{:50}{:.3f}\n'.format(fragments_names, diss_en))
+
+    with open('dissociation.txt', 'w') as f:
+        f.write( '{0:50}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
+        f.writelines( text )
