@@ -73,13 +73,13 @@ def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo
     line = data[0].split(',')
     line[-1] = line[-1].split('\n')[0]
     if "relax" in pwo_prefix: #relax case
-        if E_slab_mol:
+        if 0 not in E_slab_mol:
             line.append('Eads_rel(eV)\n')
         else:
             line.append('Etot_rel(eV)\n')
     else: #screening case
         #line.append('E_0 (eV)')
-        if E_slab_mol:
+        if 0 not in E_slab_mol:
             line.append('Eads_scr(eV)\n')
         else:
             line.append('Etot_scr(eV)\n')

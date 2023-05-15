@@ -52,9 +52,9 @@ def plot_adsorption_sites(ALL = False):
         )
 
 
-def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=1500, index : str = None, rotations : str = None):
+def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, index : str = None, rotations : str = None):
 
-    if witdth_res is None and povray: witdth_res = 1500  # I used 3000
+    if witdth_res is None and povray: witdth_res = 500  # I used 3000. From 1500 is still quite good. 2000 maybe best compromise (still very high res)
     if i_or_f == 'i':
         pw = 'pwi'
     else:
@@ -250,7 +250,7 @@ def view_config(which : str, index : int):
     view(config)        
 
 
-def relax_animations(povray = False, witdth_res=3000):
+def relax_animations(povray = False, witdth_res=500):
 
 
     print('Reading files...')
@@ -273,7 +273,7 @@ def relax_animations(povray = False, witdth_res=3000):
 
 
     if(povray):
-        if witdth_res is None: witdth_res = 3000 
+        if witdth_res is None: witdth_res = 500 
         for i, config in enumerate(configs):
             if os.path.exists('temp'):
                 shutil.rmtree('temp')

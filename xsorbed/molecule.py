@@ -46,7 +46,6 @@ class Molecule:
             remove_indices = [index for index in all_indices if index not in atoms_subset]
             self.reindex_map = [index for index in all_indices if index in atoms_subset]
             del self.mol_ase[remove_indices]
-            #TODO: save the newly create fragment as file
         else:
             self.reindex_map = [*all_indices]
 

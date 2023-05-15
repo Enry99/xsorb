@@ -79,7 +79,7 @@ def cli_parse():
 
 def main():
 
-    print('xSorb version {0}, xFrag module.'.format(VERSION))
+    print('xSorb version {0}, xFrag module'.format(VERSION))
 
     if(len(sys.argv) == 1): 
         print("No command provided. The program will now terminate.")

@@ -283,7 +283,8 @@ def get_diss_energies():
         fragments_dict = json.load(f)
     
     
-    whole_mol_energy = get_energies(pwo_prefix='relax')
+    slab_energy = Settings().E_slab_mol[0] * rydbergtoev
+    whole_mol_energy = min(get_energies(pwo_prefix='relax'))
 
     fragments_data = {}
     for fragment_name in fragments_dict["fragments"]:
@@ -291,25 +292,27 @@ def get_diss_energies():
         fragments_data.update({fragment_name : {} })
 
         #get total energy of each fragment, each with the label and position
-        site_labels = []
+        sites = [] 
+        config_labels = []
         with open('fragments/{}/site_labels.csv'.format(fragment_name), 'r') as f:
             file = f.readlines()
 
             for line in file:
                 if 'site' in line: continue
-                site_labels.append(int(line.split(',')[4].split(' ')[0]))
+                sites.append(int(line.split(',')[0]))
+                config_labels.append(line.split(',')[4])
 
         energies = get_energies(pwo_prefix='fragments/{}/relax'.format(fragment_name))
 
         i_min = energies.index(min(energies))
         
-        files = natsorted(glob.glob( 'fragments/{}/relax'.format(fragment_name) ))
+        files = natsorted(glob.glob( 'fragments/{}/relax_*.pwo'.format(fragment_name) ))
 
         name_min = files[i_min]
-        label_min = int(name_min.split('_')[-1])
+        label_min = int(name_min.split('_')[-1].split('.')[0])
 
         fragments_data[fragment_name]["energy"] = min(energies)
-        fragments_data[fragment_name]["site"] = site_labels[label_min]
+        fragments_data[fragment_name]["site"] = config_labels[label_min]
         
 
     
@@ -319,11 +322,11 @@ def get_diss_energies():
     for combination in fragments_dict["combinations"]:        
         
         fragments_toten = sum([ fragments_data[frag]["energy"] for frag in combination])
-        diss_en = fragments_toten - whole_mol_energy
+        diss_en = fragments_toten - whole_mol_energy - slab_energy
 
         fragments_names = ' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in combination])
 
-        text.append('{:50}{:.3f}\n'.format(fragments_names, diss_en))
+        text.append('{:50}{:+.3f}\n'.format(fragments_names, diss_en))
 
     with open('dissociation.txt', 'w') as f:
         f.write( '{0:50}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
