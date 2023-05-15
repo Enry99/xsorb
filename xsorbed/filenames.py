@@ -16,7 +16,7 @@ relax_outdir                = 'relax_outdirs'
 jobscript_filename          = 'jobscript' #standard name used in the copied version inside the outdirs
 
 #user-defined atomic colors, with format [atomic number, [r,g,b]]:
-USER_COLORS_DEFS = [
+#USER_COLORS_DEFS = [
 #    [1,  [1.00, 1.00, 1.00]],
 #    [6,  [0.35, 0.35, 0.40]],
 #    [7,  [0.50, 0.75, 1.00]],
@@ -25,7 +25,7 @@ USER_COLORS_DEFS = [
 #    [16, [0.90, 0.95, 0.30]],
 #    [26, [0.40, 0.40, 1.00]],
 #    [42, [0.70, 0.70, 0.70]],
-]
+#]
 
-RADIUS = 0.8  #radius for bondpairs in povray
+RADIUS_DEFAULT = 0.8  #radius for bondpairs in povray
 

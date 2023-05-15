@@ -103,19 +103,42 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
     #    Nbulk = 0
     #    E_slab_mol = [0, 0]
     
-    if(not os.path.exists(which+'_'+images_dirname)):
-        os.mkdir(which+'_'+images_dirname)
-    os.chdir(which+'_'+images_dirname) 
-
 
     from ase.data.colors import jmol_colors
-    ATOM_COLORS = jmol_colors.copy()
-    for color in USER_COLORS_DEFS:
-        ATOM_COLORS[color[0]] = color[1]
+    ATOM_COLORS_SLAB = jmol_colors.copy()
+    ATOM_COLORS_MOL  = jmol_colors.copy()
+
+    if os.path.isfile("custom_colors.json"):
+        import json
+        with open("custom_colors.json", "r") as f:
+            custom_colors = json.load(f)
+
+        print("Custom colors read from file.")
+
+        USER_COLORS_SLAB = custom_colors["slab_colors"] if "slab_colors" in custom_colors else []
+        USER_COLORS_MOL  = custom_colors["mol_colors"] if "mol_colors" in custom_colors else []
+        BOND_RADIUS      = custom_colors["bond_radius"] if "bond_radius" in custom_colors else RADIUS_DEFAULT
+    else:
+        USER_COLORS_SLAB = []
+        USER_COLORS_MOL  = []
+        BOND_RADIUS      = RADIUS_DEFAULT
+
+    for color in USER_COLORS_SLAB:
+        ATOM_COLORS_SLAB[color[0]] = color[1]
+    for color in USER_COLORS_MOL:
+        ATOM_COLORS_MOL[color[0]] = color[1]
 
     if(False):
         from ase.build import make_supercell
         Nbulk_original = Nbulk
+
+    main_dir = os.getcwd()
+
+    figures_dir = '{0}/{1}'.format(which+'_'+images_dirname, 'initial' if i_or_f == 'i' else 'final')
+
+    if(not os.path.exists(figures_dir)):
+        os.makedirs(figures_dir)
+    os.chdir(figures_dir) 
 
     for i, config in enumerate(configs):
         label = labels[i]
@@ -134,7 +157,6 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
             config = slab + mol
         #######################################################################
 
-        colors = [ATOM_COLORS[atom.number] for atom in config]
 
         #fading color for lower layers in top view
         zmax = max([atom.z for atom in config if atom.index < Nbulk])
@@ -142,9 +164,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
         delta = zmax - zmin
         import numpy as np
 
-        #colors_special = [ ATOM_COLORS[atom.number] if (atom.index >= Nbulk or atom.symbol == 'Si') else jmol_colors[atom.number] for atom in config ]
-        #colors = colors_special   #only for hexene on C, remove for publication
-
+        colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nbulk else ATOM_COLORS_MOL[atom.number] for atom in config]
         colors_top = [ (colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta).round(4) if atom.index < Nbulk else colors[atom.index] for atom in config ]
 
         if(povray):
@@ -158,7 +178,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     radii = 0.65, 
                     rotation=rotations,
                     colors=colors,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
                 os.remove(pw_files_prefix+which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')))
@@ -171,7 +191,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     radii = 0.65, 
                     rotation='-5z,-85x', 
                     colors=colors,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
                 os.remove(pw_files_prefix+which+'_{0}_pov.pov'.format(label))
@@ -186,7 +206,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     radii = 0.65, 
                     colors=colors_top,
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, textures = textures,
-                        camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=RADIUS))
+                        camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
                 os.remove(pw_files_prefix+which+'_{0}_top_pov.pov'.format(label))
@@ -199,15 +219,16 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                 write(pw_files_prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors) #front view
                 write(pw_files_prefix+which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors_top) #top view
 
+    os.chdir(main_dir)
 
     if(pw=='pwo' and index is None):
-        os.chdir('..')
+        
         import numpy as np
         from matplotlib import pyplot as plt
         import matplotlib.image as mpimg
 
         #calculate aspect ratio for one image:
-        img = mpimg.imread(which+'_'+images_dirname+'/'+pw_files_prefix+which+'_{0}{1}.png'.format(labels[0], '_pov' if povray else ''))
+        img = mpimg.imread(figures_dir+'/'+pw_files_prefix+which+'_{0}{1}.png'.format(labels[0], '_pov' if povray else ''))
         ar = float(img.shape[1]) / float(img.shape[0]) #width/height
 
         n_rows_fig = max(int(np.ceil(len(configs)/5.)), 1)
@@ -222,14 +243,17 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
 
         for i, conf in enumerate(configs):
             label = labels[i]
-            img = mpimg.imread(which+'_'+images_dirname+'/'+pw_files_prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
+            img = mpimg.imread(figures_dir+'/'+pw_files_prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
             axes[i].imshow(img)
             axes[i].set_title('{0:.2f} eV'.format(energies[i]), fontsize = 7, pad=1)
-            axes[i].text(0.018, 0.983, label, bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),transform=axes[i].transAxes, 
-                fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
+            rect = plt.Rectangle((0.0, 0.93), 0.08, 0.07, transform=axes[i].transAxes, facecolor='white', edgecolor='black', linewidth=0.5)
+            axes[i].add_artist(rect)
+            axes[i].text(0.04, 0.985, label, fontsize = 5, transform=axes[i].transAxes, horizontalalignment="center", verticalalignment="top")
+                #bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),transform=axes[i].transAxes, 
+                #fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
             axes[i].set_xticks([])
             axes[i].set_yticks([])
-        fig.savefig('{0}_{1}/{0}_overview{2}.png'.format(which, images_dirname ,'_pov' if povray else ''), dpi=1000, bbox_inches='tight')
+        fig.savefig('{1}/{0}_overview{2}.png'.format(which, figures_dir,'_pov' if povray else ''), dpi=700, bbox_inches='tight')
 
     print('All images saved in {0}.'.format(which+'_'+images_dirname))
 
@@ -289,7 +313,7 @@ def relax_animations(povray = False, witdth_res=500):
                     format='pov',
                     radii = 0.65, 
                     rotation='-5z,-85x', 
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=RADIUS))
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
 
