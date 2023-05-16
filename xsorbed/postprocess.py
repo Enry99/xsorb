@@ -128,7 +128,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
     for color in USER_COLORS_MOL:
         ATOM_COLORS_MOL[color[0]] = color[1]
 
-    if(False):
+    if(True):
         from ase.build import make_supercell
         Nbulk_original = Nbulk
 
@@ -144,17 +144,36 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
         label = labels[i]
 
         #section to repeat the bulk if mol is partially outside###############
-        #TODO: mettere un check se la molecola è davvero fuori
-        #TODO: generalize by considering translation by cell vector, for non-cubic cell
-        #TODO: generalize for x,y direction in both ends
-        if(False):
+        #TODO: re-adapt cell to avoid blank regions around
+        if(True):
             mol = config[Nbulk_original:]
             slab = config[:Nbulk_original]
-            slab.translate(-config.cell[:][1])
-            slab = make_supercell(slab, [[1,0,0], [0,2,0], [0,0,1]], wrap=False)
-            del slab[[atom.index for atom in slab if atom.y < -0.25*config.cell[:][1][1]]]  
+            #print(config.get_scaled_positions())
+            print(config.cell[:])
+
+            x_rep, y_rep = (3,3)
+            slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=True) 
+
+            mol.cell = slab.cell          
+            mol.translate(+(config.cell[:][0] + config.cell[:][1]) )
+
+            max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
+            max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
+            max_a = max(2/3-0.01, max_a + 0.05)
+            min_a = min(1/3-0.01, min_a - 0.05)
+            max_b = max(2/3-0.01, max_b + 0.05)
+            min_b = min(1/3-0.01, min_b - 0.05)
+
+            del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
             Nbulk = len(slab)
+            xmin, ymin = ( min(atom.x for atom in slab) , min(atom.y for atom in slab) )
+            slab.translate([-xmin, -ymin, 0])
+            mol.translate([-xmin, -ymin, 0])
+            slab.cell[:][0] = slab.cell[:][0]*(max_a-min_a)
+            slab.cell[:][1] = slab.cell[:][1]*(max_b-min_b)
+            mol.cell = slab.cell
             config = slab + mol
+            print(config.cell[:])
         #######################################################################
 
 
