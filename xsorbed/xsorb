@@ -56,8 +56,9 @@ def cli_parse():
     energy_group = parser.add_argument_group(title='Energies collection options')  
     #main flags
     main_energy = energy_group.add_mutually_exclusive_group()
-    main_energy.add_argument('-es', action='store_true', help='save screening energies to csv')
-    main_energy.add_argument('-er', action='store_true', help='save final relax energies to csv')
+    main_energy.add_argument('-es', action='store_true', help='save screening energies to file')
+    main_energy.add_argument('-er', action='store_true', help='save final relax energies to file')
+    energy_group.add_argument('--txt', action='store_true', help='write well formatted txt file instead of csv for -es or -er  (sorted by screen. en.)')
     main_energy.add_argument('-plot-energies-scr', action='store_true', help='save image with energies evolution during screening')
     main_energy.add_argument('-plot-energies', action='store_true', help='save image with energies evolution during final relax')
 
@@ -178,7 +179,7 @@ def main():
             E_slab_mol = Settings().E_slab_mol
         except: #option in case settings.in or some other input file is no more present.
             E_slab_mol = []
-        write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
+        write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening', TXT=args.txt)
 
     elif(args.er):
         try:
@@ -187,7 +188,7 @@ def main():
             E_slab_mol = []
         if not os.path.isfile(screening_energies_filename):
             write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
-        write_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'relax')
+        write_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'relax', TXT=args.txt)
     
     elif(args.plot_energies_scr):
         plot_energy_evolution(which='screening')

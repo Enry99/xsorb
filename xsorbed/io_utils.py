@@ -59,7 +59,7 @@ def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax'):
 
 
 
-def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str):
+def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str, TXT=True):
     #can be called before all the jobs have finished
 
     #Begin script
@@ -136,6 +136,28 @@ def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo
             else: 
                 print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
 
+
+    if TXT:
+        for i, line in enumerate(data):
+            if len(data[i].split(','))   == 10:
+                data[i] = '{0:<7}{1:<9}{2:<9}{3:<9}{4:<18}{5:<10}{6:<10}{7:<10}{8:<10}{9:<10}'.format(*data[i].split(','))
+                data[i] = data[i].strip()+'\n'
+            elif len(data[i].split(',')) == 9:
+                data[i] = '{0:<7}{1:<9}{2:<9}{3:<9}{4:<18}{5:<10}{6:<10}{7:<10}{8:<10}'.format(*data[i].split(','))
+                data[i] = data[i].strip()+'\n'           
+            elif len(data[i].split(',')) == 8:       
+                data[i] = '{0:<7}{1:<9}{2:<9}{3:<9}{4:<18}{5:<10}{6:<10}{7:<10}'.format(*data[i].split(','))
+                data[i] = data[i].strip()+'\n'
+        data_copy = data.copy()
+        
+        import numpy as np
+        sortindex = np.argsort([en if en is not None else i*1e50 for i,en in enumerate(energies)])
+
+        for i in range(len(sortindex)):
+            data_copy[i+1] = data[sortindex[i]+1]
+        data = data_copy
+
+    if TXT: out_filename = out_filename.split('.')[0]+'.txt'
     with open(out_filename, 'w') as f:
         f.writelines( data )
 

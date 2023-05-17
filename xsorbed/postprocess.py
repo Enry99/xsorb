@@ -145,11 +145,13 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
 
         #section to repeat the bulk if mol is partially outside###############
         #TODO: re-adapt cell to avoid blank regions around
+        #TODO: se assumiamo che la molecola stia dentro la cella, se esce da un lato non può uscire anche dal lato opposto, quindi
+        #se estendiamo da una parte possiamo tagliare da quella opposta. utile metterlo (?)
         if(True):
             mol = config[Nbulk_original:]
             slab = config[:Nbulk_original]
             #print(config.get_scaled_positions())
-            print(config.cell[:])
+            #print(config.cell[:])
 
             x_rep, y_rep = (3,3)
             slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=True) 
@@ -159,21 +161,21 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
 
             max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
             max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
-            max_a = max(2/3-0.01, max_a + 0.05)
-            min_a = min(1/3-0.01, min_a - 0.05)
-            max_b = max(2/3-0.01, max_b + 0.05)
-            min_b = min(1/3-0.01, min_b - 0.05)
+            dx_angstrom = 0.1 #distance in angstrom of surface extending beyond the molecule
+            a, b = config.cell.lengths()[:2]
+            max_a = max(2/3-0.01/a, max_a + dx_angstrom/a)
+            min_a = min(1/3-0.01/a, min_a - dx_angstrom/a)
+            max_b = max(2/3-0.01/b, max_b + dx_angstrom/b)
+            min_b = min(1/3-0.01/b, min_b - dx_angstrom/b)
 
             del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
             Nbulk = len(slab)
-            xmin, ymin = ( min(atom.x for atom in slab) , min(atom.y for atom in slab) )
-            slab.translate([-xmin, -ymin, 0])
-            mol.translate([-xmin, -ymin, 0])
-            slab.cell[:][0] = slab.cell[:][0]*(max_a-min_a)
-            slab.cell[:][1] = slab.cell[:][1]*(max_b-min_b)
-            mol.cell = slab.cell
+            slab.translate(-(config.cell[:][0] + config.cell[:][1]) )
+            mol.translate(-(config.cell[:][0] + config.cell[:][1]) )
+            slab.cell = config.cell
+            mol.cell = config.cell
             config = slab + mol
-            print(config.cell[:])
+            #print(config.cell[:])
         #######################################################################
 
 
@@ -264,11 +266,13 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
             label = labels[i]
             img = mpimg.imread(figures_dir+'/'+pw_files_prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
             axes[i].imshow(img)
-            axes[i].set_title('{0:.2f} eV'.format(energies[i]), fontsize = 7, pad=1)
-            rect = plt.Rectangle((0.0, 0.93), 0.08, 0.07, transform=axes[i].transAxes, facecolor='white', edgecolor='black', linewidth=0.5)
-            axes[i].add_artist(rect)
-            axes[i].text(0.04, 0.985, label, fontsize = 5, transform=axes[i].transAxes, horizontalalignment="center", verticalalignment="top")
-                #bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),transform=axes[i].transAxes, 
+            axes[i].axis('equal') #ensures all images are in identical rectangular boxes, rescaling the size of the image if necessary
+            axes[i].set_title('{0:.2f} eV'.format(energies[i]), fontsize = 5, pad=1)
+            #rect = plt.patches.Rectangle((0.0, 0.93), 0.08, 0.07, transform=axes[i].transAxes, facecolor='white', edgecolor='black', linewidth=0.5)
+            #axes[i].add_artist(rect)
+            #axes[i].text(0.04, 0.985 ...
+            axes[i].text(0.045, 0.988, label, fontsize = 3.5, transform=axes[i].transAxes, horizontalalignment="left", verticalalignment="top",
+                bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),) 
                 #fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
             axes[i].set_xticks([])
             axes[i].set_yticks([])
