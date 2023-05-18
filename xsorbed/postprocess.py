@@ -98,10 +98,6 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
     E_slab_mol = settings.E_slab_mol
     slab_filename = settings.slab_filename
     Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
-    #except Exception as e:
-    #    print("Error while reading settings.in: ", e, "Energies will be given as total energies, and top view will not have faded surface atoms.")
-    #    Nbulk = 0
-    #    E_slab_mol = [0, 0]
     
 
     from ase.data.colors import jmol_colors
@@ -144,9 +140,6 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
         label = labels[i]
 
         #section to repeat the bulk if mol is partially outside###############
-        #TODO: re-adapt cell to avoid blank regions around
-        #TODO: se assumiamo che la molecola stia dentro la cella, se esce da un lato non può uscire anche dal lato opposto, quindi
-        #se estendiamo da una parte possiamo tagliare da quella opposta. utile metterlo (?)
         if(True):
             mol = config[Nbulk_original:]
             slab = config[:Nbulk_original]
@@ -297,37 +290,112 @@ def view_config(which : str, index : int):
     view(config)        
 
 
-def relax_animations(povray = False, witdth_res=500):
+def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
 
 
     print('Reading files...')
     pwo_list=glob.glob(pw_files_prefix+'relax_*.pwo')
-    configs = [read(file, index=':') for file in pwo_list]
+    if SCREEN_ONLY:
+        configs = [read(file.replace('relax', 'screening'), index=':')[:] for file in pwo_list]
+    else:
+        configs = [read(file.replace('relax', 'screening'), index=':')[:]+read(file, index=':')[:] for file in pwo_list] #full relax (screening+final)
     labels = [pwo.split('.pwo')[0].split('_')[-1] for pwo in pwo_list]
     print('All files read.')
     
     print('Generating animation(s)...')
+
+    #try:
+    settings = Settings()
+    slab_filename = settings.slab_filename
+    Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
+ 
+
+    from ase.data.colors import jmol_colors
+    ATOM_COLORS_SLAB = jmol_colors.copy()
+    ATOM_COLORS_MOL  = jmol_colors.copy()
+
+    if os.path.isfile("custom_colors.json"):
+        import json
+        with open("custom_colors.json", "r") as f:
+            custom_colors = json.load(f)
+
+        print("Custom colors read from file.")
+
+        USER_COLORS_SLAB = custom_colors["slab_colors"] if "slab_colors" in custom_colors else []
+        USER_COLORS_MOL  = custom_colors["mol_colors"] if "mol_colors" in custom_colors else []
+        BOND_RADIUS      = custom_colors["bond_radius"] if "bond_radius" in custom_colors else RADIUS_DEFAULT
+    else:
+        USER_COLORS_SLAB = []
+        USER_COLORS_MOL  = []
+        BOND_RADIUS      = RADIUS_DEFAULT
+
+    for color in USER_COLORS_SLAB:
+        ATOM_COLORS_SLAB[color[0]] = color[1]
+    for color in USER_COLORS_MOL:
+        ATOM_COLORS_MOL[color[0]] = color[1]
+
+    if(True):
+        from ase.build import make_supercell
+        Nbulk_original = Nbulk
+
+
     if(not os.path.exists('relax_'+images_dirname)):
         os.mkdir('relax_'+images_dirname)
     os.chdir('relax_'+images_dirname)
 
-
-    from ase.data.colors import jmol_colors
-    ATOM_COLORS = jmol_colors.copy()
-    for color in USER_COLORS_DEFS:
-        ATOM_COLORS[color[0]] = color[1]
-    colors = [ATOM_COLORS[atom.number] for atom in configs[0][0]]
-
-
     if(povray):
         if witdth_res is None: witdth_res = 500 
-        for i, config in enumerate(configs):
+
+        for i, config in enumerate(configs): 
+
+            if os.path.isfile('relax_{}_pov.mp4'.format(labels[i])):
+                print('relax_{}_pov.mp4 already present. Skipping.'.format(labels[i]))
+                continue      
+            
             if os.path.exists('temp'):
                 shutil.rmtree('temp')
             os.mkdir('temp')  
 
             os.chdir('temp')
-            for j, step in enumerate(config):
+
+            for j, step in enumerate(config[:]):
+                
+
+                #section to repeat the bulk if mol is partially outside###############
+                #TODO: prendere le coordinate max tra gli step, in modo da usare sempre quelle per tutti gli step
+                if(True):
+                    mol = step[Nbulk_original:]
+                    slab = step[:Nbulk_original]
+                    #print(step.get_scaled_positions())
+                    #print(step.cell[:])
+
+                    x_rep, y_rep = (3,3)
+                    slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=True) 
+
+                    mol.cell = slab.cell          
+                    mol.translate(+(step.cell[:][0] + step.cell[:][1]) )
+
+                    max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
+                    max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
+                    dx_angstrom = 0.1 #distance in angstrom of surface extending beyond the molecule
+                    a, b = step.cell.lengths()[:2]
+                    max_a = max(2/3-0.01/a, max_a + dx_angstrom/a)
+                    min_a = min(1/3-0.01/a, min_a - dx_angstrom/a)
+                    max_b = max(2/3-0.01/b, max_b + dx_angstrom/b)
+                    min_b = min(1/3-0.01/b, min_b - dx_angstrom/b)
+
+                    del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
+                    Nbulk = len(slab)
+                    slab.translate(-(step.cell[:][0] + step.cell[:][1]) )
+                    mol.translate(-(step.cell[:][0] + step.cell[:][1]) )
+                    slab.cell = step.cell
+                    mol.cell = step.cell
+                    step = slab + mol
+                    #print(step.cell[:])
+                #######################################################################
+  
+                
+                colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nbulk else ATOM_COLORS_MOL[atom.number] for atom in step]
                 
                 step_copy = step.copy()
                 step_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
@@ -342,7 +410,7 @@ def relax_animations(povray = False, witdth_res=500):
 
             os.chdir('..')
             #os.system('convert -delay 20 temp/step_*.png '+pw_files_prefix+'relax_{0}_pov.gif'.format(labels[i]))
-            os.system('ffmpeg -framerate 10 -i temp/step_%04d.png -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '+pw_files_prefix+'relax_{0}_pov.mp4'.format(labels[i]))
+            os.system('ffmpeg -framerate 10 -i temp/step_%04d.png  -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2"  -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '+pw_files_prefix+'relax_{0}_pov.mp4'.format(labels[i]))
             shutil.rmtree('temp')
 
     else:
@@ -399,7 +467,7 @@ def plot_energy_evolution(which='relax'):
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
-    plt.legend(title="Config, energy")
+    plt.legend(title="Config, energy", ncols=len(totens)/10, prop={'size': 6})
     energy_plot_filename = '{0}_energies.png'.format(which)
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
     print('plot saved in {0}'.format(energy_plot_filename))

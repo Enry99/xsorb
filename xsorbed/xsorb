@@ -71,7 +71,8 @@ def cli_parse():
     main_visual.add_argument('-screening-images', nargs=1, choices=['i', 'f'], help="save images of the screening configurations. Option: 'i'/'f' for initial or final positions")
     main_visual.add_argument('-relax-images', nargs=1, choices=['i', 'f'], help="save images of the relaxations. Option: 'i'/'f' for initial or final positions")
     #main_visual.add_argument('-render-image', nargs=2, help='select which image to render and the rotations list for the camera (syntax: [s/r][index] [rotations], e.g. r12 -10z,-80x)')
-    main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the relaxations in gif (default) or mp4 format (for povray)')
+    main_visual.add_argument('-screening-animations', action='store_true', help='save animations of the screening in gif (default) or mp4 format (for povray)')
+    main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the full relaxations (screen.+final) in gif (default) or mp4 format (for povray)')
     main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
     main_visual.add_argument('-savefiles', nargs=3, help='save files in specific format (syntax: [format] [calc_type] [i/f], e.g. cif screening i or xyz relax f)')
     #optional flags
@@ -88,7 +89,7 @@ def cli_parse():
     calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
     energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er' or key=='plot_energies_scr' or key=='plot_energies') ]
     visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='screening-images'  
-        or key=='relax-images' or key=='relax-animations' or key=='view' or key=='savefiles') ]
+        or key=='relax-images' or key=='screening-animations' or key=='relax-animations' or key=='view' or key=='savefiles') ]
 
     if calc_command and energy_command:
         parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], energy_command[0]))
@@ -117,8 +118,8 @@ def cli_parse():
         parser.error("--exclude option can only be used with -r")
     if args.regenerate and not args.r:
         parser.error("--regenerate option can only be used with -r")
-    if args.povray and not args.screening_images and not args.relax_images and not args.relax_animations: # and not args.render_image:
-        parser.error("--povray option can only be used with -screening-images or -relax-images or -relax-animations")
+    if args.povray and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations: # and not args.render_image:
+        parser.error("--povray option can only be used with -screening-images or -relax-images or -screening-animations or -relax-animations")
     if args.width_res is not None and not args.povray:
         parser.error("--width-res can be specified only for povray rendering")
 
@@ -211,8 +212,8 @@ def main():
     #    config_images(which=args.render_image[0][0], index=args.render_image[0][1:], 
     #        rotations = args.render_image[1], povray=args.povray, witdth_res=args.width_res)
 
-    elif(args.relax_animations):
-        relax_animations(povray=args.povray, witdth_res=args.width_res)
+    elif(args.relax_animations or args.screening_animations):
+        relax_animations(povray=args.povray, witdth_res=args.width_res, SCREEN_ONLY=args.screening_animations)
 
     elif(args.view):
         view_config(which=args.view[0], index=int(args.view[1:]))
