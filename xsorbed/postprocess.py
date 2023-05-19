@@ -467,7 +467,8 @@ def plot_energy_evolution(which='relax'):
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
-    plt.legend(title="Config, energy", ncols=len(totens)/10, prop={'size': 6})
+    import math
+    plt.legend(title="Config, energy", ncols=math.ceil(len(totens)/10), prop={'size': 6  if which == 'screening' else 8})
     energy_plot_filename = '{0}_energies.png'.format(which)
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
     print('plot saved in {0}'.format(energy_plot_filename))
