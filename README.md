@@ -19,7 +19,7 @@ to add the executable in the `PATH` variable. With this operation, the user can 
 
 `pip install -r requirements.txt`
 
-Xsorb is interfaced with Quantum Espresso to perform the DFT calculations. It is, therefore, necessary to compile and install the \texttt{pw.x} executable before launching the calculations.
+Xsorb is interfaced with Quantum Espresso to perform the DFT calculations. It is, therefore, necessary to compile and install the `pw.x` executable before launching the calculations.
 
 After the installation, the program works through a command-line interface (CLI) by running:  
 
@@ -27,7 +27,7 @@ After the installation, the program works through a command-line interface (CLI)
 `xsorb [command] [parameters]`
 
 
-Where \texttt{command} specifies which operation to perform and \texttt{parameters} are additional parameters available for specific commands.
+Where `command` specifies which operation to perform and `parameters` are additional parameters available for specific commands.
 
 
 ## Dependencies
