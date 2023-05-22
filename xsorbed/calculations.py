@@ -16,7 +16,7 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
  
     #check: if all calculations finished, simply skip
     if RUN:
-        energies = get_energies(calc_type='screening', VERBOSE=False)
+        energies = get_energies(pwo_prefix='screening', VERBOSE=False)
         if energies and None not in energies:
             print('All screening calculations completed. Nothing will be done.')
             return
@@ -122,7 +122,7 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False, BY_SITE = False):
     
     #check: if all calculations finished, simply skip
-    energies = get_energies(calc_type='relax', VERBOSE=False)
+    energies = get_energies(pwo_prefix='relax', VERBOSE=False)
     if energies and None not in energies:
         print('All screening calculations completed. Nothing will be done.')
         return    
@@ -146,7 +146,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     if indices is not None: calcs = indices
     else:
         print('Collecting energies from screening...')
-        energies = get_energies(E_slab_mol=settings.E_slab_mol, calc_type='screening')
+        energies = get_energies(E_slab_mol=settings.E_slab_mol, pwo_prefix='screening')
         if None in energies:
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)

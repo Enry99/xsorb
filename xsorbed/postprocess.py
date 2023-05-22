@@ -111,13 +111,17 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
 
         print("Custom colors read from file.")
 
-        USER_COLORS_SLAB = custom_colors["slab_colors"] if "slab_colors" in custom_colors else []
-        USER_COLORS_MOL  = custom_colors["mol_colors"] if "mol_colors" in custom_colors else []
-        BOND_RADIUS      = custom_colors["bond_radius"] if "bond_radius" in custom_colors else RADIUS_DEFAULT
+        USER_COLORS_SLAB  = custom_colors["slab_colors"] if "slab_colors" in custom_colors else []
+        USER_COLORS_MOL   = custom_colors["mol_colors"] if "mol_colors" in custom_colors else []
+        BOND_RADIUS       = custom_colors["bond_radius"] if "bond_radius" in custom_colors else RADIUS_DEFAULT
+        CELLLINEWIDTH     = custom_colors["cell_line_width_lateral"] if "cell_line_width_lateral" in custom_colors else 0.01
+        CELLLINEWIDTH_TOP = custom_colors["cell_line_width_top"] if "cell_line_width_top" in custom_colors else 0
     else:
-        USER_COLORS_SLAB = []
-        USER_COLORS_MOL  = []
-        BOND_RADIUS      = RADIUS_DEFAULT
+        USER_COLORS_SLAB  = []
+        USER_COLORS_MOL   = []
+        BOND_RADIUS       = RADIUS_DEFAULT
+        CELLLINEWIDTH     = 0.01
+        CELLLINEWIDTH_TOP = 0
 
     for color in USER_COLORS_SLAB:
         ATOM_COLORS_SLAB[color[0]] = color[1]
@@ -147,19 +151,19 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
             #print(config.cell[:])
 
             x_rep, y_rep = (3,3)
-            slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=True) 
+            slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False) 
 
             mol.cell = slab.cell          
             mol.translate(+(config.cell[:][0] + config.cell[:][1]) )
 
             max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
             max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
-            dx_angstrom = 0.1 #distance in angstrom of surface extending beyond the molecule
+            dx_angstrom = 0.01 #distance in angstrom of surface extending beyond the molecule
             a, b = config.cell.lengths()[:2]
-            max_a = max(2/3-0.01/a, max_a + dx_angstrom/a)
-            min_a = min(1/3-0.01/a, min_a - dx_angstrom/a)
-            max_b = max(2/3-0.01/b, max_b + dx_angstrom/b)
-            min_b = min(1/3-0.01/b, min_b - dx_angstrom/b)
+            max_a = max(2/3-0.05/a, max_a + dx_angstrom/a)
+            min_a = min(1/3-0.05/a, min_a - dx_angstrom/a)
+            max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
+            min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
 
             del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
             Nbulk = len(slab)
@@ -192,7 +196,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     radii = 0.65, 
                     rotation=rotations,
                     colors=colors,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
                 os.remove(pw_files_prefix+which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')))
@@ -205,7 +209,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     radii = 0.65, 
                     rotation='-5z,-85x', 
                     colors=colors,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
                 os.remove(pw_files_prefix+which+'_{0}_pov.pov'.format(label))
@@ -219,7 +223,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     format='pov',
                     radii = 0.65, 
                     colors=colors_top,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=0, transparent=False, textures = textures,
+                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH_TOP, transparent=False, textures = textures,
                         camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()

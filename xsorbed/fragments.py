@@ -312,9 +312,9 @@ def get_diss_energies():
             if 'site' in line: continue
             sites.append(int(line.split(',')[0]))
             config_labels.append(line.split(',')[4])
-    energies = get_energies(pwo_prefix='relax'.format(fragment_name))
+    energies = get_energies(pwo_prefix='relax')
     i_min = energies.index(min(energies))
-    files = natsorted(glob.glob( 'relax_*.pwo'.format(fragment_name) ))
+    files = natsorted(glob.glob( 'relax_*.pwo' ))
     name_min = files[i_min]
     label_min = int(name_min.split('_')[-1].split('.')[0])
     fragments_data["mol"]["energy"] = min(energies)
@@ -359,13 +359,13 @@ def get_diss_energies():
         initial_fragment_name = combination[0]
         dissoc_products_toten = sum([ fragments_data[frag]["energy"] for frag in products_names])
         initial_fragment_energy = fragments_data[ initial_fragment_name ]["energy"]
-        diss_en = dissoc_products_toten - initial_fragment_energy - slab_energy
+        diss_en = dissoc_products_toten - initial_fragment_energy - slab_energy * (len(products_names) - 1)
 
-        fragments_names = '{0}({1}) -> '.format("mol", fragments_data["mol"]["site"]).format()    \
+        fragments_names = '{0}({1}) -> '.format(initial_fragment_name, fragments_data[initial_fragment_name]["site"]).format()    \
             +' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in products_names])
 
-        text.append('{:60}{:+.3f}\n'.format(fragments_names, diss_en))
+        text.append('{:70}{:+.3f}\n'.format(fragments_names, diss_en))
 
     with open('DISSOCIATION.txt', 'w') as f:
-        f.write( '{0:60}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
+        f.write( '{0:70}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
         f.writelines( text )
