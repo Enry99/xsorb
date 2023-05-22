@@ -168,7 +168,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
 
         print('\n--------------------\nFragment {}:'.format(fragment_name))
 
-        mol_frag_name = "'{0}.{1}'".format(fragment_name, 'pwo' if os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)) else 'pwi')
+        mol_frag_name = "fragments/{0}/{0}.{1}".format(fragment_name, 'pwo' if os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)) else 'pwi')
         mol = Molecule(mol_frag_name)
     
         if not os.path.exists('fragments/{0}/{1}'.format(fragment_name, settings.slab_filename)): shutil.copyfile(settings.slab_filename, 'fragments/{0}/{1}'.format(fragment_name, settings.slab_filename))
@@ -183,7 +183,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
             for i, line in enumerate(settings_lines_frag):
                 if "molecule_filename" in line:
                     l = line.split('=')[:2]
-                    l[1] = mol_frag_name
+                    l[1] = mol_frag_name.split('/')[-1]
                     line = '= '.join(l)+'\n'
                     settings_lines_frag[i] = line
     

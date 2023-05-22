@@ -463,7 +463,7 @@ def plot_energy_evolution(which='relax'):
             #plt.xlim(xmin=0)
             
     
-    plt.title('Relax energies')
+    plt.title('Energy evolution during optimization')
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
