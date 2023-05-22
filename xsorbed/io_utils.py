@@ -18,9 +18,9 @@ from filenames import *
 TEST = False #do not actually launch the jobs, simply prints the command
 
 
-def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax'):
+def get_energies(E_slab_mol : list = [0,0], calc_type : str = 'relax', VERBOSE : bool = True):
 
-    files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
+    files = natsorted(glob.glob( calc_type + "_*.pwo" ))
 
     #get energies from pwo(s)
     energies = len(files)*[None]  #those not completed will be left as None, raising an error if used for relax
@@ -53,7 +53,7 @@ def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax'):
                     energies[i] = toten
               
             else: 
-                print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
+                if VERBOSE: print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
 
     return energies
 

@@ -14,6 +14,13 @@ from filenames import *
 
 def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_format=None): 
  
+    #check: if all calculations finished, simply skip
+    if RUN:
+        energies = get_energies(calc_type='screening', VERBOSE=False)
+        if energies and None not in energies:
+            print('All screening calculations completed. Nothing will be done.')
+            return
+    
     #BEGIN STRUCTURES GENERATION ############################################################################
 
     settings=Settings()
@@ -83,6 +90,13 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
 
     for i in np.arange(len(all_mol_on_slab_configs_ase)):
         filename = pw_files_prefix+'screening_'+str(i)+'.pwi'
+
+        csvfile.write(str(i)+','+full_labels[i]+'\n')
+
+        if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
+            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. It will be skipped, and pwi will not be written. (Delete/rename the pwo to re-generate it).')
+            continue
+
         pwi_names.append(filename)
         calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
@@ -96,8 +110,6 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
         calc.write_input(all_mol_on_slab_configs_ase[i])
         if(saveas_format is not None): write(folder+filename.split('.')[0]+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
 
-        csvfile.write(str(i)+','+full_labels[i]+'\n')
-
     csvfile.close()
 
     print('All pwi(s) written.')
@@ -108,6 +120,13 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
 
 
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False, BY_SITE = False):
+    
+    #check: if all calculations finished, simply skip
+    energies = get_energies(calc_type='relax', VERBOSE=False)
+    if energies and None not in energies:
+        print('All screening calculations completed. Nothing will be done.')
+        return    
+    
     
     if n_configs is None and threshold is None: n_configs = N_relax_default if not BY_SITE else 1
     
@@ -127,7 +146,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     if indices is not None: calcs = indices
     else:
         print('Collecting energies from screening...')
-        energies = get_energies(E_slab_mol=settings.E_slab_mol, pwo_prefix='screening')
+        energies = get_energies(E_slab_mol=settings.E_slab_mol, calc_type='screening')
         if None in energies:
             print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
             sys.exit(1)
@@ -234,6 +253,11 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
 
         filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
+
+        if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
+            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. It will be skipped, and pwi will not be written. (Delete/rename the pwo to re-generate it).')
+            continue
+
         pwi_names.append(filename)
         calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
