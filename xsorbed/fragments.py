@@ -21,7 +21,8 @@ from filenames import *
 from slab import Slab
 
 
-TEST = False
+TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs
+#TODO: uniformare parte di lanciare jobs: usa la funzione in io_utils, anziché un quasi doppione qui
 
 
 def isolated_fragments(RUN = False):
@@ -47,9 +48,26 @@ def isolated_fragments(RUN = False):
 
         if not os.path.exists('fragments/'+fragment_name): os.mkdir('fragments/'+fragment_name)
 
+
+        if os.path.exists('fragments/'+fragment_name+'/'+fragment_name+'.pwo'): 
+            print('fragments/'+fragment_name+'/'+fragment_name+'.pwo already present, possibly from a running calculation. You can decide to re-calculate it or skip it.')        
+            while True:
+                answer = input('Re-calculate? ("y" = yes, "n" = no): ')
+                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                    break
+                else: print('Value not recognized. Try again.')
+            if 'n' in answer: continue
+
+        answer = 'yes'
         if os.path.exists('fragments/'+fragment_name+'/'+fragment_name+'.pwi'):
-            print(fragment_name+'.pwi already present. It will not be rewritten, to mantain possible manual fine-tuning of the convergence parameters. Delete the file to re-generate it.' )
-        else:     
+            print(fragment_name+'.pwi already present.')
+            while True:
+                answer = input('Overwrite? ("y" = yes, "n" = no): ')
+                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                    break
+                else: print('Value not recognized. Try again.')
+
+        if answer == 'yes' or answer == 'y':     
             #create complementary
             if "mol_subset_atoms" in fragments_dict["fragments"][fragment_name] and "mol_subset_atoms_compl" in fragments_dict["fragments"][fragment_name]:
                 print("You can specify a fragment either by its atoms or by the complementary atoms of the whole molecule, not both. Quitting.")
@@ -116,9 +134,6 @@ def isolated_fragments(RUN = False):
             input_file = fragment_name+'.pwi'
             output_file = input_file.replace("pwi", "pwo")
 
-            if(os.path.isfile(output_file)): 
-                print(output_file+' already present, possibly from a running calculation. It will be skipped.')
-                continue
 
             j_dir = 'fragments/'+fragment_name
             shutil.copyfile(settings.jobscript, j_dir + '/'+jobscript_filename)
@@ -156,9 +171,10 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
             break
 
 
-    #if not os.path.exists('fragments'): os.mkdir('fragments') # ci deve essere per forza, perché prima di questo comando le molecole vanno generate/rilassate
-
-    #TODO: check if ALL fragments exist in folders, otherwise ERROR! you need to generate/relax the fragments first
+    for fragment_name in fragments_dict["fragments"]:
+        if not os.path.exists('fragments/{0}/{0}.pwi'.format(fragment_name)) and not os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)):
+            print("ERROR! fragments/{0}/{0} (.pwi or .pwo) not found. You need to generate/relax all the fragments first.".format(fragment_name))
+            sys.exit(1)
 
     main_dir = os.getcwd()
 
@@ -176,7 +192,17 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
         shutil.copyfile(settings.jobscript, 'fragments/{0}/{1}'.format(fragment_name, jobscript_filename))
 
         #only edit settings.in if not already present. This allows to fine-tune some parameters for specific fragments after -g, before -s
-        if not os.path.exists('fragments/{0}/settings.in'.format(fragment_name)): 
+
+        answer = 'yes'
+        if os.path.exists('fragments/{0}/settings.in'.format(fragment_name)):
+            print('fragments/{0}/settings.in already present.'.format(fragment_name))
+            while True:
+                answer = input('Overwrite? ("y" = yes, "n" = no): ')
+                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                    break
+                else: print('Value not recognized. Try again.')
+
+        if answer == 'yes' or answer == 'y': 
     
             settings_lines_frag = copy.deepcopy(settings_lines)
 

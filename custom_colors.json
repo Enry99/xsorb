@@ -24,7 +24,6 @@
         ],
 
     "bond_radius" : 0.8,
-    "cell_line_width_lateral"  : 0.05,
-    "cell_line_width_top"    : 0
+    "cell_line_width"  : 0
 
 }
