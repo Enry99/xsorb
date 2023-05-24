@@ -9,7 +9,7 @@ Created on Thu 11 May 2023
 Generation of molecular fragments and dissociation energies calculation
 
 """
-
+#TODO: fragments, se atomo isolato aggiungere nosym=.true.
 
 import json, os, shutil, copy, sys
 from settings import Settings
@@ -22,7 +22,6 @@ from slab import Slab
 
 
 TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs
-#TODO: uniformare parte di lanciare jobs: usa la funzione in io_utils, anziché un quasi doppione qui
 
 
 def isolated_fragments(RUN = False):
@@ -116,6 +115,7 @@ def isolated_fragments(RUN = False):
                     flags_i_subset.append(flag)
 
             settings.espresso_settings_dict['ELECTRONS'].update({'mixing_beta' : 0.1})
+            if(len(mol.mol_ase) == 1): settings.espresso_settings_dict['SYSTEM'].update({'nosym' : '.true.'}) #isolated atoms
 
             calc = Espresso_mod(pseudopotentials=pseudos_subset, 
                     input_data=settings.espresso_settings_dict,

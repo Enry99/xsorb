@@ -253,8 +253,15 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
         full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
         print('All slab+adsorbate cells generated.')
     else:
-        files = natsorted(glob.glob( pw_files_prefix + "screening_*.pwo" ))        
-        all_mol_on_slab_configs_ase = [read(filename=file, results_required=False) for file in files]
+        files = natsorted(glob.glob( pw_files_prefix + "screening_*.pwo" ))
+        all_mol_on_slab_configs_ase = [None] *  len(files)
+        for i, file in enumerate(files):
+            try:
+                r = read(filename=file, results_required=False)
+            except AssertionError as e:
+                print("Error while reading {0} due to ase problem in reading calculations with scf NOT terminated. Skipping.".format(file))
+                continue
+            all_mol_on_slab_configs_ase[i] = r
 
  
 
@@ -266,6 +273,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     for i in calcs:       
         #struct_ase = read(pwi_prefix+'screening_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
+        if all_mol_on_slab_configs_ase[i] == None: continue
 
         filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
 
