@@ -100,6 +100,8 @@ class Settings:
         for flag in optional_flags_list:
             if flag not in script_settings_dict['STRUCTURE']:
                 script_settings_dict['STRUCTURE'].update({flag : optional_flags_list[flag]})
+        if 'IONS' not in self.espresso_settings_dict:
+            self.espresso_settings_dict['IONS'] = {}
         if 'ion_dynamics' not in self.espresso_settings_dict['IONS']:
             self.espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
         if len(self.kpoints) == 2: #so no gamma but also no offset
