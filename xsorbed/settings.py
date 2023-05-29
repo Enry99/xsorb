@@ -135,7 +135,7 @@ class Settings:
                     print("Slab and molecule energies read from files.")
                     self.E_slab_mol = [slab_en, mol_en]
             
-        if not self.E_slab_mol:
+        if not self.E_slab_mol and read_energies:
             print('It was not possible to obtain slab and molecule energy in any way. Total energies will be displayed instead.')
             self.E_slab_mol = [0, 0]
             

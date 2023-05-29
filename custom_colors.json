@@ -23,6 +23,7 @@
             [42, [0.70, 0.70, 0.70]]
         ],
 
-    "bond_radius" : 0.8
+    "bond_radius" : 0.8,
+    "cell_line_width"  : 0
 
 }

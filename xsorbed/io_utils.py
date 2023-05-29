@@ -18,7 +18,7 @@ from filenames import *
 TEST = False #do not actually launch the jobs, simply prints the command
 
 
-def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax'):
+def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax', VERBOSE : bool = True):
 
     files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
 
@@ -53,7 +53,7 @@ def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax'):
                     energies[i] = toten
               
             else: 
-                print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
+                if VERBOSE: print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
 
     return energies
 
@@ -96,12 +96,16 @@ def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo
 
             scf_terminated = False
             relax_terminated = False
+            NONCONV = False
             for line in pwo: #make sure to get the last one (useful in relaxations)
                 if '!' in line: 
                     toten = line.split()[4]
                     #if not scf_terminated: toten0 = toten #scf_terminated becomes true in the next line, so we take the first step
+                if 'convergence NOT achieved' in line:
+                    NONCONV = True  
                 if 'convergence has been achieved' in line:
-                    scf_terminated = True                   
+                    scf_terminated = True
+                    NONCONV = False                
                 if 'Final energy' in line:
                     relax_terminated = True
 
@@ -127,14 +131,19 @@ def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo
                 #if "relax" not in pwo_prefix: line.append('{:.3f}'.format(toten0))
                 line.append('{:.3f}'.format(toten))
                 if not relax_terminated:
-                    print(file.split('/')[-1] + ' relaxation has not reached final configuration. The energy will be marked with a *')
-                    line[-1]+='*'
+                    if NONCONV:
+                        print('Warning! {0} failed to reach SCF convergence after electron_maxstep. The energy will be marked with **'.format(file.split('/')[-1]))
+                        line[-1]+='**'
+                    else:
+                        line[-1]+='*'
+                        print(file.split('/')[-1] + ' relaxation has not reached final configuration. The energy will be marked with a *')
                 
                 data[config_label+1] = ','.join(line)
                 data[config_label+1] += '\n'
                 
             else: 
-                print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
+                print(file.split('/')[-1] + ' job has not reached the first scf convergence. It will be skipped.')
+    
 
 
     if TXT:
@@ -200,10 +209,6 @@ def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_title :
         label = input_file.split('.pwi')[0].split('_')[-1]
 
         if(os.path.isfile(input_file)): # unnecessary, this check is also done before calling the function
-
-            if(os.path.isfile(output_file)): 
-                print(output_file+' already present, possibly from a running calculation. It will be skipped.')
-                continue
 
             j_dir = outdirs+'/'+str(label)
             if not os.path.exists(j_dir): os.mkdir(j_dir)

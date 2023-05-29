@@ -9,7 +9,7 @@ Created on Thu 11 May 2023
 Generation of molecular fragments and dissociation energies calculation
 
 """
-
+#TODO: fragments, se atomo isolato aggiungere nosym=.true.
 
 import json, os, shutil, copy, sys
 from settings import Settings
@@ -21,10 +21,14 @@ from filenames import *
 from slab import Slab
 
 
-TEST = False
+TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs
 
 
 def isolated_fragments(RUN = False):
+
+    #NOTE!!! By default the program sets starting magnetizations to 1 and mixing_beta to 0.1 for all fragments to facilitate convergence. Might be changed in the future.
+
+
     with open("fragments.json", "r") as f:
         fragments_dict = json.load(f)
 
@@ -35,61 +39,91 @@ def isolated_fragments(RUN = False):
     if not os.path.exists('fragments'): os.mkdir('fragments')
     for fragment_name in fragments_dict["fragments"]:
 
-        if not os.path.exists('fragments/'+fragment_name): os.mkdir('fragments/'+fragment_name)
-        
-        #create complementary
-        if "mol_subset_atoms" in fragments_dict["fragments"][fragment_name] and "mol_subset_atoms_compl" in fragments_dict["fragments"][fragment_name]:
-            print("You can specify a fragment either by its atoms or by the complementary atoms of the whole molecule, not both. Quitting.")
+        print("Generating fragment {}...".format(fragment_name))
+
+        if fragment_name == "mol":
+            print('Error: fragment name "mol" not allowed (reserved for whole molecule). Quitting.')
             sys.exit(1)
-         
-        if "mol_subset_atoms_compl" in fragments_dict["fragments"][fragment_name]:
-            mol_subset_atoms = [i for i in range(mol_whole.natoms) if i not in fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]]
-        else:
-            mol_subset_atoms = fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]
-        
-        mol = Molecule(settings.molecule_filename, atoms_subset=mol_subset_atoms)      
 
-        fragment_species = set([atom.symbol for atom in mol.mol_ase])            
-        absent_species = [species for species in settings.pseudopotentials if species not in fragment_species]
-
-        pseudos_subset = copy.deepcopy(settings.pseudopotentials)
-        for species in absent_species:
-            pseudos_subset.pop(species)
+        if not os.path.exists('fragments/'+fragment_name): os.mkdir('fragments/'+fragment_name)
 
 
-        absent_indices = []
-        for i, pot in enumerate(settings.pseudopotentials):
-            if pot in absent_species: absent_indices.append(i)
+        if os.path.exists('fragments/'+fragment_name+'/'+fragment_name+'.pwo'): 
+            print('fragments/'+fragment_name+'/'+fragment_name+'.pwo already present, possibly from a running calculation. You can decide to re-calculate it or skip it.')        
+            while True:
+                answer = input('Re-calculate? ("y" = yes, "n" = no): ')
+                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                    break
+                else: print('Value not recognized. Try again.')
+            if 'n' in answer: continue
 
-        starting_mag_subset = []
-        for i, mag in enumerate(settings.starting_mag):
-            if i not in absent_indices:
-                starting_mag_subset.append(mag)
-        
-        delta_n = []
-        missing_counter = 0
-        for j, species in enumerate(settings.pseudopotentials):
-            if species in absent_species:
-                missing_counter += 1
-            delta_n.append(missing_counter)
+        answer = 'yes'
+        if os.path.exists('fragments/'+fragment_name+'/'+fragment_name+'.pwi'):
+            print(fragment_name+'.pwi already present.')
+            while True:
+                answer = input('Overwrite? ("y" = yes, "n" = no): ')
+                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                    break
+                else: print('Value not recognized. Try again.')
+
+        if answer == 'yes' or answer == 'y':     
+            #create complementary
+            if "mol_subset_atoms" in fragments_dict["fragments"][fragment_name] and "mol_subset_atoms_compl" in fragments_dict["fragments"][fragment_name]:
+                print("You can specify a fragment either by its atoms or by the complementary atoms of the whole molecule, not both. Quitting.")
+                sys.exit(1)
+            
+            if "mol_subset_atoms_compl" in fragments_dict["fragments"][fragment_name]:
+                mol_subset_atoms = [i for i in range(mol_whole.natoms) if i not in fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]]
+            else:
+                mol_subset_atoms = fragments_dict["fragments"][fragment_name]["mol_subset_atoms"]
+            
+            mol = Molecule(settings.molecule_filename, atoms_subset=mol_subset_atoms)      
+
+            fragment_species = set([atom.symbol for atom in mol.mol_ase])            
+            absent_species = [species for species in settings.pseudopotentials if species not in fragment_species]
+
+            pseudos_subset = copy.deepcopy(settings.pseudopotentials)
+            for species in absent_species:
+                pseudos_subset.pop(species)
 
 
-        flags_i_subset      = []
-        settings_flags_i = copy.deepcopy(settings.flags_i)
-        for flag in settings_flags_i:
-            i_flag = int(flag[0].split('(')[1].split(')')[0])
-            if i_flag-1 not in absent_indices:
-                #print(i_flag)
-                flag[0] = flag[0].replace('({0})'.format(i_flag), '({0})'.format(i_flag - delta_n[i_flag-1]))
-                flags_i_subset.append(flag)
+            absent_indices = []
+            for i, pot in enumerate(settings.pseudopotentials):
+                if pot in absent_species: absent_indices.append(i)
 
-        calc = Espresso_mod(pseudopotentials=pseudos_subset, 
-                input_data=settings.espresso_settings_dict,
-                filename='fragments/'+fragment_name+'/'+fragment_name+'.pwi',
-                kpts = None,   #TODO: handle case where gamma is not right, here we assume that the input cell for the molecule was big enough
-                koffset= None)
-        calc.set_system_flags(starting_mag_subset, flags_i_subset)
-        calc.write_input(mol.mol_ase)
+            starting_mag_subset = []
+            for i, mag in enumerate(settings.starting_mag):
+                if i not in absent_indices:
+                    #starting_mag_subset.append(mag)
+                    starting_mag_subset.append(1.0) #set all to 1, can be better for fragments
+            
+            delta_n = []
+            missing_counter = 0
+            for j, species in enumerate(settings.pseudopotentials):
+                if species in absent_species:
+                    missing_counter += 1
+                delta_n.append(missing_counter)
+
+
+            flags_i_subset      = []
+            settings_flags_i = copy.deepcopy(settings.flags_i)
+            for flag in settings_flags_i:
+                i_flag = int(flag[0].split('(')[1].split(')')[0])
+                if i_flag-1 not in absent_indices:
+                    #print(i_flag)
+                    flag[0] = flag[0].replace('({0})'.format(i_flag), '({0})'.format(i_flag - delta_n[i_flag-1]))
+                    flags_i_subset.append(flag)
+
+            settings.espresso_settings_dict['ELECTRONS'].update({'mixing_beta' : 0.1})
+            if(len(mol.mol_ase) == 1): settings.espresso_settings_dict['SYSTEM'].update({'nosym' : '.true.'}) #isolated atoms
+
+            calc = Espresso_mod(pseudopotentials=pseudos_subset, 
+                    input_data=settings.espresso_settings_dict,
+                    filename='fragments/'+fragment_name+'/'+fragment_name+'.pwi',
+                    kpts = None,   #TODO: handle case where gamma is not right, here we assume that the input cell for the molecule was big enough
+                    koffset= None)
+            calc.set_system_flags(starting_mag_subset, flags_i_subset)
+            calc.write_input(mol.mol_ase)
 
 
         if(RUN):
@@ -100,9 +134,6 @@ def isolated_fragments(RUN = False):
             input_file = fragment_name+'.pwi'
             output_file = input_file.replace("pwi", "pwo")
 
-            if(os.path.isfile(output_file)): 
-                print(output_file+' already present, possibly from a running calculation. It will be skipped.')
-                continue
 
             j_dir = 'fragments/'+fragment_name
             shutil.copyfile(settings.jobscript, j_dir + '/'+jobscript_filename)
@@ -140,9 +171,10 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
             break
 
 
-    if not os.path.exists('fragments'): os.mkdir('fragments')
-
-    #TODO: check if ALL fragments exist in folders, otherwise ERROR! you need to generate/relax the fragments first
+    for fragment_name in fragments_dict["fragments"]:
+        if not os.path.exists('fragments/{0}/{0}.pwi'.format(fragment_name)) and not os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)):
+            print("ERROR! fragments/{0}/{0} (.pwi or .pwo) not found. You need to generate/relax all the fragments first.".format(fragment_name))
+            sys.exit(1)
 
     main_dir = os.getcwd()
 
@@ -152,7 +184,7 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
 
         print('\n--------------------\nFragment {}:'.format(fragment_name))
 
-        mol_frag_name = "'{0}.{1}'".format(fragment_name, 'pwo' if os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)) else 'pwi')
+        mol_frag_name = "fragments/{0}/{0}.{1}".format(fragment_name, 'pwo' if os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)) else 'pwi')
         mol = Molecule(mol_frag_name)
     
         if not os.path.exists('fragments/{0}/{1}'.format(fragment_name, settings.slab_filename)): shutil.copyfile(settings.slab_filename, 'fragments/{0}/{1}'.format(fragment_name, settings.slab_filename))
@@ -160,14 +192,24 @@ def setup_fragments_screening(RUN = False, etot_forc_conv = hybrid_screening_thr
         shutil.copyfile(settings.jobscript, 'fragments/{0}/{1}'.format(fragment_name, jobscript_filename))
 
         #only edit settings.in if not already present. This allows to fine-tune some parameters for specific fragments after -g, before -s
-        if not os.path.exists('fragments/{0}/settings.in'.format(fragment_name)): 
+
+        answer = 'yes'
+        if os.path.exists('fragments/{0}/settings.in'.format(fragment_name)):
+            print('fragments/{0}/settings.in already present.'.format(fragment_name))
+            while True:
+                answer = input('Overwrite? ("y" = yes, "n" = no): ')
+                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                    break
+                else: print('Value not recognized. Try again.')
+
+        if answer == 'yes' or answer == 'y': 
     
             settings_lines_frag = copy.deepcopy(settings_lines)
 
             for i, line in enumerate(settings_lines_frag):
                 if "molecule_filename" in line:
                     l = line.split('=')[:2]
-                    l[1] = mol_frag_name
+                    l[1] = mol_frag_name.split('/')[-1]
                     line = '= '.join(l)+'\n'
                     settings_lines_frag[i] = line
     
@@ -284,9 +326,27 @@ def get_diss_energies():
     
     
     slab_energy = Settings().E_slab_mol[0] * rydbergtoev
-    whole_mol_energy = min(get_energies(pwo_prefix='relax'))
 
-    fragments_data = {}
+
+    fragments_data = {"mol" : {}}
+    #get total energy of molecule, each with the label and position
+    sites = [] 
+    config_labels = []
+    with open('site_labels.csv', 'r') as f:
+        file = f.readlines()
+        for line in file:
+            if 'site' in line: continue
+            sites.append(int(line.split(',')[0]))
+            config_labels.append(line.split(',')[4])
+    energies = get_energies(pwo_prefix='relax')
+    i_min = energies.index(min(energies))
+    files = natsorted(glob.glob( 'relax_*.pwo' ))
+    name_min = files[i_min]
+    label_min = int(name_min.split('_')[-1].split('.')[0])
+    fragments_data["mol"]["energy"] = min(energies)
+    fragments_data["mol"]["site"] = config_labels[label_min]
+
+    #repeat for each fragment
     for fragment_name in fragments_dict["fragments"]:
         
         fragments_data.update({fragment_name : {} })
@@ -321,13 +381,17 @@ def get_diss_energies():
 
     for combination in fragments_dict["combinations"]:        
         
-        fragments_toten = sum([ fragments_data[frag]["energy"] for frag in combination])
-        diss_en = fragments_toten - whole_mol_energy - slab_energy
+        products_names = combination[1]
+        initial_fragment_name = combination[0]
+        dissoc_products_toten = sum([ fragments_data[frag]["energy"] for frag in products_names])
+        initial_fragment_energy = fragments_data[ initial_fragment_name ]["energy"]
+        diss_en = dissoc_products_toten - initial_fragment_energy - slab_energy * (len(products_names) - 1)
 
-        fragments_names = ' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in combination])
+        fragments_names = '{0}({1}) -> '.format(initial_fragment_name, fragments_data[initial_fragment_name]["site"]).format()    \
+            +' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in products_names])
 
-        text.append('{:50}{:+.3f}\n'.format(fragments_names, diss_en))
+        text.append('{:70}{:+.3f}\n'.format(fragments_names, diss_en))
 
-    with open('dissociation.txt', 'w') as f:
-        f.write( '{0:50}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
+    with open('DISSOCIATION.txt', 'w') as f:
+        f.write( '{0:70}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
         f.writelines( text )

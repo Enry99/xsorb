@@ -14,6 +14,13 @@ from filenames import *
 
 def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_format=None): 
  
+    #check: if all calculations finished, simply skip
+    #if RUN:
+    #    energies = get_energies(pwo_prefix='screening', VERBOSE=False)
+    #    if energies and None not in energies:
+    #        print('All screening calculations completed. Nothing will be done.')
+    #        return
+    
     #BEGIN STRUCTURES GENERATION ############################################################################
 
     settings=Settings()
@@ -81,8 +88,26 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
     
     pwi_names = []
 
+    ANSWER_ALL = False
+    answer = 'yes'
+    
     for i in np.arange(len(all_mol_on_slab_configs_ase)):
         filename = pw_files_prefix+'screening_'+str(i)+'.pwi'
+
+        csvfile.write(str(i)+','+full_labels[i]+'\n')
+
+        if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
+            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer  else 're-calculated') \
+                  if ANSWER_ALL else 'You can decide to re-calculate it or skip it.'))
+            while True and not ANSWER_ALL:
+                answer = input('Re-calculate? ("y" = yes to this one, "yall" = yes to all, "n" = no to this one, "nall" = no to all): ')
+                if answer == 'yes' or answer == 'y' or answer == 'yall' or answer == 'no' or answer == 'n' or answer == 'nall': 
+                    if answer == 'yall' or answer == 'nall': ANSWER_ALL = True
+                    break
+                else: print('Value not recognized. Try again.')
+            if answer == 'no' or answer == 'n' or answer == 'nall': continue #skip if user does not want to overwrite
+        
+
         pwi_names.append(filename)
         calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
@@ -96,8 +121,6 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
         calc.write_input(all_mol_on_slab_configs_ase[i])
         if(saveas_format is not None): write(folder+filename.split('.')[0]+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
 
-        csvfile.write(str(i)+','+full_labels[i]+'\n')
-
     csvfile.close()
 
     print('All pwi(s) written.')
@@ -108,6 +131,13 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
 
 
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False, BY_SITE = False):
+    
+    #check: if all calculations finished, simply skip
+    #energies = get_energies(pwo_prefix='relax', VERBOSE=False)
+    #if energies and None not in energies:
+    #    print('All screening calculations completed. Nothing will be done.')
+    #    return    
+    
     
     if n_configs is None and threshold is None: n_configs = N_relax_default if not BY_SITE else 1
     
@@ -223,17 +253,42 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
         full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
         print('All slab+adsorbate cells generated.')
     else:
-        files = natsorted(glob.glob( pw_files_prefix + "screening_*.pwo" ))        
-        all_mol_on_slab_configs_ase = [read(filename=file, results_required=False) for file in files]
+        files = natsorted(glob.glob( pw_files_prefix + "screening_*.pwo" ))
+        all_mol_on_slab_configs_ase = [None] *  len(files)
+        for i, file in enumerate(files):
+            try:
+                r = read(filename=file, results_required=False)
+            except AssertionError as e:
+                print("Error while reading {0} due to ase problem in reading calculations with scf NOT terminated. Skipping.".format(file))
+                continue
+            all_mol_on_slab_configs_ase[i] = r
 
  
 
     pwi_names = []
+
+    ANSWER_ALL = False
+    answer = 'yes'
+    
     for i in calcs:       
         #struct_ase = read(pwi_prefix+'screening_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
 
+        if all_mol_on_slab_configs_ase[i] == None: continue
 
         filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
+
+        if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
+            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer else 're-calculate') \
+                  if ANSWER_ALL else 'You can decide to re-calculate it or skip it.'))
+            while True and not ANSWER_ALL:
+                answer = input('Re-calculate? ("y" = yes to this one, "yall" = yes to all, "n" = no to this one, "nall" = no to all): ')
+                if answer == 'yes' or answer == 'y' or answer == 'yall' or answer == 'no' or answer == 'n' or answer == 'nall': 
+                    if answer == 'yall' or answer == 'nall': ANSWER_ALL = True
+                    break
+                else: print('Value not recognized. Try again.')
+            if answer == 'no' or answer == 'n' or answer == 'nall': continue #skip if user does not want to overwrite
+
+
         pwi_names.append(filename)
         calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
