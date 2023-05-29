@@ -20,7 +20,7 @@ from filenames import *
 
 
 
-def read_energy(filename: str, Eslab = 0, Emol = 0):
+def read_energy(filename: str, Eslab = 0, Emol = 0):  #sort of duplicate, TODO: unify with the one in io_utils
     with open(filename, 'r') as f:
         pwo = f.readlines()
 

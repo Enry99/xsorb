@@ -7,7 +7,7 @@ import glob
 from slab import Slab, adsorb_both_surfaces
 from molecule import Molecule
 from espresso_mod import Espresso_mod
-from io_utils import get_energies, launch_jobs
+from io_utils import get_energy_from_pwo, launch_jobs
 from settings import Settings
 from filenames import *
 
@@ -153,16 +153,32 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
 
     settings=Settings()
-    
+
+    files_list = [ file.replace('pwi', 'pwo') if os.path.isfile(file.replace('pwi', 'pwo')) else None for file in natsorted(glob.glob( "screening_*.pwi" ))]
+    #this will contain None if the pwi has not the corresponding pwo
+
     if indices is not None: calcs = indices
     else:
         print('Collecting energies from screening...')
-        energies = get_energies(E_slab_mol=settings.E_slab_mol, pwo_prefix='screening')
-        if None in energies:
-            print('Not all the calculations have reached convergence: impossible to identify the minimum. Quitting.')
-            sys.exit(1)
-        print('screening energies collected.')
 
+        
+        energies = [ get_energy_from_pwo(file, REQUIRE_RELAX_COMPLETED=True) if file is not None else None for file in files_list]
+        #this will contain None if there are some pwi for which the corresponding pwo does not exist or has not a final relaxed energy
+
+        
+        if None in energies:
+            print('Not all screening calculations have provided a final energy. Those for which no pwo exists will be excluded, while for those not completed the last coordinates will be used.')
+            while True:
+                answer = input('Continue anyway with the ones available? ("y" = yes, "n" = no (quit)): ')
+                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                    break
+                else: print('Value not recognized. Try again.')
+            if 'n' in answer:
+                sys.exit(1)
+        print('screening energies collected.')
+        #if we decided to continue anyway, set the None cases to an extremely high value so that they do not get picked as lowest energy
+        #this is just a trick, put in a more elegant way in the future
+        energies = [ en if en is not None else 1e50 for en in energies]
 
         if exclude is None: exclude = []
         else: print('Configurations {0} will be excluded, as requested'.format(exclude))
@@ -172,6 +188,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
         if(BY_SITE):
             site_labels = []
+            #TODO: if not present, generate site_labels.csv
             with open('site_labels.csv', 'r') as f:
                 file = f.readlines()
 
@@ -189,7 +206,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
                 sorted_indices = np.argsort(energies_site, kind='stable').tolist()
                 if n_configs is not None:                  
                     if(n_configs > len(sorted_indices)):
-                        print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n')
+                        print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n (the default is 5)')
                         sys.exit(1)
                     for n, i in enumerate(sorted_indices):
                         if config_labels_site[i] in exclude: continue
@@ -204,7 +221,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
             sorted_indices = np.argsort(energies, kind='stable').tolist()
             if n_configs is not None:           
                 if(n_configs > len(sorted_indices)):
-                    print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n')
+                    print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n (the default is 5)')
                     sys.exit(1)
                 for i in sorted_indices:
                     if i in exclude: continue
@@ -253,13 +270,13 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
         full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
         print('All slab+adsorbate cells generated.')
     else:
-        files = natsorted(glob.glob( pw_files_prefix + "screening_*.pwo" ))
-        all_mol_on_slab_configs_ase = [None] *  len(files)
-        for i, file in enumerate(files):
+        all_mol_on_slab_configs_ase = [None] *  len(files_list)
+        for i, file in enumerate(files_list):
+            if file is None: continue
             try:
                 r = read(filename=file, results_required=False)
             except AssertionError as e:
-                print("Error while reading {0} due to ase problem in reading calculations with scf NOT terminated. Skipping.".format(file))
+                print("Error while reading {0} due to ASE problem in reading calculations with scf NOT terminated. Skipping.".format(file))
                 continue
             all_mol_on_slab_configs_ase[i] = r
 
@@ -270,15 +287,14 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     ANSWER_ALL = False
     answer = 'yes'
     
-    for i in calcs:       
-        #struct_ase = read(pwi_prefix+'screening_'+str(i)+'.pwi') #simply reads the files, avoid to re-generate them
+    for i in calcs: #calcs are the integer indexes of the selected calculations to run
 
         if all_mol_on_slab_configs_ase[i] == None: continue
 
         filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
 
         if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
-            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer else 're-calculate') \
+            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer else 're-calculated') \
                   if ANSWER_ALL else 'You can decide to re-calculate it or skip it.'))
             while True and not ANSWER_ALL:
                 answer = input('Re-calculate? ("y" = yes to this one, "yall" = yes to all, "n" = no to this one, "nall" = no to all): ')

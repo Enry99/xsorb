@@ -59,7 +59,7 @@ A comprehensive list of all the commands with a brief description is present in 
 
 `xsorb -h` or `xsorb --help`
 
-The program requires two input files containing the (optimized) structures of the molecule and the slab that the user wants to study. All the options needed to generate the adsorption configurations and the computational parameters must be included in a 'settings.in' file, a template of whihc is provided in the main folder of this repository. Two versions are present: one with all the parameters, each with a brief description, and another, called 'settings_minimal.in', with only the mandatory options.
+The program requires two input files containing the (optimized) structures of the molecule and the slab that the user wants to study. All the options needed to generate the adsorption configurations and the computational parameters must be included in a 'settings.in' file, a template of which is provided in the main folder of this repository. Two versions are present: one with all the parameters, each with a brief description, and another, called 'settings_minimal.in', with only the mandatory options.
 
 ## Main workflow
 

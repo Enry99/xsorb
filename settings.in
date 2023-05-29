@@ -32,7 +32,7 @@
    fixed_indices_slab            = 0 1 2           #fix chosen atoms of the slab for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
    fixed_layers_slab             = 0 
    fixed_indices_mol             = 3               #fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
-   fix_slab_xyz                  = 0 0 0           #coordinates to fix for the selected atoms in slab
+   fix_slab_xyz                  = 0 0 0           #coordinates to fix for the selected atoms in slab (as in QE, so 0 = fix)
    fix_mol_xyz                   = 0 0 1           #coordinates to fix for the selected atoms in molecule
 /
 

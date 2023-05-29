@@ -18,6 +18,50 @@ from filenames import *
 TEST = False #do not actually launch the jobs, simply prints the command
 
 
+def get_energy_from_pwo(filename : str, REQUIRE_RELAX_COMPLETED : bool = True, E_slab_mol : list = [0,0], VERBOSE : bool = True):
+    '''
+    Returns the final energy from the pwo, in eV. If E_slab_mol is not [0,0] returns the adsorption energy in eV
+    if REQUIRE_RELAX_COMPLETED is True returns None if relax was not completed, otherwise returns None only in case of finding convergence NOT achieved.
+    '''
+    
+    with open(filename, 'r') as f:
+        pwo = f.readlines()
+
+        relax_terminated = False  #will be True if the relax has been completed
+        NONCONV = False           #will be True if the LAST scf cycle did not converge
+        toten = None              #will be different from None if AT LEAST the first scf cicle has been completed successfully
+        for line in pwo: #make sure to get the last one (useful in relaxations)
+            if '!' in line: 
+                toten = line.split()[4]
+            if 'convergence NOT achieved' in line:
+                NONCONV = True  
+            if 'convergence has been achieved' in line:
+                NONCONV = False                
+            if 'Final energy' in line:
+                relax_terminated = True
+                NONCONV = False
+
+        
+        if toten is None: #so no scf cycle completed
+            if(VERBOSE):
+                print('Warning! {0} has not reached the first scf convergence, or it was impossible to read ANY energy value.'.format(filename))
+        elif REQUIRE_RELAX_COMPLETED and not relax_terminated:
+            toten = None
+        else: #we do not require completed relax, or the relax was completed
+            if NONCONV and VERBOSE:
+                print('Warning! {0} failed to reach SCF convergence after electron_maxstep. The last usable energy value will be used'.format(filename)) 
+
+            toten = float(toten)
+            if E_slab_mol:
+                toten -= (E_slab_mol[0]+E_slab_mol[1])       
+            toten *= rydbergtoev
+            
+        return toten
+            
+
+
+
+
 def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax', VERBOSE : bool = True):
 
     files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
