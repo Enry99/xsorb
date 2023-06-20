@@ -71,4 +71,4 @@ ii) identification of the most relevant ones by screening their energies through
 
 iii) full structural optimisation of the configurations identified as most relevant. 
 
-A detailed description of the worfklow and two examples of usage can be found in the repository's WIKI (https://gitlab.com/triboteam/xsorbed/-/wikis/home) and in the article related to this program.
+A detailed description of the worfklow and two examples of usage can be found in the repository's WIKI (https://gitlab.com/triboteam/xsorbed/-/wikis/home) and in the article related to this program (https://doi.org/10.1016/j.cpc.2023.108827).
