@@ -56,7 +56,8 @@ class Slab:
         ###############################################################
 
         #reindex mapping before sorting by z for fixing atoms by index#
-        self.reindex_map = np.argsort(self.slab_ase.positions[:, 2], kind='stable')
+        self.reindex_map = np.argsort(-self.slab_ase.positions[:, 2], kind='stable')  
+        #!!!!! The - must be consistent with the line self.slab_ase = sort( BELOW, not the temporary sorting to identify the layers done ABOVE !!!
         #NOTE: here we used np.argsort to get the indices, while ase.sort (which uses sorted library) to actually sort the elements.
         # Check if same result (possible problems with very similar numbers)         
         ###############################################################      
