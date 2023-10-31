@@ -173,7 +173,7 @@ class Slab:
                 ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=fontsize, path_effects=[PathEffects.withStroke(linewidth=0.25,foreground="w")], zorder=1000000)
                             
             #ax.set_title('r=ontop, g=bridge, b=hollow')
-            fig.savefig(figname, dpi=1500, bbox_inches='tight')
+            fig.savefig(figname, dpi=800, bbox_inches='tight')
 
             print("Image saved.")
 
