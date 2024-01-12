@@ -44,7 +44,10 @@ def _read_card(lines : list, CONVERT = False):
         if(CONVERT):
             if (_is_number(val)):
                 if val.isnumeric(): val = int(val)
-                else: val = float(val)      
+                else: val = float(val)
+            else:
+                if val.lower() == '.true.': val=True
+                elif val.lower() == '.false.' : val=False   
 
         block_dict[key] = val
 

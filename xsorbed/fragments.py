@@ -115,7 +115,7 @@ def isolated_fragments(RUN = False):
                     flags_i_subset.append(flag)
 
             settings.espresso_settings_dict['ELECTRONS'].update({'mixing_beta' : 0.1})
-            if(len(mol.mol_ase) == 1): settings.espresso_settings_dict['SYSTEM'].update({'nosym' : '.true.'}) #isolated atoms
+            if(len(mol.mol_ase) == 1): settings.espresso_settings_dict['SYSTEM'].update({'nosym' : True}) #isolated atoms
 
             calc = Espresso_mod(pseudopotentials=pseudos_subset, 
                     input_data=settings.espresso_settings_dict,

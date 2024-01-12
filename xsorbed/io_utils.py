@@ -103,7 +103,7 @@ def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax', VERBOSE 
 
 
 
-def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str, TXT=True):
+def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str, TXT=False):
     #can be called before all the jobs have finished
 
     #Begin script
