@@ -205,7 +205,7 @@ class Slab:
                 slab_coords = self.slab_ase[j_slab].position
                 if(mol_coords[2] < slab_coords[2]): #if mol atom below slab atom
                     #print('Atom below surface level, translating upwards.')
-                    mol.translate( [0, 0, 2*np.abs(mol_coords[2] - slab_coords[2])] )
+                    mol.translate( [0, 0, np.abs(mol_coords[2] - slab_coords[2])] ) #translate atom exactly at the z level of the slab atom, then it will be dealt with by the further translation
                     mol_coords = mol[i_mol].position
                 
                 dz = np.sqrt(covalent_distance**2 - (mol_coords[0] - slab_coords[0])**2 - (mol_coords[1] - slab_coords[1])**2 ) - (mol_coords[2] - slab_coords[2])
