@@ -192,28 +192,7 @@ class Settings:
 
         #Espresso &CONTROL
         self.espresso_settings_dict['CONTROL'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
-
-        #Espresso &SYSTEM (correction to bugs in ase function to write pwis)
-        self.starting_mag = [None]*len(self.pseudopotentials) #this needs special treatment because it must be overwritten, while the others are just appended
-        self.flags_i = []
-        keys_to_be_removed = []
-
-        for key in self.espresso_settings_dict['SYSTEM']:          
-            if '(' in key and ')' in key:
-                i = int(key.split('(')[1].split(')')[0])
-                if i > len(self.pseudopotentials):
-                    print("Flag {0} out of range (> than the nubmer of specified ATOMIC_SPECIES). Quitting.".format(key))
-                    sys.exit(1)
-
-                if 'starting_magnetization' in key:               
-                    self.starting_mag[i-1] = self.espresso_settings_dict['SYSTEM'][key]
-                else:
-                    self.flags_i.append([key, self.espresso_settings_dict['SYSTEM'][key]])
-                 
-                keys_to_be_removed.append(key)              
-
-        for key in keys_to_be_removed:
-            self.espresso_settings_dict['SYSTEM'].pop(key)
+        
 
         #Espresso &IONS
         self.ion_dynamics = self.espresso_settings_dict['IONS']['ion_dynamics']

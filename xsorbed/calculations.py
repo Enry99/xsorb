@@ -6,10 +6,13 @@ import glob
 #
 from slab import Slab, adsorb_both_surfaces
 from molecule import Molecule
-from espresso_mod import Espresso_mod
+from ase.calculators.espresso import Espresso
 from io_utils import get_energy_from_pwo, launch_jobs
 from settings import Settings
 from filenames import *
+
+import ase_custom
+
 
 
 def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_format=None): 
@@ -20,13 +23,16 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
     #    if energies and None not in energies:
     #        print('All screening calculations completed. Nothing will be done.')
     #        return
-    
+
     #BEGIN STRUCTURES GENERATION ############################################################################
 
     settings=Settings()
 
     #Slab import from file
-    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height)
+    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height, 
+                fixed_layers_slab=settings.fixed_layers_slab, 
+                fixed_indices_slab=settings.fixed_indices_slab, 
+                fix_slab_xyz=settings.fix_slab_xyz)
 
     #sga = SpacegroupAnalyzer(slab.slab_pymat)
     #sops = sga.get_point_group_operations(cartesian=True)
@@ -35,7 +41,9 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
     #        print(sop.rotation_matrix)
 
     #Molecule import from file
-    mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms)
+    mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms, 
+                   settings.fixed_indices_mol, 
+                   settings.fix_mol_xyz)
 
     #Find adsorption sites and labels (site type and x,y coords.)
     adsites, adsites_labels = slab.find_adsorption_sites(
@@ -92,9 +100,10 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
     answer = 'yes'
     
     for i in np.arange(len(all_mol_on_slab_configs_ase)):
-        filename = pw_files_prefix+'screening_'+str(i)+'.pwi'
-
-        csvfile.write(str(i)+','+full_labels[i]+'\n')
+        file_prefix = pw_files_prefix+'screening_'+str(i)
+        filename = f'{file_prefix}.pwi'
+        
+        csvfile.write(f'{i},{full_labels[i]}\n')
 
         if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
             print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer  else 're-calculated') \
@@ -109,17 +118,16 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
         
 
         pwi_names.append(filename)
-        calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
+        calc = Espresso(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
-                    filename=filename,
+                    label = file_prefix,
                     kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None)
-        if(settings.fixed_layers_slab): 
-            fixed_slab = slab.get_atoms_by_layers(settings.fixed_layers_slab)
-        else: fixed_slab = settings.fixed_indices_slab
-        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, settings.fixed_indices_mol, mol.reindex_map, slab.natoms, mol.natoms, settings.fix_slab_xyz, settings.fix_mol_xyz)
-        calc.set_system_flags(settings.starting_mag, settings.flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
-        if(saveas_format is not None): write(folder+filename.split('.')[0]+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
+        if(saveas_format is not None): 
+            if(saveas_format == 'xyz'):
+                ase_custom.write_xyz_custom(folder+file_prefix+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
+            else:
+                write(folder+file_prefix+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
 
     csvfile.close()
 
@@ -291,7 +299,8 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
         if all_mol_on_slab_configs_ase[i] == None: continue
 
-        filename = pw_files_prefix+'relax_'+str(i)+'.pwi'
+        file_prefix = pw_files_prefix+'relax_'+str(i)
+        filename = f'{file_prefix}.pwi'
 
         if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
             print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer else 're-calculated') \
@@ -306,14 +315,10 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
 
         pwi_names.append(filename)
-        calc = Espresso_mod(pseudopotentials=settings.pseudopotentials, 
+        calc = Espresso(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
-                    filename=filename,
+                    label=file_prefix,
                     kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None)
-        if(settings.fixed_layers_slab): fixed_slab = slab.get_atoms_by_layers(settings.fixed_layers_slab)
-        else: fixed_slab = settings.fixed_indices_slab
-        calc.set_fixed_atoms(fixed_slab, slab.reindex_map, settings.fixed_indices_mol, mol.reindex_map, slab.natoms, mol.natoms, settings.fix_slab_xyz, settings.fix_mol_xyz)
-        calc.set_system_flags(settings.starting_mag, settings.flags_i)
         calc.write_input(all_mol_on_slab_configs_ase[i])
 
     #print(pwi_names)
@@ -344,7 +349,10 @@ def saveas(which : str, i_or_f : str, saveas_format : str):
         os.mkdir(folder)    
 
     for i, config in enumerate(configs):
-        write(folder+pw_list[i].replace(pw, saveas_format), config)
+            if(saveas_format == 'xyz'):
+                ase_custom.write_xyz_custom(folder+pw_list[i].replace(pw, saveas_format), config)
+            else:
+                write(folder+pw_list[i].replace(pw, saveas_format), config)
 
     print("Files saved to {0}".format(saveas_format+'/'+which) )
     
