@@ -11,27 +11,29 @@ Small helper class to handle the slab
 
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder, plot_slab, get_rot
 from pymatgen.analysis.local_env import MinimumDistanceNN
-from pymatgen.io import ase
+from pymatgen.io.ase import AseAtomsAdaptor
 from ase.io import read
 from ase.build.tools import sort
 from ase.data import atomic_numbers, covalent_radii
 from matplotlib import pyplot as plt
 import matplotlib.patheffects as PathEffects
 import numpy as np
+from ase.constraints import FixCartesian
 
+import ase_custom
 
 class Slab:
 
-    def __init__(self, slab_filename : str, layers_threshold = 0.5, surface_sites_height = 0.9):
+    def __init__(self, slab_filename : str, layers_threshold = 0.5, surface_sites_height = 0.9, fixed_layers_slab : list = None, fixed_indices_slab : list = None, fix_slab_xyz : list = None):
         '''
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
 
         print('Loading slab...')
-
-        self.slab_ase = read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename)
+        
+        self.slab_ase = read(filename=slab_filename)
         self.natoms   = len(self.slab_ase)
-        self.slab_ase.set_initial_magnetic_moments(len(self.slab_ase)*[0])
+
 
         #translate slab so that the bottom layer is at least 1 angstrom from the bottom
         zmin = min(self.slab_ase.positions[:,2])
@@ -41,47 +43,37 @@ class Slab:
         #self.slab_ase.wrap(pbc=True)
         
 
-        #identification of the layers##################################
-        slab = sort(self.slab_ase, tags= self.slab_ase.positions[:, 2])
-        self.layers = [[]] #each list element corresponds to a layer, and it is itself a list of the
-        #atoms contained in the layer
-        zmin = min(slab.positions[:,2])
-        i_layer = 0
-        for i, z in enumerate(slab.positions[:,2]):
-            if(z-zmin > layers_threshold): #new layer
-                zmin = z
-                i_layer = i_layer+1
-                self.layers.append([])
-            self.layers[i_layer].append(i)
+        #SET CONSTRAINTS before sorting##################################
+        fixed_atoms_indices = []
+        if(fixed_layers_slab):
+            #identification of the layers
+            slab = sort(self.slab_ase, tags= self.slab_ase.positions[:, 2])
+            layers = [[]] #each list element corresponds to a layer, and it is itself a list of the
+            #atoms contained in the layer
+            zmin = min(slab.positions[:,2])
+            i_layer = 0
+            for i, z in enumerate(slab.positions[:,2]):
+                if(z-zmin > layers_threshold): #new layer
+                    zmin = z
+                    i_layer = i_layer+1
+                    layers.append([])
+                layers[i_layer].append(i)
+            for layer in fixed_layers_slab:
+                fixed_atoms_indices += layers[layer]
+        elif(fixed_indices_slab):
+            fixed_atoms_indices = fixed_indices_slab
+
+        c = [FixCartesian(atom_index, mask=[not x for x in fix_slab_xyz]) for atom_index in fixed_atoms_indices]  #we need to negate: in qe 0 = fix, here 1(true)=fix
+        self.slab_ase.set_constraint(c)
         ###############################################################
 
-        #reindex mapping before sorting by z for fixing atoms by index#
-        self.reindex_map = np.argsort(-self.slab_ase.positions[:, 2], kind='stable')  
-        #!!!!! The - must be consistent with the line self.slab_ase = sort( BELOW, not the temporary sorting to identify the layers done ABOVE !!!
-        #NOTE: here we used np.argsort to get the indices, while ase.sort (which uses sorted library) to actually sort the elements.
-        # Check if same result (possible problems with very similar numbers)         
-        ###############################################################      
-
-        #small trick to find sites closer to each other. CURRENTLY NOT WORKING
-        #slab_ase_rounded = self.slab_ase.copy() #to find sites close to each other
-        #slab_ase_rounded.positions = np.round(slab_ase_rounded.positions, decimals = 2)
-        #scaled_positions = slab_ase_rounded.get_scaled_positions()
-        #for i, pos in enumerate(scaled_positions):
-            #slab_ase_rounded.positions[i][2] += 0.005*(2 - abs(0.5-pos[0]) - abs(0.5-pos[1]))
-        #slab_pymat_rounded = ase.AseAtomsAdaptor.get_structure(self.slab_ase_rounded)
-        #self.asf = AdsorbateSiteFinder(slab_pymat_rounded, height=surface_sites_height)
-
         self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
-        self.slab_pymat = ase.AseAtomsAdaptor.get_structure(self.slab_ase)
+        slabcopy = self.slab_ase.copy() #to suppress the warning about constraints not supported in pymatgen
+        del slabcopy.constraints
+        self.slab_pymat = AseAtomsAdaptor.get_structure(slabcopy)
         self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height)
 
         print('Slab loaded.')
-
-    def get_atoms_by_layers(self, layers_list : list):
-        atoms_list = []
-        for layer in layers_list:
-            atoms_list += self.layers[layer]
-        return atoms_list
 
 
     def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, selected_sites : list = [], ALL=False,  save_image = False ):

@@ -13,11 +13,14 @@ import numpy as np
 from ase.io import read
 from matplotlib import pyplot as plt
 from ase.visualize.plot import plot_atoms
+from ase.constraints import FixCartesian
 
+
+import ase_custom 
 
 class Molecule:
 
-    def __init__(self, molecule_filename : str, molecule_axis_atoms : list = None, axis_vector: list = None, atoms_subset : list = None):
+    def __init__(self, molecule_filename : str, molecule_axis_atoms : list = None, axis_vector: list = None, atoms_subset : list = None, fixed_indices_mol : list = None, fix_mol_xyz : list = None):
         '''
         Reads molecule from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         Optional parameters:
@@ -27,8 +30,7 @@ class Molecule:
 
 
         print('Loading molecule...')
-        self.mol_ase = read(molecule_filename, results_required=False) if molecule_filename.split('.')[-1]=='pwo' else read(molecule_filename)
-        self.mol_ase.set_initial_magnetic_moments(len(self.mol_ase)*[0])
+        self.mol_ase = read(molecule_filename)
 
         #align axis to x axis
         if molecule_axis_atoms and axis_vector: raise RuntimeError("molecule axis cannot be given simultaneously as vector and by two atoms.")
@@ -39,6 +41,11 @@ class Molecule:
         elif axis_vector:
             self.mol_ase.rotate(axis_vector, 'x')
 
+        #SET CONSTRAINTS
+        c = [FixCartesian(atom_index, mask=[not x for x in fix_mol_xyz]) for atom_index in fixed_indices_mol]  #we need to negate: in qe 0 = fix, here 1(true)=fix
+        self.mol_ase.set_constraint(c)
+        ###############################################################
+            
         #select atoms subset
         self.original_mol_ase = self.mol_ase.copy() #before removing atoms
         all_indices = range(0, len(self.mol_ase))
