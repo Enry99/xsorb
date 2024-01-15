@@ -474,7 +474,7 @@ def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
     # Convert to a namelist to make working with parameters much easier
     # Note that the name ``input_data`` is chosen to prevent clash with
     # ``parameters`` in Calculator objects
-    input_parameters = construct_namelist(input_data, **kwargs)
+    input_parameters = construct_namelist_custom(input_data, **kwargs)
 
     # Convert ase constraints to QE constraints
     # Nx3 array of force multipliers matches what QE uses
@@ -674,7 +674,7 @@ def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
     fd.write(''.join(pwi))
 
 #bugfix for OrderedDict mutated
-def construct_namelist(parameters=None, warn=False, **kwargs):
+def construct_namelist_custom(parameters=None, warn=False, **kwargs):
     """
     Construct an ordered Namelist containing all the parameters given (as
     a dictionary or kwargs). Keys will be inserted into their appropriate
@@ -905,7 +905,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
 
         # add structure to reference if not there
         if pwscf_start_info[prev_start_index] is None:
-            pwscf_start_info[prev_start_index] = parse_pwo_start(
+            pwscf_start_info[prev_start_index] = parse_pwo_start_custom(
                 pwo_lines, prev_start_index)
 
         # Get the bounds for information for this structure. Any associated
@@ -1552,6 +1552,6 @@ import ase.io.espresso
 import ase.io.extxyz
 ase.io.espresso.write_espresso_in = write_espresso_in_custom
 ase.io.espresso.read_espresso_in = read_espresso_in_custom
-ase.io.espresso.parse_pwo_start = parse_pwo_start_custom
-ase.io.extxyz._read_xyz_frame = _read_xyz_frame_custom
 ase.io.espresso.read_espresso_out = read_espresso_out_custom
+ase.io.extxyz._read_xyz_frame = _read_xyz_frame_custom
+ase.io.extxyz.write_xyz = write_xyz_custom

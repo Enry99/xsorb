@@ -42,8 +42,9 @@ class Molecule:
             self.mol_ase.rotate(axis_vector, 'x')
 
         #SET CONSTRAINTS
-        c = [FixCartesian(atom_index, mask=[not x for x in fix_mol_xyz]) for atom_index in fixed_indices_mol]  #we need to negate: in qe 0 = fix, here 1(true)=fix
-        self.mol_ase.set_constraint(c)
+        if fixed_indices_mol:
+            c = [FixCartesian(atom_index, mask=[not x for x in fix_mol_xyz]) for atom_index in fixed_indices_mol]  #we need to negate: in qe 0 = fix, here 1(true)=fix
+            self.mol_ase.set_constraint(c)
         ###############################################################
             
         #select atoms subset
