@@ -28,9 +28,8 @@ class Molecule:
         if the atoms in the list actually exist in the molecule
         '''
 
-
         print('Loading molecule...')
-        self.mol_ase = read(molecule_filename)
+        self.mol_ase = read(molecule_filename, results_required=False)
 
         #align axis to x axis
         if molecule_axis_atoms and axis_vector: raise RuntimeError("molecule axis cannot be given simultaneously as vector and by two atoms.")

@@ -31,7 +31,7 @@ class Slab:
 
         print('Loading slab...')
         
-        self.slab_ase = read(filename=slab_filename)
+        self.slab_ase = read(filename=slab_filename, results_required=False)
         self.natoms   = len(self.slab_ase)
 
 
@@ -46,20 +46,24 @@ class Slab:
         #SET CONSTRAINTS before sorting##################################
         fixed_atoms_indices = []
         if(fixed_layers_slab):
-            #identification of the layers
-            slab = sort(self.slab_ase, tags= self.slab_ase.positions[:, 2])
-            layers = [[]] #each list element corresponds to a layer, and it is itself a list of the
-            #atoms contained in the layer
-            zmin = min(slab.positions[:,2])
+            original_positions = self.slab_ase.positions
+            positions = self.slab_ase.positions.copy().tolist()
             i_layer = 0
-            for i, z in enumerate(slab.positions[:,2]):
-                if(z-zmin > layers_threshold): #new layer
-                    zmin = z
-                    i_layer = i_layer+1
-                    layers.append([])
-                layers[i_layer].append(i)
-            for layer in fixed_layers_slab:
-                fixed_atoms_indices += layers[layer]
+            while len(positions): #go on until there are no more atoms
+                layer = []
+                base_z = min([x[2] for x in positions])
+
+                remove_list = []
+                for pos in positions:
+                    if pos[2] < base_z + layers_threshold:
+                        layer.append([idx for idx in range(0, len(original_positions)) if np.allclose(original_positions[idx], pos)][0])
+                        remove_list.append(pos)
+                for pos in remove_list:
+                    positions.remove(pos)
+
+                if len(layer) and i_layer in fixed_layers_slab: fixed_atoms_indices += layer
+                i_layer += 1
+
         elif(fixed_indices_slab):
             fixed_atoms_indices = fixed_indices_slab
 

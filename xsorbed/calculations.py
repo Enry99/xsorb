@@ -4,9 +4,10 @@ import os, sys
 from natsort import natsorted
 import glob
 #
+from ase.calculators.espresso import Espresso
+from ase.constraints import FixCartesian
 from slab import Slab, adsorb_both_surfaces
 from molecule import Molecule
-from ase.calculators.espresso import Espresso
 from io_utils import get_energy_from_pwo, launch_jobs
 from settings import Settings
 from filenames import *
@@ -245,11 +246,14 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     settings.espresso_settings_dict['IONS'].update({'ion_dynamics': settings.ion_dynamics})
 
     #Slab import from file
-    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height)
-
+    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height, 
+                fixed_layers_slab=settings.fixed_layers_slab, 
+                fixed_indices_slab=settings.fixed_indices_slab, 
+                fix_slab_xyz=settings.fix_slab_xyz)
     #Molecule import from file
-    mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms)
-
+    mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms, 
+                   settings.fixed_indices_mol, 
+                   settings.fix_mol_xyz)
 
     if(REGENERATE):
         #Re-generation of structures, placing the molecule very close to the surface to avoid
@@ -286,6 +290,11 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
             except AssertionError as e:
                 print("Error while reading {0} due to ASE problem in reading calculations with scf NOT terminated. Skipping.".format(file))
                 continue
+            #set constraints from mol and slab if when we are reading the whole pre-relaxed structure
+            c = [constraint for constraint in slab.slab_ase.constraints] + \
+                [FixCartesian(constraint.a + slab.natoms, ~constraint.mask) for constraint in mol.mol_ase.constraints]
+            #for some obscure reason FixCartesian wants the mask in the form 1=Fix, 0=Free, but then it negates in internally, so we first need to negate the mask to construct a new object
+            r.set_constraint(c)
             all_mol_on_slab_configs_ase[i] = r
 
  
@@ -318,7 +327,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
         calc = Espresso(pseudopotentials=settings.pseudopotentials, 
                     input_data=settings.espresso_settings_dict,
                     label=file_prefix,
-                    kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None)
+                    kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None)    
         calc.write_input(all_mol_on_slab_configs_ase[i])
 
     #print(pwi_names)
