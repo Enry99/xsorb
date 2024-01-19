@@ -24,7 +24,7 @@ import ase_custom
 
 class Slab:
 
-    def __init__(self, slab_filename : str, layers_threshold = 0.5, surface_sites_height = 0.9, fixed_layers_slab : list = None, fixed_indices_slab : list = None, fix_slab_xyz : list = None):
+    def __init__(self, slab_filename : str, layers_threshold = 0.5, surface_sites_height = 0.9, fixed_layers_slab : list = None, fixed_indices_slab : list = None, fix_slab_xyz : list = None, sort_atoms_by_z = False):
         '''
             Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
         '''
@@ -71,7 +71,9 @@ class Slab:
         self.slab_ase.set_constraint(c)
         ###############################################################
 
-        self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
+        
+        if sort_atoms_by_z:
+            self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
         slabcopy = self.slab_ase.copy() #to suppress the warning about constraints not supported in pymatgen
         del slabcopy.constraints
         self.slab_pymat = AseAtomsAdaptor.get_structure(slabcopy)

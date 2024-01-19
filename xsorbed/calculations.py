@@ -33,7 +33,8 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
     slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height, 
                 fixed_layers_slab=settings.fixed_layers_slab, 
                 fixed_indices_slab=settings.fixed_indices_slab, 
-                fix_slab_xyz=settings.fix_slab_xyz)
+                fix_slab_xyz=settings.fix_slab_xyz,
+                sort_atoms_by_z=True)
 
     #sga = SpacegroupAnalyzer(slab.slab_pymat)
     #sops = sga.get_point_group_operations(cartesian=True)
@@ -249,7 +250,8 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
     slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height, 
                 fixed_layers_slab=settings.fixed_layers_slab, 
                 fixed_indices_slab=settings.fixed_indices_slab, 
-                fix_slab_xyz=settings.fix_slab_xyz)
+                fix_slab_xyz=settings.fix_slab_xyz,
+                sort_atoms_by_z=True)
     #Molecule import from file
     mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms, 
                    settings.fixed_indices_mol, 
