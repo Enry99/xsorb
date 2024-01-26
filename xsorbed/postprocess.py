@@ -16,7 +16,7 @@ from natsort import natsorted
 from slab import Slab
 from settings import Settings
 from filenames import *
-
+z
 
 
 
@@ -47,8 +47,8 @@ def plot_adsorption_sites(ALL = False):
         'near_reduce':settings.near_reduce, 
         'no_obtuse_hollow':True}.values(),
         selected_sites= [] if ALL else settings.selected_sites,
-        ALL = ALL,
-        save_image=True
+        save_image=True,
+        figname = 'adsorption_sites_all.png' if ALL else 'adsorption_sites.png'
         )
 
 
@@ -60,7 +60,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
     else:
         pw = 'pwo'
     print('Reading files...')
-    pw_list=natsorted(glob.glob(pw_files_prefix+which+'_*.'+pw))
+    pw_list=natsorted(glob.glob(which+'_*.'+pw))
     if(not pw_list):
         print("Files not found. Quitting.")
         sys.exit(1)
@@ -189,7 +189,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
             config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
 
             if rotations is not None: #use specified rotation
-                write(pw_files_prefix+which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')), 
+                write(which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')), 
                     config, 
                     format='pov',
                     radii = 0.65, 
@@ -198,11 +198,11 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
-                os.remove(pw_files_prefix+which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')))
-                os.remove(pw_files_prefix+which+'_{0}_{1}_pov.ini'.format(label, rotations.replace(',','_')))
+                os.remove(which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')))
+                os.remove(which+'_{0}_{1}_pov.ini'.format(label, rotations.replace(',','_')))
             else: #front and top view
                 #front view
-                write(pw_files_prefix+which+'_{0}_pov.pov'.format(label), 
+                write(which+'_{0}_pov.pov'.format(label), 
                     config, 
                     format='pov',
                     radii = 0.65, 
@@ -211,13 +211,13 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                     povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
-                os.remove(pw_files_prefix+which+'_{0}_pov.pov'.format(label))
-                os.remove(pw_files_prefix+which+'_{0}_pov.ini'.format(label))
+                os.remove(which+'_{0}_pov.pov'.format(label))
+                os.remove(which+'_{0}_pov.ini'.format(label))
 
                 #top view
 
                 textures = ['pale'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
-                write(pw_files_prefix+which+'_{0}_top_pov.pov'.format(label), 
+                write(which+'_{0}_top_pov.pov'.format(label), 
                     config, 
                     format='pov',
                     radii = 0.65, 
@@ -226,15 +226,15 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
                         camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
                     #camera_type='perspective'
                 ).render()
-                os.remove(pw_files_prefix+which+'_{0}_top_pov.pov'.format(label))
-                os.remove(pw_files_prefix+which+'_{0}_top_pov.ini'.format(label))
+                os.remove(which+'_{0}_top_pov.pov'.format(label))
+                os.remove(which+'_{0}_top_pov.ini'.format(label))
 
         else:
             if rotations is not None: #use specified rotation
-                write(pw_files_prefix+which+'_{0}_{1}.png'.format(label, rotations), config, rotation=rotations, scale = 100, colors=colors)
+                write(which+'_{0}_{1}.png'.format(label, rotations), config, rotation=rotations, scale = 100, colors=colors)
             else: #front and top view           
-                write(pw_files_prefix+which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors) #front view
-                write(pw_files_prefix+which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors_top) #top view
+                write(which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors) #front view
+                write(which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors_top) #top view
 
     os.chdir(main_dir)
 
@@ -245,7 +245,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
         import matplotlib.image as mpimg
 
         #calculate aspect ratio for one image:
-        img = mpimg.imread(figures_dir+'/'+pw_files_prefix+which+'_{0}{1}.png'.format(labels[0], '_pov' if povray else ''))
+        img = mpimg.imread(figures_dir+'/'+which+'_{0}{1}.png'.format(labels[0], '_pov' if povray else ''))
         ar = float(img.shape[1]) / float(img.shape[0]) #width/height
 
         n_rows_fig = max(int(np.ceil(len(configs)/5.)), 1)
@@ -261,7 +261,7 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
         for i, conf in enumerate(configs):
             if energies[i] == None : continue
             label = labels[i]
-            img = mpimg.imread(figures_dir+'/'+pw_files_prefix+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
+            img = mpimg.imread(figures_dir+'/'+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
             axes[i].imshow(img)
             axes[i].axis('equal') #ensures all images are in identical rectangular boxes, rescaling the size of the image if necessary
             axes[i].set_title('{0:.2f} eV'.format(energies[i]), fontsize = 5, pad=1)
@@ -285,7 +285,7 @@ def view_config(which : str, index : int):
     elif which == 'r':
         which = 'relax'
         pw = 'pwo'
-    file = pw_files_prefix+which+'_{0}.'.format(index)+pw
+    file = which+'_{0}.'.format(index)+pw
     try:
         config = read(file, index=':')
     except:
@@ -298,7 +298,7 @@ def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
 
 
     print('Reading files...')
-    pwo_list=glob.glob(pw_files_prefix+'relax_*.pwo')
+    pwo_list=glob.glob('relax_*.pwo')
     if SCREEN_ONLY:
         configs = [read(file.replace('relax', 'screening'), index=':')[:] for file in pwo_list]
     else:
@@ -405,7 +405,7 @@ def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
                 
                 step_copy = step.copy()
                 step_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
-                write(pw_files_prefix+'step_{:04d}.pov'.format(j), 
+                write('step_{:04d}.pov'.format(j), 
                     step, 
                     format='pov',
                     radii = 0.65, 
@@ -415,13 +415,13 @@ def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
                 ).render()
 
             os.chdir('..')
-            #os.system('convert -delay 20 temp/step_*.png '+pw_files_prefix+'relax_{0}_pov.gif'.format(labels[i]))
-            os.system('ffmpeg -framerate 10 -i temp/step_%04d.png  -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2"  -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '+pw_files_prefix+'relax_{0}_pov.mp4'.format(labels[i]))
+            #os.system('convert -delay 20 temp/step_*.png '+'relax_{0}_pov.gif'.format(labels[i]))
+            os.system('ffmpeg -framerate 10 -i temp/step_%04d.png  -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2"  -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '+'relax_{0}_pov.mp4'.format(labels[i]))
             shutil.rmtree('temp')
 
     else:
         for i, config in enumerate(configs):
-            write(pw_files_prefix+'relax_{0}.gif'.format(labels[i]), config, rotation='-5z,-85x', interval=150, scale = 100, colors=colors, save_count=None)
+            write('relax_{0}.gif'.format(labels[i]), config, rotation='-5z,-85x', interval=150, scale = 100, colors=colors, save_count=None)
 
     print('All animations saved to {0}.'.format('relax_'+images_dirname))
 
@@ -432,7 +432,7 @@ def plot_energy_evolution(which='relax'):
     Eslab, Emol = (settings.E_slab_mol[0], settings.E_slab_mol[1])
 
     print('Reading files...')
-    pwo_list=natsorted(glob.glob(pw_files_prefix+which+'_*.pwo'))
+    pwo_list=natsorted(glob.glob(which+'_*.pwo'))
     labels = [int(pwo.split('.pwo')[0].split('_')[-1]) for pwo in pwo_list]
 
     totens = []

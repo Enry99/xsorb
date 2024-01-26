@@ -1,0 +1,13 @@
+ase_custom:       OK
+calculations:   
+dftcode_specific: OK
+filenames:
+fragments:
+input:
+io_utils:         OK
+molecule:         OK
+postprocess:
+settings:
+slab:             OK
+xfrag:
+xsorb:

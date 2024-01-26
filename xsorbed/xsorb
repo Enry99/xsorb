@@ -22,7 +22,7 @@ import argparse
 from filenames import *
 ########################################################################################
 
-
+#TODO: rimuovere il saveas nel launching , tanto c'è una funzione dedicata per farlo in qualsiasi momento
 
 def cli_parse():
 
@@ -170,7 +170,7 @@ def main():
         final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, indices=args.i, REGENERATE=args.regenerate, BY_SITE=args.by_site)
 
     elif(args.restart):
-        restart_jobs(which='screening' if args.restart == 's' else 'relax')
+        restart_jobs(calc_type=='SCREENING' if args.restart == 's' else 'RELAX')
 
 
 

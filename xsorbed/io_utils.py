@@ -9,327 +9,318 @@ Function definitions to read from pwo and launch scripts
 
 """
 
-import os, sys, shutil
-import glob
-from natsort import natsorted
-
+import os, shutil
+import numpy as np
+import pandas as pd
+from ase.io import read
+from dftcode_specific import edit_files_for_restart, UNITS_TO_EV_FACTOR, COMPLETION_STRINGS, OUT_FILE_PATHS, SBATCH_POSTFIX
+from settings import Settings
+from slab import Slab, mol_bonded_to_slab
+from molecule import Molecule
 from filenames import *
+
+import ase_custom
 
 TEST = False #do not actually launch the jobs, simply prints the command
 
 
-def get_energy_from_pwo(filename : str, REQUIRE_RELAX_COMPLETED : bool = True, E_slab_mol : list = [0,0], VERBOSE : bool = True):
+
+#TODO: add check bonded to csv
+
+#OK (code agnostic) 
+def is_completed(program : str, calc_type : str, completion_type : str, i_calc : int):
     '''
-    Returns the final energy from the pwo, in eV. If E_slab_mol is not [0,0] returns the adsorption energy in eV
-    if REQUIRE_RELAX_COMPLETED is True returns None if relax was not completed, otherwise returns None only in case of finding convergence NOT achieved.
+    Check if the given calculation is completed, reading the output file
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - completion_type: 'RELAX_COMPLETED' or 'SCF_NONCONVERGED'
+    - i_calc: numeric index of the calculation
     '''
+
+    filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
+    searchfor = COMPLETION_STRINGS[completion_type][program]
     
     with open(filename, 'r') as f:
-        pwo = f.readlines()
-
-        relax_terminated = False  #will be True if the relax has been completed
-        NONCONV = False           #will be True if the LAST scf cycle did not converge
-        toten = None              #will be different from None if AT LEAST the first scf cicle has been completed successfully
-        for line in pwo: #make sure to get the last one (useful in relaxations)
-            if '!' in line: 
-                toten = line.split()[4]
-            if 'convergence NOT achieved' in line:
-                NONCONV = True  
-            if 'convergence has been achieved' in line:
-                NONCONV = False                
-            if 'Final energy' in line:
-                relax_terminated = True
-                NONCONV = False
-
-        
-        if toten is None: #so no scf cycle completed
-            if(VERBOSE):
-                print('Warning! {0} has not reached the first scf convergence, or it was impossible to read ANY energy value.'.format(filename))
-        elif REQUIRE_RELAX_COMPLETED and not relax_terminated:
-            toten = None
-        else: #we do not require completed relax, or the relax was completed
-            if NONCONV and VERBOSE:
-                print('Warning! {0} failed to reach SCF convergence after electron_maxstep. The last usable energy value will be used'.format(filename)) 
-
-            toten = float(toten)
-            if E_slab_mol:
-                toten -= (E_slab_mol[0]+E_slab_mol[1])       
-            toten *= rydbergtoev
-            
-        return toten
-            
-
-
-
-
-def get_energies(E_slab_mol : list = [0,0], pwo_prefix : str = 'relax', VERBOSE : bool = True):
-
-    files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
-
-    #get energies from pwo(s)
-    energies = len(files)*[None]  #those not completed will be left as None, raising an error if used for relax
-
-    for i, file in enumerate(files):
-        
-        with open(file, 'r') as f:
-            pwo = f.readlines()
-
-            scf_terminated = False
-            relax_terminated = False
-            for line in pwo: #make sure to get the last one (useful in relaxations)
-                if '!' in line: 
-                    toten = line.split()[4]
-                if 'convergence has been achieved' in line:
-                    scf_terminated = True                   
-                if 'Final energy' in line:
-                    relax_terminated = True
-
-
-            if scf_terminated: #add energy to line in csv         
-                toten = float(toten)
-
-                if E_slab_mol:
-                    toten -= (E_slab_mol[0]+E_slab_mol[1])
-                
-                toten *= rydbergtoev
-
-                if relax_terminated:
-                    energies[i] = toten
-              
-            else: 
-                if VERBOSE: print(file.split('/')[-1] + ' job has not reached scf convergence. It will be skipped.')
-
-    return energies
-
-
-
-def write_energies(in_filename : str, out_filename : str, E_slab_mol : list, pwo_prefix : str, TXT=False):
-    #can be called before all the jobs have finished
-
-    #Begin script
-    files = natsorted(glob.glob( pwo_prefix + "_*.pwo" ))
-
-    with open(in_filename, 'r') as f:
-        data = f.readlines()
-
-
-    #add E_ads column header
-    line = data[0].split(',')
-    line[-1] = line[-1].split('\n')[0]
-    if "relax" in pwo_prefix: #relax case
-        if 0 not in E_slab_mol:
-            line.append('Eads_rel(eV)\n')
-        else:
-            line.append('Etot_rel(eV)\n')
-    else: #screening case
-        #line.append('E_0 (eV)')
-        if 0 not in E_slab_mol:
-            line.append('Eads_scr(eV)\n')
-        else:
-            line.append('Etot_scr(eV)\n')
-    data[0] = ','.join(line)
-
-
-    #get energies from pwo(s)
-    energies = len(files)*[None]  #those not completed will be left as None, raising an error if used for relax
-
-    for i, file in enumerate(files):
-        
-        with open(file, 'r') as f:
-            pwo = f.readlines()
-
-            scf_terminated = False
-            relax_terminated = False
-            NONCONV = False
-            for line in pwo: #make sure to get the last one (useful in relaxations)
-                if '!' in line: 
-                    toten = line.split()[4]
-                    #if not scf_terminated: toten0 = toten #scf_terminated becomes true in the next line, so we take the first step
-                if 'convergence NOT achieved' in line:
-                    NONCONV = True  
-                if 'convergence has been achieved' in line:
-                    scf_terminated = True
-                    NONCONV = False                
-                if 'Final energy' in line:
-                    relax_terminated = True
-
-
-            if scf_terminated: #add energy to line in csv
-
-                config_label = int( (file.split('.pwo')[0]).split('_')[-1] )                
-
-                toten = float(toten)
-                #toten0 = float(toten0)
-                if E_slab_mol:
-                    toten -= (E_slab_mol[0]+E_slab_mol[1])
-                    #toten0 -= (E_slab_mol[0]+E_slab_mol[1])
-                
-                toten *= rydbergtoev
-                #toten0 *= rydbergtoev
-
-                if relax_terminated:
-                    energies[i] = toten
-
-                line = data[config_label+1].split(',')
-                line[-1] = line[-1].split('\n')[0]
-                #if "relax" not in pwo_prefix: line.append('{:.3f}'.format(toten0))
-                line.append('{:.3f}'.format(toten))
-                if not relax_terminated:
-                    if NONCONV:
-                        print('Warning! {0} failed to reach SCF convergence after electron_maxstep. The energy will be marked with **'.format(file.split('/')[-1]))
-                        line[-1]+='**'
-                    else:
-                        line[-1]+='*'
-                        print(file.split('/')[-1] + ' relaxation has not reached final configuration. The energy will be marked with a *')
-                
-                data[config_label+1] = ','.join(line)
-                data[config_label+1] += '\n'
-                
-            else: 
-                print(file.split('/')[-1] + ' job has not reached the first scf convergence. It will be skipped.')
-    
-
-
-    if TXT:
-        for i, line in enumerate(data):
-            if len(data[i].split(','))   == 10:
-                data[i] = '{0:<7}{1:<9}{2:<9}{3:<9}{4:<18}{5:<10}{6:<10}{7:<10}{8:<10}{9:<10}'.format(*data[i].split(','))
-                data[i] = data[i].strip()+'\n'
-            elif len(data[i].split(',')) == 9:
-                data[i] = '{0:<7}{1:<9}{2:<9}{3:<9}{4:<18}{5:<10}{6:<10}{7:<10}{8:<10}'.format(*data[i].split(','))
-                data[i] = data[i].strip()+'\n'           
-            elif len(data[i].split(',')) == 8:       
-                data[i] = '{0:<7}{1:<9}{2:<9}{3:<9}{4:<18}{5:<10}{6:<10}{7:<10}'.format(*data[i].split(','))
-                data[i] = data[i].strip()+'\n'
-        data_copy = data.copy()
-        
-        import numpy as np
-        sortindex = np.argsort([en if en is not None else i*1e50 for i,en in enumerate(energies)])
-
-        for i in range(len(sortindex)):
-            data_copy[i+1] = data[sortindex[i]+1]
-        data = data_copy
-
-    if TXT: out_filename = out_filename.split('.')[0]+'.txt'
-    with open(out_filename, 'w') as f:
-        f.writelines( data )
-
-    return energies
-
-
-def get_z(pwo_filename : str, atom_index : int):
-
-    with open(pwo_filename, 'r') as f:
-
-        pwo = f.readlines()
-
-        relax_terminated = False
-        first_index = 0
-        for i, line in enumerate(pwo):
-            if 'Final energy' in line:
-                relax_terminated = True
-                first_index  = i+3
-                #do not break, so that if more than one relax is present we take the last one
-
-        if not relax_terminated: raise RuntimeError(pwo_filename + ' relax not terminated. Quitting.')
-        else: 
-            z = pwo[first_index+atom_index].split()[3]           
-            return float(z)
-            
-
-def launch_jobs(jobscript : str, pwi_list : list, outdirs : str, jobname_title : str):
-    #NOTE: for this script, the execution of pw.x in the jobscript need to be called with this option:  
-    #      -input $1 >> $2, so that it reads the input from file $1 and writes output in file $2   
-
-    from settings import Settings
-    sbatch_command = Settings().sbatch_command 
-
-    main_dir = os.getcwd()
-    if not os.path.exists(outdirs): os.mkdir(outdirs)
-
-    for input_file in pwi_list:
-
-        output_file = input_file.replace("pwi", "pwo")
-        label = input_file.split('.pwi')[0].split('_')[-1]
-
-        if(os.path.isfile(input_file)): # unnecessary, this check is also done before calling the function
-
-            j_dir = outdirs+'/'+str(label)
-            if not os.path.exists(j_dir): os.mkdir(j_dir)
-
-            shutil.copyfile(jobscript, j_dir+'/'+jobscript_filename)
-
-            os.chdir(j_dir) #####################
-            with open(jobscript_filename, 'r') as f:
-                lines = f.readlines()
-
-                for i, line in enumerate(lines):
-                    if "job-name" in line:
-                        lines[i] = line.split('=')[0] + '="' + jobname_title + '_' + label + '"\n'
-                        break
-        
-            with open(jobscript_filename, 'w') as f:
-                f.writelines( lines )
-
-
-            if(TEST): print(sbatch_command+" " + jobscript_filename + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)
-            else: os.system(sbatch_command+" " + jobscript_filename + ' ' +main_dir+'/'+input_file + ' '+ main_dir+'/'+output_file)  #launchs the jobscript in j_dir from j_dir
-            os.chdir(main_dir) ####################
-
-
-def _is_completed(pwo : str):
-
-    searchfor = 'Final energy'
-    
-    with open(pwo, 'r') as f:
-        file = f.readlines()
+        file_content = f.readlines()
 
     completed = False
-    for line in file:
+    for line in file_content:
         if searchfor in line:
             completed = True
+            break
     
     return completed
 
+#OK (code agnostic) 
+def _get_configurations_numbers():
+    '''
+    Function to get the list of indices from the site_labels.csv file
 
-def restart_jobs(which : str):
+    Returns a list of indices
+    '''
 
-    from settings import Settings
-    sbatch_command = Settings().sbatch_command
+    site_labels = np.genfromtxt(labels_filename, delimiter=',', names=True)
+    return site_labels['Label']
 
-    if(which == 'screening'):
-        outdirs = screening_outdir
-        pwo_prefix_full = pw_files_prefix + 'screening'
-    elif(which == 'relax'):
-        outdirs = 'relax_outdirs'
-        pwo_prefix_full = pw_files_prefix + 'relax'
-    else:
-        raise ValueError("Not clear which calculation should be restarted.")
+#OK (code agnostic) 
+def _get_actually_present_outputs(program : str, calc_type : str):
+    '''
+    Function to get the list of indices of the outputs that are actually present.
+
+    Returns a list of indices.
+    '''
     
+    indices = _get_configurations_numbers()
 
+    existing_indices = []
+    for index in indices:
+        if os.path.isfile(OUT_FILE_PATHS[calc_type][program].format(index)):
+            existing_indices.append(index)
+
+    return existing_indices
+
+#OK (code agnostic) 
+def get_energy(program : str, calc_type : str, i_calc : int):
+    '''
+    Returns the TOTAL energy for a given configuration, or None if not available
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - i_calc: numeric index of the calculation
+    '''
+    
+    filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
+
+    try:
+        atoms = read(filename)
+        return atoms.get_potential_energy()
+    except:
+        return None
+
+#OK (code agnostic) 
+def get_calculations_results(program : str, calc_type : str, E_slab_mol : list = [0,0], VERBOSE : bool =True):
+    '''
+    Returns a dictionary in the format
+
+    {
+        'energies': {1: -1200, 2: -1300},
+        'relax_completed': {1: True, 2: False},
+        'scf_nonconverged': {1: False, 2: False},
+    }
+
+    The calculations with no output file are not included in the dictionary
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - E_slab_mol: if not [0,0] returns the adsorption energy in eV
+    - VERBOSE: give warning messages for noncompleted calculations
+    '''
+
+    results = {'energies': {}, 'relax_completed': {}, 'scf_nonconverged': {}}
+
+    indices = _get_configurations_numbers()
+
+    for index in indices:
+        if not os.path.isfile(OUT_FILE_PATHS[calc_type][program].format(index)):
+            continue #skip if file does not exist yet
+
+        energy = (get_energy(program, calc_type, index) - (E_slab_mol[0]+E_slab_mol[1])) * UNITS_TO_EV_FACTOR[program]
+        relax_completed = is_completed(program, calc_type, 'RELAX_COMPLETED', index)
+        scf_nonconverged = is_completed(program, calc_type, 'SCF_NONCONVERGED', index)
+
+        results['energies'].update({index : energy})
+        results['relax_completed'].update({index : relax_completed})
+        results['scf_nonconverged'].update({index : scf_nonconverged})
+
+        if(VERBOSE and scf_nonconverged): 
+            print(f'Warning! Config. {index} failed to reach SCF convergence after electron_maxstep.\
+                The last usable energy value will be used')
+
+    
+    return results
+
+#OK (code agnostic) 
+def write_results_to_file(TXT=False):
+    '''
+    Function to write the calculations results to a csv file.
+    It can be called before all the jobs have finished.
+
+    It needs to read the 'site_labels.csv' file.
+
+    Args:
+    - TXT: write a txt file (tab separated) instead of csv, sorted by screening or relax energies
+    '''
+    #
+
+    settings = Settings()
+
+    datafile = pd.read_csv(labels_filename, index_col=0)
+
+    if os.path.isdir(screening_outdir): #for screening
+        screening_results = \
+            get_calculations_results(program=settings.program, calc_type='SCREENING', E_slab_mol=settings.E_slab_mol)
+        
+        column_name = 'Eads_scr(eV)' if 0 not in settings.E_slab_mol else 'Etot_scr(eV)'
+
+        column_data = []
+        for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None
+            if i in screening_results['energies']:
+                
+                column_data.append(screening_results['energies'][i] )
+
+                if screening_results['scf_nonconverged'][i]:
+                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep.\
+                           The energy will be marked with **')
+                    column_data[-1] = str(column_data[-1])+'**'
+                if not screening_results['relax_completed'][i]:
+                    print(f'Warning! {i} relaxation has not reached final configuration. \
+                           The energy will be marked with a *')
+                    column_data[-1] = str(column_data[-1])+'*'
+
+            else: #if the file does not exist
+                column_data.append(None)
+
+        datafile[column_name] = column_data
+
+
+    if os.path.isdir(relax_outdir): #for relax
+        relax_results = \
+            get_calculations_results(program=settings.program, calc_type='RELAX', E_slab_mol=settings.E_slab_mol)
+        
+        column_name = 'Eads_rel(eV)' if 0 not in settings.E_slab_mol else 'Etot_rel(eV)'
+
+        column_data = []
+        for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None
+            if i in relax_results['energies']:
+                
+                column_data.append(relax_results['energies'][i] )
+
+                if relax_results['scf_nonconverged'][i]:
+                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep.\
+                           The energy will be marked with **')
+                    column_data[-1] = str(column_data[-1])+'**'
+                if not relax_results['relax_completed'][i]:
+                    print(f'Warning! {i} relaxation has not reached final configuration. \
+                           The energy will be marked with a *')
+                    column_data[-1] = str(column_data[-1])+'*'
+
+            else: #if the file does not exist
+                column_data.append(None)
+
+        datafile[column_name] = column_data
+
+    
+    #add bonding info
+    slab = Slab(settings.slab_filename)
+    mol = Molecule(settings.molecule_filename)
+    mol_indices = np.arange(mol.natoms) if settings.mol_before_slab else np.arange(mol.natoms) + slab.natoms
+    bonding_status = []
+    for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None
+        if i in relax_results['energies']:
+            status = check_bond_status(settings.program, 
+                                                    calc_type= 'RELAX' if os.path.isdir(relax_outdir) else 'SCREENING', 
+                                                    i_calc=i, 
+                                                    mol_indices=mol_indices)
+            bonding_status.append('Yes' if status else 'No')
+        else: #if the file does not exist
+            bonding_status.append(None)
+
+    datafile['Bonded'] = column_data   
+        
+
+    if(TXT): #sort by energy column (relax if available, else screening)
+        datafile.sort_values(by=column_name)
+  
+    datafile.to_csv(results_filename.replace('csv', 'txt' if TXT else 'csv'), sep='\t' if TXT else ',')
+
+#OK (code agnostic) 
+def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices : list):
+    '''
+    Reads output file and returns True if the molecule is bonded to the surface
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - i_calc: numeric index of the calculation
+    - mol_indices: indices of the atoms belonging to the molecule
+    '''
+    filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
+    atoms = read(filename, results_required=False)
+
+    slab = atoms.copy()
+    del slab[[atom.index for atom in slab if atom.index in mol_indices]]
+    mol = atoms.copy()
+    del mol[[atom.index for atom in mol if atom.index not in mol_indices]]
+
+    return mol_bonded_to_slab(slab, mol)
+
+#OK (code agnostic) 
+def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command : str, indices_list : list):
+    '''
+    Launch the calculations.
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - jobscript: path of the jobscript file
+    - sbatch_command: command to submit the jobscript (in Slurm it is sbatch)
+    - indices_list: indices of the calculations
+    '''
     main_dir = os.getcwd()
-    pwos = natsorted(glob.glob( pwo_prefix_full + "_*.pwo" ))
-    #restart only non-completed calculations
-    pwos = [pwo for pwo in pwos if not _is_completed(pwo)]
-    pwis = [pwo.replace('.pwo', '.pwi') for pwo in pwos]
-    config_labels = [(file.split('.pwo')[0]).split('_')[-1] for file in pwos]
 
+    for index in indices_list:
 
-    #edit pwi(s)
-    for pwi in pwis:
-        with open(pwi, 'r') as f:
+        j_dir = f'{screening_outdir if calc_type is "SCREENING" else relax_outdir}/{index}'
+        os.makedirs(j_dir, exist_ok=True)
+        shutil.copyfile(jobscript, f'{j_dir}/{jobscript_stdname}')
+        
+        os.chdir(j_dir)   ####################
+        
+        #change job title (only for slumr jobscripts)
+        with open(jobscript_stdname, 'rw') as f:
             lines = f.readlines()
             for i, line in enumerate(lines):
-                if 'from_scratch' in line:
-                    lines[i] = lines[i].replace('from_scratch','restart')
-                    break
-        with open(pwi, 'w') as f:
-            f.writelines( lines )    
+                if "job-name" in line:
+                    lines[i] = f"{line.split('=')[0]} = {'scr' if calc_type is 'SCREENING' else 'RELAX'}_{index}\n"
+                    break        
+            f.writelines(lines)
 
 
-    #launch jobs
-    for i, label in enumerate(config_labels):        
-        os.chdir(outdirs+'/'+label) #####################
-        if(TEST): print(sbatch_command+" " + jobscript_filename + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])
-        else: os.system(sbatch_command+" " + jobscript_filename + ' ' +main_dir+'/'+pwis[i] + ' '+ main_dir+'/'+pwos[i])  #launchs the jobscript in j_dir from j_dir
+        launch_string = f"{sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][program].format(main_dir, i)}"
+        if(TEST): print(launch_string)
+        else: os.system(launch_string)  #launchs the jobscript in j_dir from j_dir
         os.chdir(main_dir) ####################
+
+#OK (code agnostic) 
+def restart_jobs(calc_type : str):
+    '''
+    Restart the uncompleted calculations
+
+    Args:
+    - calc_type: 'SCREENING' or 'RELAX'
+    '''
+
+    from settings import Settings
+    settings = Settings()
+
+    existing_indices = _get_actually_present_outputs(settings.program, calc_type)
+    indices_to_restart = [index for index in existing_indices if is_completed(settings.program, calc_type, 'RELAX_COMPLETED', index)]
+
+    #edit input files
+    edit_files_for_restart(settings.program, calc_type, indices_to_restart)  
+
+    #launch the calculations
+    main_dir = os.getcwd()
+    for index in indices_to_restart:
+        j_dir = f'{screening_outdir if calc_type is "SCREENING" else relax_outdir}/{index}'
+        os.chdir(j_dir)
+
+        launch_string = f"{settings.sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][settings.program].format(main_dir, index)}"
+        if(TEST): print(launch_string)
+        else: os.system(launch_string)  #launchs the jobscript in j_dir from j_dir 
+
+        os.chdir(main_dir)

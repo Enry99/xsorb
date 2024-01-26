@@ -1,114 +1,154 @@
+"""
+Created on Tue 28 Feb 2023
+@author: Enrico Pedretti
+
+Main functions to generate the adsorption configurations and set up the calculations
+
+"""
+
 from ase.io import read, write
 import numpy as np
 import os, sys
-from natsort import natsorted
 import glob
 #
-from ase.calculators.espresso import Espresso
 from ase.constraints import FixCartesian
-from slab import Slab, adsorb_both_surfaces
+from slab import Slab
 from molecule import Molecule
-from io_utils import get_energy_from_pwo, launch_jobs
+from io_utils import launch_jobs
 from settings import Settings
+from dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS
 from filenames import *
 
 import ase_custom
 
 
+#OK (code agnostic)
+def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBOSE : bool = False):
+    '''
+    Generate all adsorption structures considering the combinations of 
+    molecular rotations and adsorption sites.
 
-def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_format=None): 
- 
-    #check: if all calculations finished, simply skip
-    #if RUN:
-    #    energies = get_energies(pwo_prefix='screening', VERBOSE=False)
-    #    if energies and None not in energies:
-    #        print('All screening calculations completed. Nothing will be done.')
-    #        return
+    Returns a list of  ASE atoms with the configurations, 
+    and a list of info (csv format) of each configuration.
 
-    #BEGIN STRUCTURES GENERATION ############################################################################
-
-    settings=Settings()
+    Args:
+    - settings: Settings object, containing the filenames of molecule and slab, and all the parameters for the rotations of the molecule and the indentifications of adsorption sites
+    - SAVEFIG: save an image of the adsorption sites and of the molecular rotations.
+    ''' 
 
     #Slab import from file
-    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height, 
+    if VERBOSE: print('Loading slab...')
+    slab = Slab(slab_filename=settings.slab_filename, 
+                layers_threshold=settings.layers_height, 
+                surface_sites_height=settings.surface_height, 
                 fixed_layers_slab=settings.fixed_layers_slab, 
                 fixed_indices_slab=settings.fixed_indices_slab, 
                 fix_slab_xyz=settings.fix_slab_xyz,
-                sort_atoms_by_z=True)
+                sort_atoms_by_z=settings.sort_atoms_by_z,
+                translate_slab_from_below_cell_bottom=settings.translate_slab_from_below_cell_bottom)
+    if VERBOSE: print('Slab loaded.')
 
-    #sga = SpacegroupAnalyzer(slab.slab_pymat)
-    #sops = sga.get_point_group_operations(cartesian=True)
-    #for sop in sops:
-    #    if sop.rotation_matrix[2][2] == 1.:
-    #        print(sop.rotation_matrix)
 
     #Molecule import from file
-    mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms, 
-                   settings.fixed_indices_mol, 
-                   settings.fix_mol_xyz)
+    if VERBOSE: print('Loading molecule...')
+    mol = Molecule(molecule_filename=settings.molecule_filename,
+                   atom_index=settings.selected_atom_index,
+                   molecule_axis_atoms=settings.molecule_axis_atoms, 
+                   axis_vector=settings.axis_vector, 
+                   atoms_subset=settings.mol_subset_atoms, 
+                   fixed_indices_mol=settings.fixed_indices_mol, 
+                   fix_mol_xyz=settings.fix_mol_xyz)
+    if VERBOSE: print('Molecule loaded.')
+
 
     #Find adsorption sites and labels (site type and x,y coords.)
     adsites, adsites_labels = slab.find_adsorption_sites(
-        *settings.sites_find_args.values(), 
+        **settings.sites_find_args,
+        selected_sites=settings.selected_sites,
         save_image=SAVEFIG,
-        selected_sites=settings.selected_sites)
-    for i, ads in enumerate(adsites):
-        adsites[i][2] = max(slab.slab_ase.positions[:,2]) #takes care if some surface atoms are higher than the adsorption site
+        VERBOSE=VERBOSE)
 
 
     #Generate all the configs for the various molecular rotations and a list of labels
-    all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
-        atom_index=settings.selected_atom_index,  
-        y_rot_angles=settings.y_rot_angles,
+    all_mol_configs_ase, rotations_labels = mol.generate_molecule_rotations(
         x_rot_angles=settings.x_rot_angles, 
+        y_rot_angles=settings.y_rot_angles,
         z_rot_angles=settings.z_rot_angles, 
         vert_angles_list=settings.vertical_angles,
-        distance_from_surf=settings.screening_atom_distance, 
-        min_distance=settings.screening_min_distance, 
-        save_image=SAVEFIG
-        )
+        save_image=SAVEFIG,
+        VERBOSE=VERBOSE)
 
 
     #Adsorption of molecule on all adsorption sites for all molecule orientations
-    print('Generating adsorption structures...') 
-    all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites) for mol_config in all_mol_configs_ase]
-    all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
-    if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
-    full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
-    print('All slab+adsorbate cells generated.')
-       
-    print('Writing pwi(s)...')
-    csvfile=open(labels_filename, 'w')
-    csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
+    if VERBOSE: print('Generating adsorption structures...') 
+    all_mol_on_slab_configs_ase = []
+    full_labels = []
+    for mol_config, rot_label in zip(all_mol_configs_ase, rotations_labels):
+        structures, labels = slab.generate_adsorption_structures(molecule=mol_config, 
+                                                adsites=adsites,
+                                                z_distance_from_site=settings.screening_atom_distance,
+                                                min_z_distance_from_surf=settings.screening_min_distance,
+                                                adsites_labels=adsites_labels,
+                                                rotation_label=rot_label,
+                                                mol_before_slab=settings.mol_before_slab) 
+        all_mol_on_slab_configs_ase += structures
+        full_labels += labels
 
-    if RUN: 
-        settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax' })
-        settings.espresso_settings_dict['CONTROL'].update({'etot_conv_thr' : etot_forc_conv[0]})
-        settings.espresso_settings_dict['CONTROL'].update({'forc_conv_thr' : etot_forc_conv[1]})
-        settings.espresso_settings_dict['IONS'].update({'upscale': 1})
-    settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
+    if VERBOSE: print('All slab+adsorbate cells generated.')
 
-    if saveas_format is not None:
-        folder = saveas_format+'/screening/'
-        if not os.path.exists(saveas_format):
-            os.mkdir(saveas_format)
-        if not os.path.exists(folder):
-            os.mkdir(folder)  
+    return all_mol_on_slab_configs_ase, full_labels
 
+#OK (code agnostic)
+def write_labels_csvfile(full_labels : list, labels_filename : str):
+    '''
+    Write the labels of the configurations to a csv file.
+
+    Args:
+    - full_labels: list of labels for the configurations, in csv format
+    - labels_filename: name of the csv file where the data will be written
+    '''
+    with open(labels_filename, 'w') as csvfile:
+        csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
+        for i, label in full_labels:
+            csvfile.write(f'{i},{label}\n')
+
+#OK (code agnostic)  
+def write_inputs(settings : Settings, 
+                 all_mol_on_slab_configs_ase : list, 
+                 calc_type : str,
+                 OVERRIDE_SETTINGS : bool = True, 
+                 INTERACTIVE : bool = False):
+    '''
+    Writes the input files for all the adsorption configurations.
+
+    Returns a list of the indices associated to the files.
+
+    Args:
+    - settings: Settings object, containing the dft code parameters
+    - all_mol_on_slab_configs_ase: list of ASE atoms for all the adsorption configurations
+    - calc_type: 'SCREENING' or 'RELAX'
+    - OVERRIDE_SETTINGS: override some specifc settings (e.g. conv tresholds)
+    - INTERACTIVE: interactive mode: ask before overwriting files that are already present
+    '''
     
-    pwi_names = []
+    if INTERACTIVE: print('Writing input files...')
+
+    if OVERRIDE_SETTINGS: override_settings(settings, calc_type) 
+
 
     ANSWER_ALL = False
     answer = 'yes'
     
-    for i in np.arange(len(all_mol_on_slab_configs_ase)):
-        file_prefix = pw_files_prefix+'screening_'+str(i)
-        filename = f'{file_prefix}.pwi'
+    for i, atoms in enumerate(all_mol_on_slab_configs_ase):
         
-        csvfile.write(f'{i},{full_labels[i]}\n')
+        file_label = f'{calc_type.lower()}_{i}'
 
-        if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
-            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer  else 're-calculated') \
+        corresponding_outfile = OUT_FILE_PATHS[calc_type][settings.program].format(i)
+        
+        #if in interactive mode, ask before overwriting
+        if(INTERACTIVE and os.path.isfile(corresponding_outfile)): #convoluted, but it works
+            print(f'{corresponding_outfile} already present, possibly from a running calculation. '+ \
+                  ('It will be {0}, as requested.'.format('skipped' if 'n' in answer  else 're-calculated') \
                   if ANSWER_ALL else 'You can decide to re-calculate it or skip it.'))
             while True and not ANSWER_ALL:
                 answer = input('Re-calculate? ("y" = yes to this one, "yall" = yes to all, "n" = no to this one, "nall" = no to all): ')
@@ -118,28 +158,61 @@ def generate(RUN : bool, etot_forc_conv = [5e-3, 5e-2], SAVEFIG=False, saveas_fo
                 else: print('Value not recognized. Try again.')
             if answer == 'no' or answer == 'n' or answer == 'nall': continue #skip if user does not want to overwrite
         
+        calc = Calculator(settings, file_label, atoms) 
+        calc.write_input(atoms)
 
-        pwi_names.append(filename)
-        calc = Espresso(pseudopotentials=settings.pseudopotentials, 
-                    input_data=settings.espresso_settings_dict,
-                    label = file_prefix,
-                    kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None)
-        calc.write_input(all_mol_on_slab_configs_ase[i])
-        if(saveas_format is not None): 
-            if(saveas_format == 'xyz'):
-                ase_custom.write_xyz_custom(folder+file_prefix+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
-            else:
-                write(folder+file_prefix+'.'+saveas_format, all_mol_on_slab_configs_ase[i])
+    if INTERACTIVE: print('All input files written.')
 
-    csvfile.close()
+    return np.arange(len(all_mol_on_slab_configs_ase))
 
-    print('All pwi(s) written.')
-    #END OF STRUCTURE GENERATIONS #########################################################################################
+#OK (code agnostic)  
+def generate(SAVEFIG=False):
+    '''
+    Generates adsorption configurations and writes the inputs, using the settings for the final relaxations.
+    Useful to use the program just as a generator of configurations
+
+    Args:
+    - SAVEFIG: save an image of the adsorption sites and of the molecular rotations when generating the configurations
+    '''
     
-    if RUN:
-        launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=screening_outdir, jobname_title='scr')
+    settings=Settings()
 
+    all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG)
 
+    write_labels_csvfile(full_labels, labels_filename=labels_filename)
+
+    write_inputs(settings, 
+                 all_mol_on_slab_configs_ase,
+                 calc_type='SCREENING',
+                 OVERRIDE_SETTINGS=False)
+
+#OK (code agnostic)   
+def launch_screening(SAVEFIG : bool = False):
+    '''
+    Generates adsorption configurations, writes inputs and launches calculations for the preliminary screening.
+
+    Args:
+    - SAVEFIG: save an image of the adsorption sites and of the molecular rotations when generating the configurations
+    '''
+    
+    settings=Settings()
+
+    all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG, VERBOSE=True)
+
+    write_labels_csvfile(full_labels, labels_filename=labels_filename)
+
+    indices_list = write_inputs(settings, 
+                                 all_mol_on_slab_configs_ase,
+                                 calc_type='SCREENING', 
+                                 VERBOSE=True)
+
+    launch_jobs(program=settings.program,
+                calc_type='SCREENING',
+                jobscript=settings.jobscript,
+                sbatch_command=settings.sbatch_command,
+                indices_list=indices_list)    
+
+#TODO: check later that if not relax_completed. Before we put None in the energy
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False, BY_SITE = False):
     
     #check: if all calculations finished, simply skip
@@ -310,7 +383,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
 
         if all_mol_on_slab_configs_ase[i] == None: continue
 
-        file_prefix = pw_files_prefix+'relax_'+str(i)
+        file_prefix = 'relax_'+str(i)
         filename = f'{file_prefix}.pwi'
 
         if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
@@ -348,7 +421,7 @@ def saveas(which : str, i_or_f : str, saveas_format : str):
         raise RuntimeError("Wrong argument: passed '{0}', expected 'screening' or 'relax'".format(which))
 
     print('Reading files...')
-    pw_list=glob.glob(pw_files_prefix+which+'_*.'+pw)
+    pw_list=glob.glob(which+'_*.'+pw)
     configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
     print('All files read.')
 

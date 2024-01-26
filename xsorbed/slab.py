@@ -12,6 +12,8 @@ Small helper class to handle the slab
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder, plot_slab, get_rot
 from pymatgen.analysis.local_env import MinimumDistanceNN
 from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.core import Structure
+from ase import Atoms
 from ase.io import read
 from ase.build.tools import sort
 from ase.data import atomic_numbers, covalent_radii
@@ -22,48 +24,50 @@ from ase.constraints import FixCartesian
 
 import ase_custom
 
+#NOTE: ALL MODIFICATIONS DONE
 class Slab:
+    '''
+        Class to read slab from file (e.g. Quantum ESPRESSO pwi/pwo or VASP POSCAR),
+        find adsorption sites on the surface, and generate the adsorption structures with a molecule
+        by placing the molecule on all the different sites
 
-    def __init__(self, slab_filename : str, layers_threshold = 0.5, surface_sites_height = 0.9, fixed_layers_slab : list = None, fixed_indices_slab : list = None, fix_slab_xyz : list = None, sort_atoms_by_z = False):
-        '''
-            Read slab from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
-        '''
+        Initialization parameters:
+        - slab_filename: file containing the structure of the slab
+        - layers_threshold: deltaz for the atoms to be considered as part of the same layer. 
+        Used to identify layers when fixing atoms by layer.
+        - surface_sites_height: deltaz from the topmost atom to identify which atoms are surface atoms,
+        used by Pymatgen to find adsorption sites (it is the 'height' parameter of Pymatgen's AdsorbateSiteFinder)
+        - fixed_layers_slab: list of layers of the slab to be fixed 
+        (counting starts from the bottom, beginning with 0)
+        - fixed_indices_slab: list of specific atoms to be fixed 
+        (indices start from 0, with the ordering of the atoms in the input file)
+        - fix_slab_xyz: which coordinates to fix for the fixed atoms, e.g. [True, True, False] = fix motion in x,y, free to move along z.
+        - sort_atoms_by_z: sort the atoms of the slab according to their z coordinate, in reverse order (from higher to lower)
+        - translate_slab_from_below_cell_bottom: translate slab to make sure that it is at least 1 Angstrom from the bottom of the cell
+    '''
 
-        print('Loading slab...')
+    def __init__(self, slab_filename : str, 
+                 layers_threshold : float = 0.5, 
+                 surface_sites_height : float = 0.9, 
+                 fixed_layers_slab : list = None, 
+                 fixed_indices_slab : list = None, 
+                 fix_slab_xyz : list = None, 
+                 sort_atoms_by_z : bool = False,
+                 translate_slab_from_below_cell_bottom : bool = True):
         
         self.slab_ase = read(filename=slab_filename, results_required=False)
         self.natoms   = len(self.slab_ase)
 
 
-        #translate slab so that the bottom layer is at least 1 angstrom from the bottom
-        zmin = min(self.slab_ase.positions[:,2])
-        if(zmin < 1):
-            self.slab_ase.translate([0,0,1-zmin])
-        #translate so that the slab does not have atoms outside the cell
-        #self.slab_ase.wrap(pbc=True)
+        if(min(self.slab_ase.positions[:,2]) < 1 and translate_slab_from_below_cell_bottom):
+            #translate slab so that the bottom layer is at least 1 angstrom from the bottom
+            self.slab_ase.translate([0,0,1-min(self.slab_ase.positions[:,2])])
         
 
-        #SET CONSTRAINTS before sorting##################################
+        #SET CONSTRAINTS (before sorting)##############################
         fixed_atoms_indices = []
-        if(fixed_layers_slab):
-            original_positions = self.slab_ase.positions
-            positions = self.slab_ase.positions.copy().tolist()
-            i_layer = 0
-            while len(positions): #go on until there are no more atoms
-                layer = []
-                base_z = min([x[2] for x in positions])
-
-                remove_list = []
-                for pos in positions:
-                    if pos[2] < base_z + layers_threshold:
-                        layer.append([idx for idx in range(0, len(original_positions)) if np.allclose(original_positions[idx], pos)][0])
-                        remove_list.append(pos)
-                for pos in remove_list:
-                    positions.remove(pos)
-
-                if len(layer) and i_layer in fixed_layers_slab: fixed_atoms_indices += layer
-                i_layer += 1
-
+        if(fixed_layers_slab): # identify the atoms belonging to the various layers
+            fixed_atoms_indices = self._find_atom_indices_fixed_layers(layers_threshold, fixed_layers_slab)
         elif(fixed_indices_slab):
             fixed_atoms_indices = fixed_indices_slab
 
@@ -71,66 +75,107 @@ class Slab:
         self.slab_ase.set_constraint(c)
         ###############################################################
 
-        
         if sort_atoms_by_z:
             self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
-        slabcopy = self.slab_ase.copy() #to suppress the warning about constraints not supported in pymatgen
-        del slabcopy.constraints
+
+        #create pymatgen version of the slab, and initialize the AdsorbateSiteFinder
+        slabcopy = self.slab_ase.copy() 
+        del slabcopy.constraints #to suppress the warning about constraints not supported in pymatgen
         self.slab_pymat = AseAtomsAdaptor.get_structure(slabcopy)
         self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height)
 
-        print('Slab loaded.')
+
+    def _find_atom_indices_fixed_layers(self, layers_threshold : float, fixed_layers_slab : list):
+        '''
+        Internal helper method to find the indices of the atoms belonging to the 
+        layers that we want to fix
+        Args:
+        - layers_threshold: deltaz for the atoms to be considered as part of the same layer. 
+        - fixed_layers_slab: list of layers of the slab to be fixed 
+        '''
+
+        fixed_atoms_indices = []
+        original_positions = self.slab_ase.positions
+        positions = self.slab_ase.positions.copy().tolist()
+        i_layer = 0
+        while len(positions): #go on until there are no more atoms
+            layer = []
+            base_z = min([x[2] for x in positions])
+
+            remove_list = []
+            for pos in positions:
+                if pos[2] < base_z + layers_threshold:
+                    layer.append([idx for idx in range(0, len(original_positions)) if np.allclose(original_positions[idx], pos)][0])
+                    remove_list.append(pos)
+            for pos in remove_list:
+                positions.remove(pos)
+
+            if len(layer) and i_layer in fixed_layers_slab: fixed_atoms_indices += layer
+            i_layer += 1
+
+        return fixed_atoms_indices
 
 
-    def find_adsorption_sites(self, distance_from_surf=0., symm_reduce_thr=0.01, near_reduce_thr=0.01, no_obtuse_hollow=True, selected_sites : list = [], ALL=False,  save_image = False ):
+    def find_adsorption_sites(self, symm_reduce_thr : float = 0.01, 
+                              near_reduce_thr : float = 0.01, 
+                              no_obtuse_hollow : bool = True, 
+                              selected_sites : list = None,   
+                              save_image : bool = False,
+                              figname : str = 'adsorption_sites.png',
+                              VERBOSE : bool = False):
         '''
         Returns a list of cartesian coordinates of the adsites, and a list of labels ('ontop', x, y).
         Optionally it saves a figure with the sites on the surface.
 
         Args:
-            distance_from_surf: distance of the site (where the selected atom of the molecule is to be placed) from the surface
-            symm_reduce_thr, near_reduce_thr: thresholds for removing sites duplicates (increase them to reduce duplicates).
-            no_obtuse_hollow: avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation of topmost layer used to find sites.
+            -symm_reduce_thr: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. It is a theshold for removing symmetrically equivalent sites.
+            -near_reduce_thr: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. Threshold for removing sites duplicates (increase it to reduce duplicates).
+            -no_obtuse_hollow: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. Avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation of topmost layer used to find sites.
+            -selected_sites: indices of the sites to be returned by this function, selected between those found by AdsorbateSiteFinder
+            -save_image: decide wether to save a png image of the sites
+            -figname: filename of the image.
         '''
 
-        print('Finding adsorption sites...')
+        if VERBOSE: print('Finding adsorption sites...')
 
-        if ALL:
-            figname = 'adsorption_sites_all.png'
-        else:
-            figname = 'adsorption_sites.png'
-
-        adsites = self.asf.find_adsorption_sites(distance=distance_from_surf, symm_reduce=symm_reduce_thr, near_reduce=near_reduce_thr, no_obtuse_hollow=no_obtuse_hollow)
+        adsites = self.asf.find_adsorption_sites(distance=0, 
+                                                 symm_reduce=symm_reduce_thr, 
+                                                 near_reduce=near_reduce_thr, 
+                                                 no_obtuse_hollow=no_obtuse_hollow)
         if selected_sites:
             sel_adsites = [adsites['all'][i] for i in selected_sites]
         else:
             sel_adsites = adsites['all']
-        
 
         adsite_labels = []
-        nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are at the center of a non-perfeclty equilater triangle
+
+        #create structure containing only surface atoms
         surf_coords = [s.coords for s in self.asf.surface_sites]
         nonsurf_sites_indices = [i for i in range(len(self.asf.slab.sites)) if not np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
         slab = self.asf.slab.copy()
         slab.remove_sites(nonsurf_sites_indices)
-        for i in range(len(slab)): slab[i].z = 0
+        for i in range(len(slab)): slab[i].z = 0 #flatten the surface (z=0 for all)
+
+        nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are at the center of a non-perfeclty equilater triangle
+
         #run over all the slab_adsites, classifiying them by checking if the
         #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'        
         for i, site in enumerate(sel_adsites):
             #dummy structure just to place one atom in the site
             coords = site.tolist()
-            coords[2] = 0.2
+            coords[2] = 0.2 #place the dummy atom just above the surface level z=0
             slab.append('O', coords, coords_are_cartesian=True)
             coord_n = nn.get_cn(slab, len(slab)-1)
             nn_list = nn.get_nn(slab, len(slab)-1) 
             slab.remove_sites([len(slab)-1]) #remove dummy atom     
 
+            # add further information to the site types
             if any((site == x).all() for x in adsites['ontop']):
-                first_nn_species = nn_list[0].species_string
+                first_nn_species = nn_list[0].species_string #atomic species of the atom just below the ontop site
                 adsite_labels.append('{0} ontop_{1},{2:.3f},{3:.3f},'.format(i, first_nn_species, *site[:2]))   
-            elif any((site == x).all() for x in adsites['hollow']):
+            elif any((site == x).all() for x in adsites['hollow']): #coordination number of the hollow site
                 adsite_labels.append('{0} hollow_c{1},{2:.3f},{3:.3f},'.format(i, coord_n, *site[:2])) 
-            else:
+            else: 
                 if(coord_n>=4): #attemps to fix the problem of fake bridges for 4-fold sites
                     adsite_labels.append('{0} hollow_c{1},{2:.3f},{3:.3f},'.format(i, coord_n, *site[:2]))
                 else:
@@ -140,106 +185,182 @@ class Slab:
                     else: adsite_labels.append('{0} bridge,{1:.3f},{2:.3f},'.format(i, *site[:2]))
         
         
-        print('Adsorption sites found.')
+        if VERBOSE: print('Adsorption sites found.')
 
         if(save_image): #save png to visualize the identified sites
-            print("Saving image to {0}".format(figname))
-            sop = get_rot(self.asf.slab)
+            self.save_adsites_image(sel_adsites, adsite_labels, self.slab_pymat, figname, VERBOSE)
 
-            fig = plt.figure(figsize=(4,3))
-            ax = fig.add_subplot(111)
-            #ax.xaxis.set_tick_params(labelsize=5)
-            #ax.yaxis.set_tick_params(labelsize=5)
-            plot_slab(self.slab_pymat, ax, adsorption_sites=False, window=1.0, decay=0.25)
-
-
-            #w,h = fig.get_size_inches()*fig.dpi
-            w = ax.get_xlim()[1] - ax.get_xlim()[0]
-
-            crosses_size = 6.0  * 25. / w
-            fontsize     = 2.0 * 25. / w
-            mew          = 1.0 * 25. / w
-            adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in sel_adsites]
-            for i, site in enumerate(sel_adsites):
-                if 'ontop' in adsite_labels[i]:
-                    color = 'r'
-                elif 'bridge' in adsite_labels[i]:
-                    color = 'g'
-                elif 'hollow' in adsite_labels[i]:
-                    color = 'b'
-                ax.plot(*adsites_xy[i], color=color, marker="x", markersize=crosses_size, mew=mew, linestyle="", zorder=500000)
-                ax.annotate(str(i), xy=adsites_xy[i], xytext=adsites_xy[i], fontsize=fontsize, path_effects=[PathEffects.withStroke(linewidth=0.25,foreground="w")], zorder=1000000)
-                            
-            #ax.set_title('r=ontop, g=bridge, b=hollow')
-            fig.savefig(figname, dpi=800, bbox_inches='tight')
-
-            print("Image saved.")
-
-        
-        
         return sel_adsites, adsite_labels
 
-    def generate_adsorption_structures(self, molecule, adsites):
-              
-        structs = []
 
-        for coords in adsites:
+    def generate_adsorption_structures(self, molecule : Atoms, 
+                                       adsites : list, 
+                                       z_distance_from_site : float,
+                                       min_z_distance_from_surf : float,
+                                       adsites_labels : list,
+                                       rotation_label : str,
+                                       mol_before_slab = False):
+        '''
+        Returns the adsorption structures obtained by placing the molecule on all the adsites,
+        ensuring that the molecule is not too close to the surface
+
+        Args:
+        - molecule: ase Atoms for the molecule to be placed in all the adsorption sites
+        - adsites: list of cartesian coordinates of the adsorption sites
+        - z_distance_from_site: target distance between reference atom and site.
+        - min_z_distance_from_surf: minimum vertical distance between ANY atom of the molecule and ANY atom of the surface
+        - adsites_labels: list of labels of the adsorption sites, used to create the final full labels of the adsorption configurations
+        - rotation_label: label of the rotation of the molecule, used to create the final full labels of the adsorption configurations
+        - mol_before_slab: decide wether to put the molecule before or after the slab in the list of atoms
+        '''
+
+        adsorption_structures = []
+        full_labels = []
+
+        for coords, site_label in zip(adsites, adsites_labels):
             mol = molecule.copy()
-            mol.translate(coords)
 
-            #final check on distance#########################################
-            distances = []
-            for mol_atom in mol:
-                for slab_atom in self.slab_ase:
-                    distances.append(np.linalg.norm(mol_atom.position - slab_atom.position))
-            
-            mindist = min(distances)
-            i_min = distances.index(mindist)
-            i_mol, j_slab = ( i_min // len(self.slab_ase), i_min % len(self.slab_ase) )
-            covalent_distance = 0.5 * (covalent_radii[atomic_numbers[self.slab_ase[j_slab].symbol]] + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
+            #place the molecule in the adsorption site, then translate it upwards by the target height
+            mol.translate(coords) 
+            mol.translate([0,0,z_distance_from_site])
+            final_deltaz = z_distance_from_site
 
-            if mindist < covalent_distance:
-
-                mol_coords = mol[i_mol].position
-                slab_coords = self.slab_ase[j_slab].position
-                if(mol_coords[2] < slab_coords[2]): #if mol atom below slab atom
-                    #print('Atom below surface level, translating upwards.')
-                    mol.translate( [0, 0, np.abs(mol_coords[2] - slab_coords[2])] ) #translate atom exactly at the z level of the slab atom, then it will be dealt with by the further translation
-                    mol_coords = mol[i_mol].position
+            #Check for min_z_distance_from_surf and translate accordingly
+            dz = mindistance_deltaz(self.slab_ase, mol, min_z_distance_from_surf)
+            if dz:
+                mol.translate( [0, 0, dz] )
+                #print("The molecule was translated further by {0} to enforce minimum distance.".format(dz))
+                final_deltaz += dz
                 
-                dz = np.sqrt(covalent_distance**2 - (mol_coords[0] - slab_coords[0])**2 - (mol_coords[1] - slab_coords[1])**2 ) - (mol_coords[2] - slab_coords[2])
-                mol.translate([0, 0, dz])
-                #print("The molecule was translated further by {0} to avoid collisions.".format(dz))
-            #################################################################
 
-            structs.append(self.slab_ase + mol)
+            adsorption_structures.append(mol + self.slab_ase if mol_before_slab else self.slab_ase + mol)
+            full_labels.append(rotation_label+site_label+',{:.3f}'.format(final_deltaz))
 
-        return structs
+        return adsorption_structures, full_labels
 
 
-#NOTE!!!: CURRENTLY NOT WORKING, might be implemented in the future
-def adsorb_both_surfaces(all_mol_on_slab_configs_pymat : list): 
-    new_adslabs = []
+def closest_pair(slab : Atoms, mol: Atoms):
+    '''
+    Returns the indices of the closest pair of (slab, molecule) atoms, and their distance
+
+    Args:
+    - slab: Atoms object for the slab
+    - mol: Atoms object for the molecule 
+    '''
+    distances = []
+    for mol_atom in mol:
+        for slab_atom in slab:
+            distances.append(np.linalg.norm(mol_atom.position - slab_atom.position))
+    mindist = min(distances)
+
+    i_min = distances.index(mindist)
+    i_mol, j_slab = ( i_min // len(slab), i_min % len(slab) )
+
+    return i_mol, j_slab, mindist
+
+
+def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : float):
+    '''
+    Returns the vertical translation required so that the closest mol-slab atom pair is at least
+    min_z_distance_from_surf apart (or half the sum of the covalent radii) along z
+
+    Args:
+    - slab: Atoms object for the slab
+    - mol: Atoms object for the molecule
+    - min_distance: minimum required distance along z
+    '''
+
+    #First, find the closest slab-mol atoms pair
+    i_mol, j_slab, _ = closest_pair(slab, mol)
+
+    #Find the z coordinates of the closest atoms pair, and half their covalent distance
+    half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
+                                + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
+    zmol = mol[i_mol].position[2]
+    zslab = slab[j_slab].position[2]
+
+    #Calculate the distance required to enforce the minimum distance
+    necessary_min_z_dist = max(min_z_distance_from_surf, half_covalent_distance)
+    if(zmol < zslab + necessary_min_z_dist):
+        return zslab + necessary_min_z_dist - zmol
+    else:
+        return None
+
+
+def mol_bonded_to_slab(slab : Atoms, mol: Atoms):
+    '''
+    Returns true if the molecule is bonded to the slab, i.e. if a
+    (slab, molecule) atom pair is closer than 1.1 x sum of covalent radii
+
+    Args:
+    - slab: Atoms object for the slab
+    - mol: Atoms object for the molecule
+    '''
+
+    i_mol, j_slab, distance = closest_pair(slab, mol)
+
+    max_bond_distance = 1.1 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
+                                + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
     
-    for adslab in all_mol_on_slab_configs_pymat: 
+    return distance <= max_bond_distance
 
-        # Find the adsorbate sites and indices in each slab           
-        _, adsorbates, indices = False, [], []
-        for i, site in enumerate(adslab.sites):
-            if site.surface_properties == "adsorbate":
-                    adsorbates.append(site)
-                    indices.append(i)
 
-        # Clean slab to find center of mass
-        slab_noads = adslab.copy()
-        slab_noads.remove_sites(indices)
+def save_adsites_image(adsites : list, 
+                       adsite_labels : list,
+                       slab_pymat : Structure,
+                       figname : str = 'adsorption_sites.png',
+                       VERBOSE : bool = False):
+        '''
+        Internal helper function to save an image of the adsorption sites with their numeric label
+        Args:
+        -adsites: list of cartesian coordinates of the sites
+        -adsite_labels: list of the adsites labels (used to color code the sites)
+        -slab_pymat: Pymatgen Structure of the slab
+        -figname: filename of the image
+        '''
 
-        new_slab = adslab.copy()
-        for adsorbate in adsorbates:
-            p2 = 0 #qui ci vogliono le coordinate di asdorbate con la z invertita
-            #rispetto al centro geometrico (non di massa) della slab_noads
-            new_slab.append(adsorbate.specie, p2, properties={"surface_properties": "adsorbate"})
-        new_adslabs.append(new_slab)
-    
-    return new_adslabs
+        if VERBOSE: print("Saving image to {0}".format(figname))
+        
 
+        fig = plt.figure(figsize=(4,3))
+        ax = fig.add_subplot(111)
+        #ax.xaxis.set_tick_params(labelsize=5)
+        #ax.yaxis.set_tick_params(labelsize=5)
+
+        #plot slab without the sites, using Pymatgen's function
+        plot_slab(slab_pymat, ax, adsorption_sites=False, window=1.0, decay=0.25)
+
+
+        #plot the sites on the slab
+        #w,h = fig.get_size_inches()*fig.dpi
+        w = ax.get_xlim()[1] - ax.get_xlim()[0]
+        crosses_size = 6.0 * 25. / w
+        fontsize     = 2.0 * 25. / w
+        mew          = 1.0 * 25. / w
+
+        sop = get_rot(slab_pymat)
+        adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites]
+        for i, label, site_xy in zip(range(len(adsite_labels)), adsite_labels, adsites_xy):
+            if 'ontop' in label:
+                color = 'r'
+            elif 'bridge' in label:
+                color = 'g'
+            elif 'hollow' in label:
+                color = 'b'
+            ax.plot(*site_xy, 
+                    color=color, marker="x", 
+                    markersize=crosses_size, 
+                    mew=mew, 
+                    linestyle="", 
+                    zorder=500000) # zorder to ensure that all crosses are drawn on top
+            ax.annotate(str(i), 
+                        xy=site_xy, 
+                        xytext=site_xy, 
+                        fontsize=fontsize, 
+                        path_effects=[PathEffects.withStroke(linewidth=0.25,foreground="w")], 
+                        zorder=1000000) # zorder to ensure that the text is on top of the crosses
+                        
+        ax.set_title('r=ontop, g=bridge, b=hollow')
+        fig.savefig(figname, dpi=800, bbox_inches='tight')
+
+        if VERBOSE: print("Image saved.")

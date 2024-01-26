@@ -13,9 +13,17 @@ import sys
 import numpy as np
 import input
 
+#TODO: eslabmol should be given in the default type for each program: ESPRESSO: Ry, VASP: eV
+#TODO: add energy and force convergence as optional flag, set here default values if not provided
+#TODO: per espresso, mettere espresso_settings_dict.kpts=                    kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None
+# e espresso_settings_dict.=settings.pseudopotentials
+
+#settings.sort_atoms_by_z
+#settings.translate_slab_from_below_cell_bottom
+#settings.mol_before_slab
 class Settings:
 
-    def __init__(self, settings_filename : str = "settings.in", read_energies = True) -> None:
+    def __init__(self, settings_filename : str = "settings.in", read_energies = True, VERBOSE=True) -> None:
 
         #variables read from settings.in
         script_settings_dict, self.espresso_settings_dict, self.atomic_species, self.kpoints, self.last_dump, self.text = input.read_input_file(settings_filename)

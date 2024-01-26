@@ -15,20 +15,37 @@ from matplotlib import pyplot as plt
 from ase.visualize.plot import plot_atoms
 from ase.constraints import FixCartesian
 
-
 import ase_custom 
 
+#NOTE: ALL MODIFICATIONS DONE
 class Molecule:
+    '''
+        Class to read molecule from file (e.g. Quantum ESPRESSO pwi/pwo or VASP POSCAR),
+        find adsorption sites on the surface, and generate the adsorption structures with a molecule
+        by placing the molecule on all the different sites
 
-    def __init__(self, molecule_filename : str, molecule_axis_atoms : list = None, axis_vector: list = None, atoms_subset : list = None, fixed_indices_mol : list = None, fix_mol_xyz : list = None):
-        '''
-        Reads molecule from file (e.g. Quantum ESPRESSO pwi/pwo or .xyz)
-        Optional parameters:
-        -atoms_subset: indices of the atoms to include. Only removes atom NOT in this list, does not check
+        Initialization parameters:
+        - molecule_filename: file containing the structure of the molecule
+        - atom_index: index of the reference atom (indexing starting from 0, in the order of the input file)
+        - molecule_axis_atoms: indices of the two atoms defining the x-axis of the molecule (a = r2 - r1) 
+        - axis_vector: [ax, ay, az] of the vector that is considered as the x-axis of the molecule
+        - atoms_subset: indices of the atoms to include. Only removes atom NOT in this list, does not check
         if the atoms in the list actually exist in the molecule
-        '''
+        - fixed_indices_mol: list of specific atoms to be fixed 
+        (indices start from 0, with the ordering of the atoms in the input file)
+        - fix_mol_xyz: which coordinates to fix for the fixed atoms, e.g. [True, True, False] = fix motion in x,y, free to move along z.
+    '''
 
-        print('Loading molecule...')
+
+    def __init__(self, molecule_filename : str,
+                 atom_index: int,
+                 molecule_axis_atoms : list = None, 
+                 axis_vector: list = None, 
+                 atoms_subset : list = None, 
+                 fixed_indices_mol : list = None, 
+                 fix_mol_xyz : list = None):
+
+
         self.mol_ase = read(molecule_filename, results_required=False)
 
         #align axis to x axis
@@ -46,126 +63,100 @@ class Molecule:
             self.mol_ase.set_constraint(c)
         ###############################################################
             
+        #Translate reference atom to origin
+        self.mol_ase.translate(-self.mol_ase.get_positions()[atom_index])
+            
         #select atoms subset
-        self.original_mol_ase = self.mol_ase.copy() #before removing atoms
-        all_indices = range(0, len(self.mol_ase))
         if atoms_subset:            
-            remove_indices = [index for index in all_indices if index not in atoms_subset]
-            self.reindex_map = [index for index in all_indices if index in atoms_subset]
-            del self.mol_ase[remove_indices]
-        else:
-            self.reindex_map = [*all_indices]
+            del self.mol_ase[[index for index in range(0, len(self.mol_ase)) if index not in atoms_subset]]
+
+        self.reference_atom_index = np.where([np.allclose(atom.position, [0,0,0]) for atom in self.mol_ase])[0]
 
         self.natoms = len(self.mol_ase)
-        
-        print('Molecule loaded.')
 
-    #translation and rotation functions defs
-    def _set_atom_to_origin(self, atom_index : int = None, coords : list = None):
-        '''
-        Returns a copy of the molecule with the selected atom translated to the origin,
-        or alternatively translated by the vector specified by coords
-        '''
-        mol = self.mol_ase.copy()
-
-        if atom_index is not None:
-            #Reindex if only some atoms were selected from input
-            atom_coords = self.original_mol_ase.get_positions()[atom_index].tolist()
-            #print(atom_coords)   
-            #print(self.mol_ase.get_positions().tolist())     
-            atom_reindex = self.mol_ase.get_positions().tolist().index(atom_coords)        
-            mol.translate(-mol.get_positions()[atom_reindex])
-        else:
-            mol.translate(-np.array(coords)) #NOTE!: for now NOT implemented
-        return mol
 
     def generate_molecule_rotations(
             self, 
-            atom_index : int=None, 
-            coords : list=None, 
-            y_rot_angles : list= [0.0],
-            x_rot_angles : list=[0.0],
-            z_rot_angles : list=[0.0],
-            vert_angles_list : list = [0.0],
-            distance_from_surf : float = 2., 
-            min_distance : float = 1.5, 
+            x_rot_angles : list,
+            y_rot_angles : list,
+            z_rot_angles : list,
+            vert_angles_list : list = [0],
             save_image = False,
+            VERBOSE : bool = False
             ):
         '''
         Returns list (of ase Atoms) of all the rotated configurations and their labels.
+
+        Args:
+        - x_rot_angles: list of angles to rotate around the x axis
+        - y_rot_angles: list of angles to rotate around the y axis
+        - z_rot_angles: list of angles to rotate around the z axis
+        - vert_angles_list: custom list of rotation angles for when the molecule is vertical (for y_angle = +/- 90°)
+        - save_image: decide wether to save an image of all the molecular rotations
         '''
         
-        print('Generating molecular configurations...')
-        configs_ase = []
-        labels = []   #format [[xrot, yrot, zrot], z_coord]
-        delta_z_values = []
+        if VERBOSE: print('Generating molecular configurations...')
 
-        transl_molecule = self._set_atom_to_origin(atom_index, coords)
+        configs_ase = []
+        labels = []
+
 
         #just to enter the loop and generate the (only one) unmodified configuration
-        if not y_rot_angles : y_rot_angles = [0]   #y_rot
         if not x_rot_angles : x_rot_angles = [0] #x_rot
+        if not y_rot_angles : y_rot_angles = [0] #y_rot
         if not z_rot_angles : z_rot_angles = [0] #z_rot
         
-
+        #build list of rotations (all combinations of x,y,z)
         rotations_list = []
-
         for y_angle in y_rot_angles:
             if (y_angle == 90 or y_angle == -90):
                 for ang in vert_angles_list:
-                    rotations_list.append([ang, y_angle, 0.0])               
+                    rotations_list.append([ang, y_angle, 0.0]) #x rotation is equivalent to z rotation              
                 continue
             for x_angle in x_rot_angles:         
                 for z_angle in z_rot_angles:
                         rotations_list.append([x_angle, y_angle, z_angle])
                                 
-            
+        #perform the rotations 
         for (x_angle, y_angle, z_angle) in rotations_list:
                 
-            mol = transl_molecule.copy()
-
+            mol = self.mol_ase.copy()
+           
             mol.rotate(x_angle, 'x')
             mol.rotate(y_angle, '-y')
-            mol.rotate(z_angle, 'z')
-
-            mol.translate([0,0,distance_from_surf])
-
-            #Check for min_distance and translate accordingly
-            assert(min_distance <= distance_from_surf)
-            atoms_too_close = [atom.z for atom in mol if atom.z < min_distance]
-            if atoms_too_close:
-                z_min = min(atoms_too_close)                       
-                delta_z = -z_min + min_distance
-                if(False): delta_z_values.append(delta_z)
-
-                #print('Config. roty={0} rotz={1}: {2} atoms closer than intended distance. Translating molecule {3:.3f} upwards '.format(y_angle, z_angle, len(atoms_too_close), delta_z))
-                mol.translate([0,0,delta_z])              
+            mol.rotate(z_angle, 'z')          
 
             configs_ase.append(mol)
-
-            if(False): labels.append( ['{0},{1},{2},'.format(x_angle, y_angle, z_angle), 0] )
-            labels.append( ['{0},{1},{2},'.format(x_angle, y_angle, z_angle), '{:.3f}'.format(mol.get_positions()[atom_index][2])] )
+            labels.append( '{0},{1},{2},'.format(x_angle, y_angle, z_angle) )
                 
+        if VERBOSE: print('All molecular configurations generated.') 
 
-
-        if(False): #translation for all same z
-            for i, mol in enumerate(configs_ase):
-                mol.translate([0,0, max(delta_z_values)])
-                labels[i][1] = '{:.3f}'.format(selected_atom_distance + mol.get_positions()[atom_index][2])
-                
-    
-        if(save_image): #Plot all the configs from top view
-            rows_fig = max(int(np.ceil(len(configs_ase)/5)), 1)
-            cols_fig = max(int(np.ceil(len(configs_ase)/rows_fig)), 1)
-            fig = plt.figure(figsize=(10 * cols_fig / 5, 5 * rows_fig / 3))
-            axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs_ase) + 1)]
-
-            for i, conf in enumerate(configs_ase):
-                plot_atoms(conf, axes[i])
-                axes[i].set_title('({0}, {1}, {2})'.format(* labels[i][0].split(',')))
-            fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
-            fig.savefig('molecule_orientations.png', dpi=800, bbox_inches='tight')
-        
-        print('All molecular configurations generated.')
+        if(save_image):
+            save_rotations_images(configs_ase, labels, VERBOSE)
 
         return configs_ase, labels
+
+
+def save_rotations_images(configs_ase : list, labels : list, figname : str = 'molecule_orientations.png', VERBOSE : bool = False):
+    '''
+    Plot all the rotated molecules from top view
+
+    Args:
+    - configs_ase: list of ase Atoms objects containing all the rotated molecules
+    - labels: list of strings containing the info on each rotation
+    '''
+
+    if VERBOSE: print("Saving image to {0}".format(figname))
+
+    rows_fig = max(int(np.ceil(len(configs_ase)/5)), 1)
+    cols_fig = max(int(np.ceil(len(configs_ase)/rows_fig)), 1)
+    fig = plt.figure(figsize=(10 * cols_fig / 5, 5 * rows_fig / 3))
+    axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs_ase) + 1)]
+
+    for i, conf in enumerate(configs_ase):
+        plot_atoms(conf, axes[i])
+        axes[i].set_title('({0}, {1}, {2})'.format(* labels[i][0].split(',')))
+    fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
+    fig.savefig(figname, dpi=800, bbox_inches='tight')
+
+    if VERBOSE: print("Image saved.")

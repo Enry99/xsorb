@@ -5,6 +5,7 @@
    molecule_filename             = 'molecule.pwo'       #path of file containing the molecule atomic coordinates. The list of supported file types can be found on ASE website 
    jobscript                     = 'job_simple' sbatch  #path of a jobscript for running Quantum Espresso and submit command for the job scheduler
    E_slab_mol                    = 0 0                  #slab and isolated molecule energies (in Ry).
+   screening_conv_thr            = 5e-3 5e-2            #optional custom convergence tresholds for screening (2 values - energy and forces for QE, 1 value - energy OR force (EDIFFG) for VASP)
 /
 
 
@@ -34,6 +35,9 @@
    fixed_indices_mol             = 3               #fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
    fix_slab_xyz                  = 0 0 0           #coordinates to fix for the selected atoms in slab (as in QE, so 0 = fix)
    fix_mol_xyz                   = 0 0 1           #coordinates to fix for the selected atoms in molecule
+
+   mol_before_slab               = False           #put molecule before slab in the order of atoms
+   sort_atoms_by_z               = True
 /
 
 
