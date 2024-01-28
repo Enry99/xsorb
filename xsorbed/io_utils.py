@@ -12,8 +12,8 @@ Function definitions to read from pwo and launch scripts
 import os, shutil
 import numpy as np
 import pandas as pd
-from ase.io import read
-from dftcode_specific import edit_files_for_restart, UNITS_TO_EV_FACTOR, COMPLETION_STRINGS, OUT_FILE_PATHS, SBATCH_POSTFIX
+from ase.io import read, write
+from dftcode_specific import edit_files_for_restart, UNITS_TO_EV_FACTOR, COMPLETION_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
 from settings import Settings
 from slab import Slab, mol_bonded_to_slab
 from molecule import Molecule
@@ -23,9 +23,6 @@ import ase_custom
 
 TEST = False #do not actually launch the jobs, simply prints the command
 
-
-
-#TODO: add check bonded to csv
 
 #OK (code agnostic) 
 def is_completed(program : str, calc_type : str, completion_type : str, i_calc : int):
@@ -275,7 +272,7 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
     for index in indices_list:
 
         j_dir = f'{screening_outdir if calc_type is "SCREENING" else relax_outdir}/{index}'
-        os.makedirs(j_dir, exist_ok=True)
+        os.makedirs(j_dir, exist_ok=True) #for QE (for VASP they are already created by write_inputs)
         shutil.copyfile(jobscript, f'{j_dir}/{jobscript_stdname}')
         
         os.chdir(j_dir)   ####################
@@ -324,3 +321,42 @@ def restart_jobs(calc_type : str):
         else: os.system(launch_string)  #launchs the jobscript in j_dir from j_dir 
 
         os.chdir(main_dir)
+
+#OK (code agnostic)
+def saveas(calc_type : str, i_or_f : str, saveas_format : str):
+    '''
+    Save all the configurations in a different format, e.g. xyz or cif.
+
+    Args:
+    - calc_type: 'screening' or 'relax'
+    - i_or_f: initial or final coordinates of the relaxation (both for screening and full relax)
+    - saveas_format: file format, e.g. xyz
+    '''
+
+    settings = Settings()
+
+    if i_or_f is 'i':
+        FILE_PATHS = IN_FILE_PATHS
+    elif i_or_f == 'f':
+        FILE_PATHS = OUT_FILE_PATHS
+    else: 
+        raise RuntimeError(f"Wrong arguments: passed '{calc_type} {i_or_f}', expected 'screening i/f' or 'relax i/f'")
+    if calc_type != 'screening' and calc_type != 'relax':
+        raise RuntimeError(f"Wrong argument: passed '{calc_type}', expected 'screening' or 'relax'")
+
+    folder = f"{saveas_format}/{calc_type}"
+
+    print(f"Saving files to {folder}...")
+    os.makedirs(folder, exist_ok=True)
+    
+    indices = _get_configurations_numbers()
+    for i in indices:
+        if os.path.isfile(FILE_PATHS[calc_type.upper()][settings.program].format(i)):
+            atoms = read(FILE_PATHS[calc_type.upper()][settings.program].format(i))
+            if(saveas_format == 'xyz'):
+                ase_custom.write_xyz_custom(f'{folder}/{calc_type}_{i}.{saveas_format}', atoms)
+            else:
+                write(f'{folder}/{calc_type}_{i}.{saveas_format}', atoms)
+
+    print("All files saved.")
+    

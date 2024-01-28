@@ -10,11 +10,12 @@ from ase.io import read, write
 import numpy as np
 import os, sys
 import glob
+from operator import itemgetter
 #
 from ase.constraints import FixCartesian
 from slab import Slab
 from molecule import Molecule
-from io_utils import launch_jobs
+from io_utils import launch_jobs, get_calculations_results, _get_configurations_numbers
 from settings import Settings
 from dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS
 from filenames import *
@@ -112,16 +113,28 @@ def write_labels_csvfile(full_labels : list, labels_filename : str):
         for i, label in full_labels:
             csvfile.write(f'{i},{label}\n')
 
+#OK (code agnostic)
+def regenerate_missing_sitelabels():
+    '''
+    Re-generate the site_labels.csv file if it was accidentally deleted, using the info from settings.in
+    '''
+    
+    settings=Settings()
+    
+    _, full_labels = adsorption_configurations(settings, SAVEFIG=False, VERBOSE=True)
+
+    write_labels_csvfile(full_labels, labels_filename=labels_filename)
+
 #OK (code agnostic)  
 def write_inputs(settings : Settings, 
                  all_mol_on_slab_configs_ase : list, 
+                 calc_indices : list,
                  calc_type : str,
                  OVERRIDE_SETTINGS : bool = True, 
                  INTERACTIVE : bool = False):
     '''
     Writes the input files for all the adsorption configurations.
 
-    Returns a list of the indices associated to the files.
 
     Args:
     - settings: Settings object, containing the dft code parameters
@@ -139,7 +152,7 @@ def write_inputs(settings : Settings,
     ANSWER_ALL = False
     answer = 'yes'
     
-    for i, atoms in enumerate(all_mol_on_slab_configs_ase):
+    for i, atoms in zip(calc_indices, all_mol_on_slab_configs_ase):
         
         file_label = f'{calc_type.lower()}_{i}'
 
@@ -158,12 +171,147 @@ def write_inputs(settings : Settings,
                 else: print('Value not recognized. Try again.')
             if answer == 'no' or answer == 'n' or answer == 'nall': continue #skip if user does not want to overwrite
         
-        calc = Calculator(settings, file_label, atoms) 
+        
+        j_dir = f'{screening_outdir if calc_type is "SCREENING" else relax_outdir}/{i}'
+        calc = Calculator(settings, file_label, atoms, j_dir) 
         calc.write_input(atoms)
 
-    if INTERACTIVE: print('All input files written.')
+    if INTERACTIVE: print('All input files written.') 
 
-    return np.arange(len(all_mol_on_slab_configs_ase))
+#OK (code agnostic) 
+def obtain_fullrelax_indices(settings : Settings,
+                             n_configs: int = None, 
+                             threshold : float = None, 
+                             exclude : list= None, 
+                             BY_SITE = False):
+    '''
+    Returns a list with the indices of the configurations for the final relaxation,
+    chosen according to the given parameters
+
+    Args:
+    - settings: Settings object, containing the program type
+    - n_configs: nubmer of configurations to be relaxed, starting from the one with lowest energy
+    - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration. The configuration with E - Emin < threshold will be selected
+    - exclude: indices of the configurations to be excluded
+    - BY_SITE: do the configuration identification separately for each site. One or more configuration for each site will be produced
+    ''' 
+    
+        
+    print('Collecting energies from screening...')
+    screening_results = get_calculations_results(program=settings.program, calc_type='SCREENING')
+    print('Screening energies collected.')
+    
+    
+    #Ask to quit if some screening calculations are missing
+    if False in screening_results['relax_completed'].values() \
+        or len(screening_results['relax_completed'].values()) < len(_get_configurations_numbers()):
+        
+        print('Not all screening calculations have provided a final energy. \
+                Those for which no output exists will be excluded, while for those not completed the last coordinates will be used.')
+        while True:
+            answer = input('Continue anyway with those available? ("y" = yes, "n" = no (quit)): ')
+            if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                break
+            else: print('Value not recognized. Try again.')
+        if 'n' in answer:
+            sys.exit(1)
+
+
+    if exclude is None: exclude = []
+    else: 
+        exclude = set(exclude)
+        print(f'Configurations {exclude} will be excluded, as requested.')
+
+
+    #find the indices of the final relaxations
+    if(BY_SITE):
+        
+        site_labels = []
+        with open(labels_filename, 'r') as f:
+            file = f.readlines()[1:]
+            for line in file:
+                site_labels.append(int(line.split(',')[4].split(' ')[0]))
+        site_labels = np.array(site_labels)       
+
+        #list of lists, outer: site label, inner: calc indices at that site
+        site_grouped_index_list = [np.where(site_labels == site)[0] for site in set(site_labels)] 
+
+        
+        calculations_indices = []
+        for indiceslist_at_site in site_grouped_index_list:                
+            #list of {index: energy} for the indices at the site
+            indices_and_energies_at_site = [(index, energy) for index, energy in screening_results['energies'] \
+                                            if index in indiceslist_at_site and index not in exclude and energy is not None] 
+
+            if n_configs is not None: #sort indices from lower to higher energy, and choose the first n_configs
+                sorted_items = sorted(indices_and_energies_at_site,key=itemgetter(1))               
+                calculations_indices += [x[0] for x in sorted_items[:min(n_configs, len(sorted_items))] ]
+            elif threshold is not None:
+                e_min = min([x[1] for x in indices_and_energies_at_site])
+                calculations_indices += [x[0] for x in indices_and_energies_at_site if x[1] - e_min <= threshold]
+    else:
+        indices_and_energies = [(index, energy) for index, energy in screening_results['energies'] \
+                                    if index not in exclude and energy is not None]
+        if n_configs is not None: 
+            sorted_items = sorted(indices_and_energies,key=itemgetter(1))               
+            calculations_indices = [x[0] for x in sorted_items[:min(n_configs, len(sorted_items))] ]
+        elif threshold is not None:
+            e_min = min([x[1] for x in indices_and_energies])
+            calculations_indices = [x[0] for x in indices_and_energies_at_site if x[1] - e_min <= threshold]
+
+    return calculations_indices
+
+#OK (code agnostic) 
+def obtain_fullrelax_structures(settings : Settings, calculations_indices : list, REGENERATE : bool = False):
+    '''
+    Returns a list with the adsorption configurations for the full relax, either reading the final coordinates
+    of the screening, or re-generating them from scratch according to settings.in
+
+    Args:
+    - settings: Settings object, containing the slab and molecule parameters
+    - calculations_indices: indices of the configurations
+    - REGENERATE: re-generate the configurations from scratch, starting from isolated slab and molecule. Can be used to change the initial distance
+    and repeat the relax from the beginning
+    ''' 
+    if(REGENERATE):
+        all_mol_on_slab_configs_ase, _ = adsorption_configurations(settings=settings)
+    else:
+        #Read slab and molecule for constraints
+        #Slab import from file
+        slab = Slab(slab_filename=settings.slab_filename, 
+                    layers_threshold=settings.layers_height, 
+                    surface_sites_height=settings.surface_height, 
+                    fixed_layers_slab=settings.fixed_layers_slab, 
+                    fixed_indices_slab=settings.fixed_indices_slab, 
+                    fix_slab_xyz=settings.fix_slab_xyz,
+                    sort_atoms_by_z=settings.sort_atoms_by_z,
+                    translate_slab_from_below_cell_bottom=settings.translate_slab_from_below_cell_bottom)
+        #Molecule import from file
+        mol = Molecule(molecule_filename=settings.molecule_filename,
+                    atom_index=settings.selected_atom_index,
+                    molecule_axis_atoms=settings.molecule_axis_atoms, 
+                    axis_vector=settings.axis_vector, 
+                    atoms_subset=settings.mol_subset_atoms, 
+                    fixed_indices_mol=settings.fixed_indices_mol, 
+                    fix_mol_xyz=settings.fix_mol_xyz)        
+        
+        all_mol_on_slab_configs_ase = []
+        for index in calculations_indices:
+            atoms = read(OUT_FILE_PATHS['SCREENING'][settings.program])
+            #set constraints from mol and slab if when we are reading the whole pre-relaxed structure
+            
+            if settings.mol_before_slab:
+                c = [constraint for constraint in mol.mol_ase.constraints] + \
+                    [FixCartesian(constraint.a + mol.natoms, ~constraint.mask) for constraint in slab.slab_ase.constraints]
+                #for some obscure reason FixCartesian wants the mask in the form 1=Fix, 0=Free, but then it negates in internally, so we first need to negate the mask to construct a new object
+            else:
+                c = [constraint for constraint in slab.slab_ase.constraints] + \
+                    [FixCartesian(constraint.a + slab.natoms, ~constraint.mask) for constraint in mol.mol_ase.constraints]              
+            
+            atoms.set_constraint(c)
+            all_mol_on_slab_configs_ase.append(atoms)
+
+    return all_mol_on_slab_configs_ase
 
 #OK (code agnostic)  
 def generate(SAVEFIG=False):
@@ -201,10 +349,13 @@ def launch_screening(SAVEFIG : bool = False):
 
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
-    indices_list = write_inputs(settings, 
-                                 all_mol_on_slab_configs_ase,
-                                 calc_type='SCREENING', 
-                                 VERBOSE=True)
+    indices_list = np.arange(len(all_mol_on_slab_configs_ase))
+
+    write_inputs(settings, 
+                all_mol_on_slab_configs_ase,
+                indices_list,
+                calc_type='SCREENING', 
+                VERBOSE=True)
 
     launch_jobs(program=settings.program,
                 calc_type='SCREENING',
@@ -212,232 +363,45 @@ def launch_screening(SAVEFIG : bool = False):
                 sbatch_command=settings.sbatch_command,
                 indices_list=indices_list)    
 
-#TODO: check later that if not relax_completed. Before we put None in the energy
-def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, indices : list = None, REGENERATE=False, BY_SITE = False):
-    
-    #check: if all calculations finished, simply skip
-    #energies = get_energies(pwo_prefix='relax', VERBOSE=False)
-    #if energies and None not in energies:
-    #    print('All screening calculations completed. Nothing will be done.')
-    #    return    
-    
-    
-    if n_configs is None and threshold is None: n_configs = N_relax_default if not BY_SITE else 1
-    
-    #Check for duplicates in exclude or in indices
-    if indices is not None:
-        if (len(set(indices)) < len(indices)):
-            print('The indices list contain duplicate elements. Quitting.')
-            sys.exit(1)
-    if exclude is not None:
-        if (len(set(exclude)) < len(exclude)):
-            print('The exclude list contain duplicate elements. Quitting.')
-            sys.exit(1)        
+#OK (code agnostic)  
+def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, REGENERATE=False, BY_SITE = False):
+    '''
+    Reads/generates adsorption configurations, writes inputs and launches calculations for the final relax.
 
+    Args:
+    - n_configs: nubmer of configurations to be relaxed, starting from the one with lowest energy
+    - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration. The configuration with E - Emin < threshold will be selected
+    - exclude: indices of the configurations to be excluded
+    - required_indices: user-specified indices, instead of identifying them according to energys
+    - REGENERATE: re-generate the configurations from scratch, starting from isolated slab and molecule. Can be used to change the initial distance
+    and repeat the relax from the beginning
+    - BY_SITE: do the configuration identification separately for each site. One or more configuration for each site will be produced
+    '''
+
+    #Check input parameters and set n_configs accordingly
+    if n_configs is None and threshold is None: n_configs = N_relax_default if not BY_SITE else 1
 
     settings=Settings()
 
-    files_list = [ file.replace('pwi', 'pwo') if os.path.isfile(file.replace('pwi', 'pwo')) else None for file in natsorted(glob.glob( "screening_*.pwi" ))]
-    #this will contain None if the pwi has not the corresponding pwo
-
-    if indices is not None: calcs = indices
-    else:
-        print('Collecting energies from screening...')
-
-        
-        energies = [ get_energy_from_pwo(file, REQUIRE_RELAX_COMPLETED=True) if file is not None else None for file in files_list]
-        #this will contain None if there are some pwi for which the corresponding pwo does not exist or has not a final relaxed energy
-
-        
-        if None in energies:
-            print('Not all screening calculations have provided a final energy. Those for which no pwo exists will be excluded, while for those not completed the last coordinates will be used.')
-            while True:
-                answer = input('Continue anyway with the ones available? ("y" = yes, "n" = no (quit)): ')
-                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
-                    break
-                else: print('Value not recognized. Try again.')
-            if 'n' in answer:
-                sys.exit(1)
-        print('screening energies collected.')
-        #if we decided to continue anyway, set the None cases to an extremely high value so that they do not get picked as lowest energy
-        #this is just a trick, put in a more elegant way in the future
-        energies = [ en if en is not None else 1e50 for en in energies]
-
-        if exclude is None: exclude = []
-        else: print('Configurations {0} will be excluded, as requested'.format(exclude))
-
-
-        calcs = []
-
-        if(BY_SITE):
-            site_labels = []
-            #TODO: if not present, generate site_labels.csv
-            with open('site_labels.csv', 'r') as f:
-                file = f.readlines()
-
-                for line in file:
-                    if 'site' in line: continue
-                    site_labels.append(int(line.split(',')[4].split(' ')[0]))        
-            sites = set(site_labels)
-            site_labels = np.array(site_labels) 
-            samesite_indices = [np.where(site_labels == site) for site in sites] #config labels associated to same site
-
-            for indices_of_site in samesite_indices:
-                energies_site = [energies[j] for j in indices_of_site[0] ]
-                config_labels_site = [j for j in indices_of_site[0] ]
-               
-                sorted_indices = np.argsort(energies_site, kind='stable').tolist()
-                if n_configs is not None:                  
-                    if(n_configs > len(sorted_indices)):
-                        print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n (the default is 5)')
-                        sys.exit(1)
-                    for n, i in enumerate(sorted_indices):
-                        if config_labels_site[i] in exclude: continue
-                        if n < n_configs:
-                            calcs.append(config_labels_site[i])
-                elif threshold is not None:
-                    e_min = min(energies_site)
-                    calcs += [config_labels_site[i] for i in sorted_indices if energies_site[i] - e_min <= threshold and config_labels_site[i] not in exclude]
-
-
-        else:
-            sorted_indices = np.argsort(energies, kind='stable').tolist()
-            if n_configs is not None:           
-                if(n_configs > len(sorted_indices)):
-                    print('Error! The number of screening configurations is lower than the desired number of configurations to fully relax. Try with a lower value of --n (the default is 5)')
-                    sys.exit(1)
-                for i in sorted_indices:
-                    if i in exclude: continue
-                    if len(calcs)<n_configs:
-                        calcs.append(i)
-            elif threshold is not None:
-                e_min = min(energies)
-                calcs += [i for i in sorted_indices if energies[i] - e_min <= threshold and i not in exclude]
-
-
-    settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
-    settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
-    settings.espresso_settings_dict['IONS'].update({'ion_dynamics': settings.ion_dynamics})
-
-    #Slab import from file
-    slab = Slab(settings.slab_filename, layers_threshold=settings.layers_height, surface_sites_height=settings.surface_height, 
-                fixed_layers_slab=settings.fixed_layers_slab, 
-                fixed_indices_slab=settings.fixed_indices_slab, 
-                fix_slab_xyz=settings.fix_slab_xyz,
-                sort_atoms_by_z=True)
-    #Molecule import from file
-    mol = Molecule(settings.molecule_filename, settings.molecule_axis_atoms, settings.axis_vector, settings.mol_subset_atoms, 
-                   settings.fixed_indices_mol, 
-                   settings.fix_mol_xyz)
-
-    if(REGENERATE):
-        #Re-generation of structures, placing the molecule very close to the surface to avoid
-        #trapping in local physisorption minima
-        adsites, adsites_labels = slab.find_adsorption_sites(
-            *settings.sites_find_args.values(), 
-            save_image=False,
-            selected_sites=settings.selected_sites)
-
-        all_mol_configs_ase, configs_labels = mol.generate_molecule_rotations(
-            atom_index=settings.selected_atom_index,  
-            y_rot_angles=settings.y_rot_angles,
-            x_rot_angles=settings.x_rot_angles, 
-            z_rot_angles=settings.z_rot_angles, 
-            vert_angles_list=settings.vertical_angles,
-            distance_from_surf=settings.relax_atom_distance, 
-            min_distance=settings.relax_min_distance, 
-            save_image=False
-            )
-
-        #Adsorption of molecule on all adsorption sites for all molecule orientations
-        print('Generating adsorption structures...') 
-        all_mol_on_slab_configs_ase = [slab.generate_adsorption_structures(molecule=mol_config, adsites=adsites) for mol_config in all_mol_configs_ase]
-        all_mol_on_slab_configs_ase = sum(all_mol_on_slab_configs_ase, []) #flatten the 2D array
-        if(False): all_mol_on_slab_configs_ase = adsorb_both_surfaces(all_mol_on_slab_configs_ase) #Replicate molecule on the other side of the slab. NOTE: Currently not working!
-        full_labels = [mol_config[0]+site_label+mol_config[1] for mol_config in configs_labels for site_label in adsites_labels]
-        print('All slab+adsorbate cells generated.')
-    else:
-        all_mol_on_slab_configs_ase = [None] *  len(files_list)
-        for i, file in enumerate(files_list):
-            if file is None: continue
-            try:
-                r = read(filename=file, results_required=False)
-            except AssertionError as e:
-                print("Error while reading {0} due to ASE problem in reading calculations with scf NOT terminated. Skipping.".format(file))
-                continue
-            #set constraints from mol and slab if when we are reading the whole pre-relaxed structure
-            c = [constraint for constraint in slab.slab_ase.constraints] + \
-                [FixCartesian(constraint.a + slab.natoms, ~constraint.mask) for constraint in mol.mol_ase.constraints]
-            #for some obscure reason FixCartesian wants the mask in the form 1=Fix, 0=Free, but then it negates in internally, so we first need to negate the mask to construct a new object
-            r.set_constraint(c)
-            all_mol_on_slab_configs_ase[i] = r
-
- 
-
-    pwi_names = []
-
-    ANSWER_ALL = False
-    answer = 'yes'
-    
-    for i in calcs: #calcs are the integer indexes of the selected calculations to run
-
-        if all_mol_on_slab_configs_ase[i] == None: continue
-
-        file_prefix = 'relax_'+str(i)
-        filename = f'{file_prefix}.pwi'
-
-        if(os.path.isfile(filename.replace('pwi', 'pwo'))): 
-            print(filename.replace('pwi', 'pwo')+' already present, possibly from a running calculation. '+('It will be {0}, as requested.'.format('skipped' if 'n' in answer else 're-calculated') \
-                  if ANSWER_ALL else 'You can decide to re-calculate it or skip it.'))
-            while True and not ANSWER_ALL:
-                answer = input('Re-calculate? ("y" = yes to this one, "yall" = yes to all, "n" = no to this one, "nall" = no to all): ')
-                if answer == 'yes' or answer == 'y' or answer == 'yall' or answer == 'no' or answer == 'n' or answer == 'nall': 
-                    if answer == 'yall' or answer == 'nall': ANSWER_ALL = True
-                    break
-                else: print('Value not recognized. Try again.')
-            if answer == 'no' or answer == 'n' or answer == 'nall': continue #skip if user does not want to overwrite
-
-
-        pwi_names.append(filename)
-        calc = Espresso(pseudopotentials=settings.pseudopotentials, 
-                    input_data=settings.espresso_settings_dict,
-                    label=file_prefix,
-                    kpts= settings.kpoints[1] if 'gamma' not in settings.kpoints[0] else None, koffset=settings.kpoints[2] if 'gamma' not in settings.kpoints[0] else None)    
-        calc.write_input(all_mol_on_slab_configs_ase[i])
-
-    #print(pwi_names)
-    launch_jobs(jobscript=settings.jobscript, pwi_list=pwi_names, outdirs=relax_outdir, jobname_title='rel')
-
-
-def saveas(which : str, i_or_f : str, saveas_format : str):
-
-    if i_or_f == 'i':
-        pw = 'pwi'
-    elif i_or_f == 'f':
-        pw = 'pwo'
+    if required_indices: calculations_indices = required_indices
     else: 
-        raise RuntimeError("Wrong arguments: passed '{0} {1}', expected 'screening i/f' or 'relax i/f'".format(which, i_or_f))
-    if which != 'screening' and which != 'relax':
-        raise RuntimeError("Wrong argument: passed '{0}', expected 'screening' or 'relax'".format(which))
+        calculations_indices = obtain_fullrelax_indices(settings=settings, 
+                                                        n_configs=n_configs, 
+                                                        threshold=threshold, 
+                                                        exclude=exclude, 
+                                                        BY_SITE=BY_SITE)
 
-    print('Reading files...')
-    pw_list=glob.glob(which+'_*.'+pw)
-    configs = [(read(file) if pw == 'pwi' else read(file, results_required=False)) for file in pw_list]
-    print('All files read.')
+    all_mol_on_slab_configs_ase = obtain_fullrelax_structures(settings, calculations_indices, REGENERATE)
 
-    print("Saving {0} files to {1} format...".format(which, saveas_format))
-    folder = saveas_format+'/'+which+'/'
-    if not os.path.exists(saveas_format):
-        os.mkdir(saveas_format)
-    if not os.path.exists(folder):
-        os.mkdir(folder)    
 
-    for i, config in enumerate(configs):
-            if(saveas_format == 'xyz'):
-                ase_custom.write_xyz_custom(folder+pw_list[i].replace(pw, saveas_format), config)
-            else:
-                write(folder+pw_list[i].replace(pw, saveas_format), config)
+    write_inputs(settings, 
+                all_mol_on_slab_configs_ase,
+                calculations_indices,
+                calc_type='RELAX', 
+                VERBOSE=True)
 
-    print("Files saved to {0}".format(saveas_format+'/'+which) )
-    
-
+    launch_jobs(program=settings.program,
+                calc_type='RELAX',
+                jobscript=settings.jobscript,
+                sbatch_command=settings.sbatch_command,
+                indices_list=calculations_indices)   

@@ -38,6 +38,7 @@
 
    mol_before_slab               = False           #put molecule before slab in the order of atoms
    sort_atoms_by_z               = True
+   translate_slab                = True            #translate the slab upwards so that it is at least 1A above the cell bottom
 /
 
 
@@ -94,3 +95,23 @@ K_POINTS automatic
 
 
 @/ESPRESSO
+
+
+@VASP
+
+&GENERAL
+   vasp_pp_path       = 'path_to_pseudo'
+   vasp_xc_functional = 'PBE'
+   vasp_pseudo_setups = {"base": "recommended", "6": "C_h", "C": "_s"}
+/
+
+&INCAR
+
+/
+
+
+&KPOINTS
+
+/
+
+@/VASP

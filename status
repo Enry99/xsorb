@@ -1,6 +1,6 @@
 ase_custom:       OK
-calculations:   
-dftcode_specific: OK
+calculations:     OK  
+dftcode_specific:
 filenames:
 fragments:
 input:

@@ -12,44 +12,34 @@ from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
 import glob, sys, os, shutil
-from natsort import natsorted
 from slab import Slab
 from settings import Settings
 from filenames import *
-z
 
 
+#OK (code agnostic)
+def plot_adsorption_sites(ALL : bool = False):
+    '''
+    Plot an image of the surface with the adsorption sites, with parameters
+    according to settings.in
 
-def read_energy(filename: str, Eslab = 0, Emol = 0):  #sort of duplicate, TODO: unify with the one in io_utils
-    with open(filename, 'r') as f:
-        pwo = f.readlines()
-
-    toten = 0
-    scf_terminated = False
-    for line in pwo: #make sure to get the last one (useful in relaxations)
-        if '!' in line: 
-            toten = line.split()[4]
-        if 'End of self-consistent calculation' in line:
-            scf_terminated = True
-    if(scf_terminated and toten != 0): 
-        return (float(toten) - Eslab - Emol)*rydbergtoev
-    else: return None
-
-
-def plot_adsorption_sites(ALL = False):
+    Args:
+    - ALL: if True, plot all sites ignoring symm_reduce  
+    '''
 
     settings = Settings(read_energies=False)
-    slab = Slab(settings.slab_filename, surface_sites_height=settings.surface_height)
-  
-    slab.find_adsorption_sites(* {
-        "distance":0, 
-        'symm_reduce': 0 if ALL else settings.symm_reduce, 
-        'near_reduce':settings.near_reduce, 
-        'no_obtuse_hollow':True}.values(),
-        selected_sites= [] if ALL else settings.selected_sites,
-        save_image=True,
-        figname = 'adsorption_sites_all.png' if ALL else 'adsorption_sites.png'
-        )
+
+    slab = Slab(slab_filename=settings.slab_filename, 
+                surface_sites_height=settings.surface_height, 
+                sort_atoms_by_z=settings.sort_atoms_by_z,
+                translate_slab_from_below_cell_bottom=settings.translate_slab_from_below_cell_bottom)
+
+    slab.find_adsorption_sites(symm_reduce = 0 if ALL else settings.symm_reduce, 
+                               near_reduce = settings.near_reduce, 
+                               selected_sites = None if ALL else settings.selected_sites,
+                               save_image = True,
+                               figname = 'adsorption_sites_all.png' if ALL else 'adsorption_sites.png',
+                               VERBOSE = True)
 
 
 def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, index : str = None, rotations : str = None):

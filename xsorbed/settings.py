@@ -21,6 +21,12 @@ import input
 #settings.sort_atoms_by_z
 #settings.translate_slab_from_below_cell_bottom
 #settings.mol_before_slab
+#settings.incar_string
+#settings.kpoints_string
+#settings.pymatgen_set
+#settings.vasp_pp_path
+#settings.vasp_pseudo_setups {'base': 'materialsproject', 6: 'C_h', 'C': '_s'}. Default: 'recommended'
+#settings.vasp_xc_functional . Default = 'PBE'
 class Settings:
 
     def __init__(self, settings_filename : str = "settings.in", read_energies = True, VERBOSE=True) -> None:
