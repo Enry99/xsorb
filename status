@@ -1,13 +1,13 @@
 ase_custom:       OK
 calculations:     OK  
 dftcode_specific:
-filenames:
-fragments:
-input:
+filenames:        --      
+fragments:        --
+input:            OK
 io_utils:         OK
 molecule:         OK
 postprocess:
-settings:
+settings:         OK
 slab:             OK
-xfrag:
+xfrag:            --
 xsorb:

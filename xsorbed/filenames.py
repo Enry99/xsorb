@@ -1,4 +1,4 @@
-VERSION                  = '1.0'  #program version
+VERSION                  = '2.0'  #program version
 
 rydbergtoev = 13.605703976
 

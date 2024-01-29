@@ -46,7 +46,7 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
                 fixed_indices_slab=settings.fixed_indices_slab, 
                 fix_slab_xyz=settings.fix_slab_xyz,
                 sort_atoms_by_z=settings.sort_atoms_by_z,
-                translate_slab_from_below_cell_bottom=settings.translate_slab_from_below_cell_bottom)
+                translate_slab_from_below_cell_bottom=settings.translate_slab)
     if VERBOSE: print('Slab loaded.')
 
 
@@ -285,7 +285,7 @@ def obtain_fullrelax_structures(settings : Settings, calculations_indices : list
                     fixed_indices_slab=settings.fixed_indices_slab, 
                     fix_slab_xyz=settings.fix_slab_xyz,
                     sort_atoms_by_z=settings.sort_atoms_by_z,
-                    translate_slab_from_below_cell_bottom=settings.translate_slab_from_below_cell_bottom)
+                    translate_slab_from_below_cell_bottom=settings.translate_slab)
         #Molecule import from file
         mol = Molecule(molecule_filename=settings.molecule_filename,
                     atom_index=settings.selected_atom_index,

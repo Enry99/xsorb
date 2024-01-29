@@ -23,6 +23,7 @@ from filenames import *
 ########################################################################################
 
 #TODO: rimuovere il saveas nel launching , tanto c'è una funzione dedicata per farlo in qualsiasi momento
+#TODO: eslabmol should be given in the default type for each program: ESPRESSO: Ry, VASP: eV
 
 def cli_parse():
 
@@ -37,7 +38,7 @@ def cli_parse():
     #main flags
     main_calc = calc_group.add_mutually_exclusive_group()
     main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
-    main_calc.add_argument('-s', nargs='*', type=float, help='launch screening. Optional arguments: e_tot_conv_thr forc_conv_thr (default 5e-3 5e-2)')
+    main_calc.add_argument('-s', action='store_true', help='launch screening.')
     main_calc.add_argument('-r', action='store_true', help='launch final relaxations')
     main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) screening or relax calculations')
     #optional flags
@@ -49,15 +50,13 @@ def cli_parse():
     calc_group.add_argument('--exclude', nargs='+', type=int, help='exclude selected configurations from the final relaxation')
     calc_group.add_argument('--regenerate', action='store_true', default=False, help='re-generate structures for final relaxations instead of reading the positions from screening')
     calc_group.add_argument('--save-figs', action='store_true', help='plot also the figures (sites + molecule orientations) when using -g or -r')
-    calc_group.add_argument('--saveas', type=str, help='generate also files in the desired format besides the pwi(s), e.g. cif, xyz, ...')
 
 
 
     energy_group = parser.add_argument_group(title='Energies collection options')  
     #main flags
     main_energy = energy_group.add_mutually_exclusive_group()
-    main_energy.add_argument('-es', action='store_true', help='save screening energies to file')
-    main_energy.add_argument('-er', action='store_true', help='save final relax energies to file')
+    main_energy.add_argument('-e', action='store_true', help='save energies to file')
     energy_group.add_argument('--txt', action='store_true', help='write well formatted txt file instead of csv for -es or -er  (sorted by screen. en.)')
     main_energy.add_argument('-plot-energies-scr', action='store_true', help='save image with energies evolution during screening')
     main_energy.add_argument('-plot-energies', action='store_true', help='save image with energies evolution during final relax')
@@ -87,7 +86,7 @@ def cli_parse():
     #Check presence of incompatible commands belonging to different groups
     args_dict = vars(args)
     calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
-    energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er' or key=='plot_energies_scr' or key=='plot_energies') ]
+    energy_command = [ key for key in args_dict if args_dict[key] and (key=='e' or key=='plot_energies_scr' or key=='plot_energies') ]
     visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='screening-images'  
         or key=='relax-images' or key=='screening-animations' or key=='relax-animations' or key=='view' or key=='savefiles') ]
 
@@ -102,8 +101,6 @@ def cli_parse():
     #Check for all incompatible OPTIONAL arguments
     if args.save_figs and not args.g and not args.s:
         parser.error("--save-figs option can only be used with -g or -s")
-    if args.saveas and not args.g and not args.s and not args.r:
-        parser.error("--saveas option can only be used with -g, -s or -r")
     if args.n and not args.r:
         parser.error("--n option can only be used with -r")
     if args.t and not args.r:
@@ -153,43 +150,29 @@ def main():
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
     from settings import Settings
-    from io_utils import write_energies, restart_jobs
-    from calculations import generate, final_relax, saveas
+    from io_utils import write_results_to_file, restart_jobs, saveas
+    from calculations import generate, launch_screening, final_relax, saveas
     from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
     ############################################################################################
 
     #calc
     if(args.g):
-        generate(RUN = False, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+        generate(SAVEFIG=args.save_figs)
 
-    elif(args.s is not None):
-        if not args.s: args.s = hybrid_screening_thresholds
-        generate(RUN = True, etot_forc_conv = args.s, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+    elif(args.s):
+        launch_screening(SAVEFIG=args.save_figs)
 
     elif(args.r):
-        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, indices=args.i, REGENERATE=args.regenerate, BY_SITE=args.by_site)
+        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, required_indices=args.i, REGENERATE=args.regenerate, BY_SITE=args.by_site)
 
     elif(args.restart):
-        restart_jobs(calc_type=='SCREENING' if args.restart == 's' else 'RELAX')
+        restart_jobs(calc_type = 'SCREENING' if args.restart == 's' else 'RELAX')
 
 
 
     #energies
     elif(args.es):
-        try:
-            E_slab_mol = Settings().E_slab_mol
-        except: #option in case settings.in or some other input file is no more present.
-            E_slab_mol = []
-        write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening', TXT=args.txt)
-
-    elif(args.er):
-        try:
-            E_slab_mol = Settings().E_slab_mol
-        except: #option in case settings.in or some other input file is no more present.
-            E_slab_mol = []
-        if not os.path.isfile(screening_energies_filename):
-            write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
-        write_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'relax', TXT=args.txt)
+        write_results_to_file(TXT=args.txt)
     
     elif(args.plot_energies_scr):
         plot_energy_evolution(which='screening')

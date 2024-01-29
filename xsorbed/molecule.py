@@ -46,7 +46,7 @@ class Molecule:
                  fix_mol_xyz : list = None):
 
 
-        self.mol_ase = read(molecule_filename, results_required=False)
+        self.mol_ase = ase_custom.Atoms_custom(read(molecule_filename, results_required=False))
 
         #align axis to x axis
         if molecule_axis_atoms and axis_vector: raise RuntimeError("molecule axis cannot be given simultaneously as vector and by two atoms.")

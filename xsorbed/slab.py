@@ -55,7 +55,7 @@ class Slab:
                  sort_atoms_by_z : bool = False,
                  translate_slab_from_below_cell_bottom : bool = True):
         
-        self.slab_ase = read(filename=slab_filename, results_required=False)
+        self.slab_ase = ase_custom.Atoms_custom(read(filename=slab_filename, results_required=False))
         self.natoms   = len(self.slab_ase)
 
 

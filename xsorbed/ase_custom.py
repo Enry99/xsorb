@@ -1177,11 +1177,9 @@ def parse_pwo_start_custom(lines, index=0):
 
 
 #################################################
-from ase.io.extxyz import XYZError, key_val_str_to_dict, parse_properties, SinglePointCalculator, paropen, Calculator, all_properties, output_column_format
-# partition ase.calculators.calculator.all_properties into two lists:
-#  'per-atom' and 'per-config'
-per_atom_properties = ['forces', 'stresses', 'charges', 'magmoms', 'energies']
-per_config_properties = ['energy', 'stress', 'dipole', 'magmom', 'free_energy']
+from ase.io.extxyz import XYZError, Calculator, SinglePointCalculator, \
+        key_val_str_to_dict, parse_properties, paropen, output_column_format,  \
+        all_properties, per_atom_properties, per_config_properties
 
 def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
                     nvec=0):

@@ -9,15 +9,9 @@ and return them as two dictionaries (script settings and Espresso settings)
 
 """
 
-#NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, as they are read from the input structures
-#
-#NOTE 2(possible TODO): This code does not yet support the following Espresso blocks:
-#OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS, HUBBARD
+from dftcode_specific import get_dftprogram_settings, SUPPORTED_PROGRAMS
 
-
-import sys
-
-
+#OK (code agnostic)
 def _is_number(s : str):
     try:
         float(s)
@@ -25,10 +19,17 @@ def _is_number(s : str):
     except ValueError:
         return False
 
+#OK (code agnostic)
+def _read_card(lines : list, CONVERT : bool = False):
+    '''
+    Read a card with Espresso-style formatting, returning a dictionary with the entries
 
-def _read_card(lines : list, CONVERT = False):
+    Args:
+    - lines: list of strings containing the card content
+    - CONVERT: if True, try to convert string values to numbers
+    '''
 
-    block_dict =  {}
+    card_dict =  {}
 
     for line in lines:
 
@@ -37,6 +38,7 @@ def _read_card(lines : list, CONVERT = False):
         key = key.strip()
         val = val.strip()
         val = val.strip("'")
+        val = val.strip('"')
 
         key = key.lower()
         #val = val.lower()
@@ -46,80 +48,75 @@ def _read_card(lines : list, CONVERT = False):
                 if val.isnumeric(): val = int(val)
                 else: val = float(val)
             else:
-                if val.lower() == '.true.': val=True
-                elif val.lower() == '.false.' : val=False   
+                if 'true' in val.lower(): val=True
+                elif 'false' in val.lower(): val=False   
 
-        block_dict[key] = val
+        card_dict[key] = val
 
-    return  block_dict
+    return  card_dict
 
-
+#OK (code agnostic)
 def read_input_file(filename: str):
+    '''
+    Parse the settings.in file, returning a dictionary with the STRUCTURE settings, 
+    and a dictionary with the settings for the DFT code
+
+    Args:
+    - filename: path of the settings.in file
+    '''
 
     script_settings_dict   = {}    
-    espresso_settings_dict = {}
-
+    dftprogram_settings_dict = {}
 
     with open(filename) as file:
         
+        dftprogram_lines = []
         lines = []
-        kpoints = []  #syntax: ['gamma'/'automatic', [kx,ky,kz], [koffx,koffy,koffz]]
-        atomic_species = []  #syntax: [[Fe, 1.000, Fe.pbe-n-rrkjus_psl.1.0.0.UPF], ...]
-        last_dump = [] #other lines not in the two main blocks
-        text = []
         in_card = False
-        ATOMIC_SPECIES = False
-        KPOINTS = False
-        espresso_block = False
         settings_block = False
+        dftprogram_block = False
 
         for line in file:
 
-            text.append(line)
-            
+            #skip empty / comment lines
             if line.isspace() or line.strip()[0] == '!' or line.strip()[0] == '#':
-                if(line.isspace() and ATOMIC_SPECIES): ATOMIC_SPECIES = False
-                continue #skip empty / comment lines
-            if(ATOMIC_SPECIES):
-                if ('ATOMIC_POSITIONS' in line.upper() or 
-                'K_POINTS' in line.upper() or 
-                'ADDITIONAL_K_POINTS' in line.upper() or 
-                'CELL_PARAMETERS' in line.upper() or 
-                'CONSTRAINTS' in line.upper() or 
-                'OCCUPATIONS' in line.upper() or 
-                'ATOMIC_VELOCITIES' in line.upper() or 
-                'ATOMIC_FORCES' in line.upper() or 
-                'SOLVENTS' in line.upper() or 
-                'HUBBARD' in line.upper()):
-                    ATOMIC_SPECIES = False
+                continue 
 
+            #deal with comments in the lines
+            if('#' in line): line = line.split('#')[0] 
+            if('!' in line): line = line.split('!')[0]            
             
-            if('#' in line):
-                line = line.split('#')[0] #deal with comments in the lines
-            if('!' in line):
-                line = line.split('!')[0]
+                
+            #check which block we are in and sets to True/False the corresponding variable
+            for prog in SUPPORTED_PROGRAMS: 
+                if f"@{prog}" in line.upper():
+                    PROGRAM = prog
+                    dftprogram_block = True
+                    continue
             
-            if "@ESPRESSO" in line.upper():
-                espresso_block = True
+            if dftprogram_block and f"@/{PROGRAM}" in line.upper():
+                dftprogram_block = False
                 continue
+
             if "@SETTINGS" in line.upper():
                 settings_block = True
                 continue
 
-            if "@/ESPRESSO" in line.upper():
-                espresso_block = False
-                continue
             if "@/SETTINGS" in line.upper():
                 settings_block = False
                 continue
 
 
+            #read the block content
             if(settings_block):
+                
+                #begin card
                 if line.strip()[0] == '&':
                     block_name = line.split('&')[1].strip()
                     in_card = True
                     continue
 
+                #end card, add collected content to dict
                 if line.strip()=='/':
                     script_settings_dict.update({block_name : _read_card(lines)})
                     in_card = False
@@ -128,60 +125,16 @@ def read_input_file(filename: str):
 
                 if in_card: lines.append(line)  
 
-            elif(espresso_block):
-
-                if line.strip()[0] == '&':
-                    block_name = line.split('&')[1].strip()
-                    in_card = True
-                    continue
-
-                if line.strip()=='/':
-                    espresso_settings_dict.update({block_name : _read_card(lines, CONVERT=True)})
-                    in_card = False
-                    lines.clear()
-                    continue
-
-                if in_card: 
-                    lines.append(line)
-                    continue
-
-
-
-                if('ATOMIC_SPECIES' in line.upper()):
-                    ATOMIC_SPECIES = True
-                    continue
-                if(ATOMIC_SPECIES):
-                    atomic_species.append(line.split())
-                    continue
-
-                if('K_POINTS' in line.upper()):
-                    KPOINTS = True
-                    gamma_or_auto = line.split()[1].strip().lower()
-                    kpoints.append(gamma_or_auto)
-                    if 'gamma' in gamma_or_auto:
-                        KPOINTS = False
-                    continue
-                if(KPOINTS):
-                    kpoints.append(line.split()[:3])
-                    kpoints.append(line.split()[3:])
-                    KPOINTS = False
-                    continue
-
-                #collects everything that did not fall in any of the previous category. This is appended as-is at the end of the pwi.
-                last_dump.append(line)         
+            elif(dftprogram_block):
+                dftprogram_lines.append(line)
+                continue
+ 
     
+    dftprogram_settings_dict = get_dftprogram_settings(PROGRAM, dftprogram_lines)
 
     if(not script_settings_dict):
-        print('Script settings not read correctly. Quitting.')
-        sys.exit(1)
-    if(not espresso_settings_dict):
-        print('Espresso settings not read correctly. Quitting.')
-        sys.exit(1)
-    if(not kpoints):
-        print('Kpoints not read correctly. Quitting.')
-        sys.exit(1)
-    if(not atomic_species):
-        print('Atomic_species not read correctly. Quitting.')
-        sys.exit(1)
+        raise RuntimeError('Script settings not read correctly.')
+    if(not dftprogram_settings_dict):
+        raise RuntimeError(f'{PROGRAM} settings not read correctly.')
 
-    return script_settings_dict, espresso_settings_dict, atomic_species, kpoints, last_dump, text
+    return script_settings_dict, dftprogram_settings_dict

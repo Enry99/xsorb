@@ -5,7 +5,7 @@ DFT CODE-specific functions (all others must be code-agnostic)
 
 """
 
-import shutil, glob, os
+import shutil, glob, os, json
 from ase.constraints import FixCartesian, FixScaled
 from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
@@ -67,7 +67,7 @@ SBATCH_POSTFIX = {
     }
 }
 
-
+SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO']
 
 
 def override_settings(settings : Settings, calc_type : str):
@@ -81,16 +81,28 @@ def override_settings(settings : Settings, calc_type : str):
     
     if calc_type is 'SCREENING':
         if settings.program is 'ESPRESSO':
-            settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax' })
-            settings.espresso_settings_dict['CONTROL'].update({'etot_conv_thr' : settings.screening_conv_thr[0]})
-            settings.espresso_settings_dict['CONTROL'].update({'forc_conv_thr' : settings.screening_conv_thr[1]})
-            settings.espresso_settings_dict['IONS'].update({'upscale': 1})
-            settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
+
+            if settings.screening_conv_thr is None:
+                settings.screening_conv_thr = hybrid_screening_thresholds
+
+            settings.dftprogram_settings_dict['control'].update({'calculation' : 'relax' })
+            settings.dftprogram_settings_dict['control'].update({'restart_mode' : 'from_scratch'})
+            settings.dftprogram_settings_dict['control'].update({'etot_conv_thr' : settings.screening_conv_thr[0]})
+            settings.dftprogram_settings_dict['control'].update({'forc_conv_thr' : settings.screening_conv_thr[1]})
+            settings.dftprogram_settings_dict['control'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
+
+            if 'ions' not in settings.dftprogram_settings_dict: settings.dftprogram_settings_dict['ions'] = {}
+            settings.dftprogram_settings_dict['ions'].update({'upscale': 1})
+
 
         elif settings.program is 'VASP':
             
-            s = settings.incar_string.split('\n')
+            s = settings.dftprogram_settings_dict['incar_string'].split('\n')
             
+            if settings.screening_conv_thr is None:
+                settings.screening_conv_thr = hybrid_screening_thresholds
+                settings.screening_conv_thr[0] *= -1
+
             missing_ibrion = True
             for i, line in enumerate(s):
                 if 'EDIFFG' in line:
@@ -98,42 +110,44 @@ def override_settings(settings : Settings, calc_type : str):
                 if 'IBRION' in line: missing_ibrion = False
             if missing_ibrion: s.append('IBRION = 2')
 
-            settings.incar_string = '\n'.join(s)
+            settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)
 
 
     elif calc_type is 'RELAX':
         if settings.program is 'ESPRESSO':
-            settings.espresso_settings_dict['CONTROL'].update({'calculation' : 'relax'})
-            settings.espresso_settings_dict['CONTROL'].update({'restart_mode' : 'from_scratch'})
-            settings.espresso_settings_dict['IONS'].update({'ion_dynamics': settings.ion_dynamics})
+            settings.dftprogram_settings_dict['control'].update({'calculation' : 'relax'})
+            settings.dftprogram_settings_dict['control'].update({'restart_mode' : 'from_scratch'})
+            settings.dftprogram_settings_dict['control'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
+            if 'ions' not in settings.dftprogram_settings_dict: settings.dftprogram_settings_dict['ions'] = {}
+            #settings.dftprogram_settings_dict['ions'].update({'ion_dynamics': settings.ion_dynamics})
         
         elif settings.program is 'VASP':
-            s = settings.incar_string.split('\n')
+            s = settings.dftprogram_settings_dict['incar_string'].split('\n')
             
             missing_ibrion = True
             for i, line in enumerate(s):
                 if 'IBRION' in line: missing_ibrion = False
             if missing_ibrion: s.append('IBRION = 2')
 
-            settings.incar_string = '\n'.join(s)
+            settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)
 
 
 def Calculator(settings : Settings, label : str, atoms, directory : str):
     
     if settings.program is 'ESPRESSO':
-        return Espresso(label = label, **settings.espresso_settings_dict)
+        return Espresso(label = label, **settings.dftprogram_settings_dict)
     
     elif settings.program is 'VASP':
         
         preset_incar_settings = {}
-        if settings.pymatgen_set:
+        if settings.dftprogram_settings_dict["pymatgen_set"]:
             from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
             from pymatgen.io.ase import AseAtomsAdaptor
 
-            if settings.pymatgen_set.lower() is 'MPRelaxSet'.lower(): RelaxSet = MPRelaxSet
-            elif settings.pymatgen_set.lower() is 'MPMetalRelaxSet'.lower(): RelaxSet = MPMetalRelaxSet
-            elif settings.pymatgen_set.lower() is 'MPScanRelaxSet'.lower(): RelaxSet = MPScanRelaxSet
-            elif settings.pymatgen_set.lower() is 'MPHSERelaxSet'.lower(): RelaxSet = MPHSERelaxSet            
+            if settings.dftprogram_settings_dict["pymatgen_set"].lower() is 'MPRelaxSet'.lower(): RelaxSet = MPRelaxSet
+            elif settings.dftprogram_settings_dict["pymatgen_set"].lower() is 'MPMetalRelaxSet'.lower(): RelaxSet = MPMetalRelaxSet
+            elif settings.dftprogram_settings_dict["pymatgen_set"].lower() is 'MPScanRelaxSet'.lower(): RelaxSet = MPScanRelaxSet
+            elif settings.dftprogram_settings_dict["pymatgen_set"].lower() is 'MPHSERelaxSet'.lower(): RelaxSet = MPHSERelaxSet            
             elif settings.pymatgen_set.lower() is 'MITRelaxSet'.lower(): RelaxSet = MITRelaxSet
             else: raise ValueError('Pymatgen preset not recognized.')
 
@@ -147,24 +161,27 @@ def Calculator(settings : Settings, label : str, atoms, directory : str):
 
 
         adjust_constraints(atoms, 'VASP')
-        os.environ["VASP_PP_PATH"] = settings.vasp_pp_path
+        os.environ["VASP_PP_PATH"] = settings.dftprogram_settings_dict["vasp_pp_path"]
         calc = Vasp(directory=directory, 
-                    xc=settings.vasp_xc_functional, 
-                    setups=settings.vasp_pseudo_setups, 
+                    xc=settings.dftprogram_settings_dict["vasp_xc_functional"], 
+                    setups=settings.dftprogram_settings_dict["vasp_pseudo_setups"], 
                     **preset_incar_settings) #set here the default values from pymat recommended
 
 
         #write user-defined settings to string, to be parsed by ASE
-        if settings.incar_string:
+        if settings.dftprogram_settings_dict["incar_string"]:
             with open('_temp_incar_', 'w') as f:
                 f.write(settings.incar_string)
 
-        if settings.kpoints_string:
+        if settings.dftprogram_settings_dict["kpoints_string"]:
             with open('_temp_kpts_', 'w') as f:
                 f.write(settings.kpoints_string)
 
         calc.read_incar('_temp_incar_') 
         calc.read_kpoints('_temp_kpts_')
+
+        os.remove('_temp_incar_')
+        os.remove('_temp_kpts_')
         
         return calc
 
@@ -224,61 +241,103 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
             shutil.copyfile(contcar, poscar)
 
 
+def parse_espresso_settings(block_str_list : list):
+    
+    #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, 
+    #as they are read from the input structures
+    #NOTE 2: This code does not yet support the following Espresso blocks:
+    #OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS, HUBBARD
+    
+    from ase.io.espresso import read_fortran_namelist    
+    
+    # parse namelist section and extract remaining lines
+    dftprogram_settings_dict, card_lines = read_fortran_namelist(block_str_list)
+
+    #parse ATOMIC_SPECIES and K_POINTS
+    for i, line in enumerate(card_lines):
+        if('ATOMIC_SPECIES' in line.upper()):
+            atomic_species_index = i
+        if('K_POINTS' in line.upper()):
+            k_points_index = i
+
+    #ATOMIC_SPECIES
+    i = atomic_species_index+1
+    while i < len(card_lines):
+        line = card_lines[i]
+        
+        if ('ATOMIC_POSITIONS' in card_lines.upper() or 
+        'K_POINTS' in line.upper() or 
+        'ADDITIONAL_K_POINTS' in line.upper() or 
+        'CELL_PARAMETERS' in line.upper() or 
+        'CONSTRAINTS' in line.upper() or 
+        'OCCUPATIONS' in line.upper() or 
+        'ATOMIC_VELOCITIES' in line.upper() or 
+        'ATOMIC_FORCES' in line.upper() or 
+        'SOLVENTS' in line.upper() or 
+        'HUBBARD' in line.upper()): break       
+        
+        element, mass, pseudo = line.split()
+        dftprogram_settings_dict['pseudopotentials'].update({element : pseudo})
+        i+=1
+
+    #K_POINTS
+    if 'gamma' in card_lines[k_points_index].split()[1].strip().lower():
+        dftprogram_settings_dict['kpts'] = None
+        dftprogram_settings_dict['koffset'] = None
+    else:
+        line = card_lines[k_points_index+1]
+        dftprogram_settings_dict['kpts'] = line.split()[:3]
+        dftprogram_settings_dict['koffset'] = line.split()[3:]
+
+    return dftprogram_settings_dict
 
 
-#from ase.calculators.vasp
-def read_convergence(self, lines=None):
-    """Method that checks whether a calculation has converged."""
-    if not lines:
-        lines = self.load_file('OUTCAR')
+def parse_vasp_settings(block_str_list : list):
 
-    converged = None
-    # First check electronic convergence
-    for line in lines:
-        if 0:  # vasp always prints that!
-            if line.rfind('aborting loop') > -1:  # scf failed
-                raise RuntimeError(line.strip())
-                break
-        if 'EDIFF  ' in line:
-            ediff = float(line.split()[2])
-        if 'total energy-change' in line:
-            # I saw this in an atomic oxygen calculation. it
-            # breaks this code, so I am checking for it here.
-            if 'MIXING' in line:
-                continue
-            split = line.split(':')
-            a = float(split[1].split('(')[0])
-            b = split[1].split('(')[1][0:-2]
-            # sometimes this line looks like (second number wrong format!):
-            # energy-change (2. order) :-0.2141803E-08  ( 0.2737684-111)
-            # we are checking still the first number so
-            # let's "fix" the format for the second one
-            if 'e' not in b.lower():
-                # replace last occurrence of - (assumed exponent) with -e
-                bsplit = b.split('-')
-                bsplit[-1] = 'e' + bsplit[-1]
-                b = '-'.join(bsplit).replace('-e', 'e-')
-            b = float(b)
-            if [abs(a), abs(b)] < [ediff, ediff]:
-                converged = True
-            else:
-                converged = False
-                continue
-    # Then if ibrion in [1,2,3] check whether ionic relaxation
-    # condition been fulfilled
-    if ((self.int_params['ibrion'] in [1, 2, 3]
-            and self.int_params['nsw'] not in [0])):
-        if not self.read_relaxed():
-            converged = False
-        else:
-            converged = True
-    return converged
+    dftprogram_settings_dict = {}
+    cards = {'GENERAL' : [], 'INCAR' : [], 'KPOINTS': []}
+    
+    for line in enumerate(block_str_list):
+        
+        #begin card
+        if line.strip()[0] == '&':
+            block_name = line.split('&')[1].strip()
+            in_card = True
+            continue
 
-def read_relaxed(self, lines=None):
-    """Check if ionic relaxation completed"""
-    if not lines:
-        lines = self.load_file('OUTCAR')
-    for line in lines:
-        if 'reached required accuracy' in line:
-            return True
-    return False
+        #end card
+        if line.strip()=='/':
+            in_card = False
+
+        #within card
+        if in_card: cards[block_name.upper()].append(line)  
+    
+
+    for line in cards['GENERAL']:
+        (key, val) = line.split('=')
+        key = key.strip()
+        val = val.strip()
+        val = val.strip("'")
+        val = val.strip('"')   
+        key = key.lower()     
+        
+        if key is 'vasp_pseudo_setups':
+            val = json.loads(val)
+        dftprogram_settings_dict[key] = val
+        
+    if cards['INCAR']: dftprogram_settings_dict["incar_string"] = '\n'.join(cards['INCAR']) #use as an untouched single string
+    if cards['KPOINTS']: dftprogram_settings_dict["kpoints_string"] = '\n'.join(cards['KPOINTS']) #use as an untouched single string
+
+    return dftprogram_settings_dict
+    
+
+
+def get_dftprogram_settings(program : str, block_str_list : list):
+    
+    if program is 'ESPRESSO':
+        return parse_espresso_settings(block_str_list)
+    elif program is 'VASP':
+        return parse_vasp_settings(block_str_list)
+    else:
+        raise RuntimeError('Program not recognized')
+
