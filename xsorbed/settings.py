@@ -12,7 +12,7 @@ Small helper class to collect the settings read from settings.in
 import sys
 import numpy as np
 from xsorbed import input
-from xsorbed.dftcode_specific import UNITS_TO_EV_FACTOR
+from xsorbed.dftcode_specific import UNITS_TO_EV_FACTOR, HYBRID_SCREENING_THRESHOLDS
 
 #OK (code agnostic) 
 class Settings:
@@ -102,7 +102,7 @@ class Settings:
         self.sbatch_command         = script_settings_dict['INPUT']['jobscript'][1]
         if 'screening_conv_thr' in script_settings_dict['INPUT']:
             self.screening_conv_thr = np.array(script_settings_dict['INPUT']['screening_conv_thr'].split(), dtype=float).tolist()
-        else: self.screening_conv_thr = None
+        else: self.screening_conv_thr = HYBRID_SCREENING_THRESHOLDS[program]
         # read E_slab_mol from settings.in (priority over value from file) 
         if 'E_slab_mol' in script_settings_dict['INPUT']:
             E_slab_mol_str = script_settings_dict['INPUT']['E_slab_mol'].split()

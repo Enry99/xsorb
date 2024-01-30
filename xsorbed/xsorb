@@ -84,7 +84,7 @@ def main():
         view_config(which=args.view[0], index=int(args.view[1:]))
 
     elif(args.savefiles is not None):
-        saveas(which=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])
+        saveas(calc_type=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])
 
 
 

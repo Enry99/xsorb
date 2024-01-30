@@ -100,8 +100,8 @@ K_POINTS automatic
 @VASP
 
 &GENERAL
-   vasp_pp_path       = 'path_to_pseudo'
-   vasp_xc_functional = 'PBE'
+   vasp_pp_path       = 'VASP_PP_PATH' #The pseudopotentials are expected to be in: LDA: VASP_PP_PATH/potpaw/,  PBE: VASP_PP_PATH/potpaw_PBE/,  PW91: $VASP_PP_PATH/potpaw_GGA/
+   vasp_xc_functional = 'PBE' #default PBE
    vasp_pseudo_setups = {"base": "recommended", "6": "C_h", "C": "_s"}
 
    pymatgen_set       = MPRelaxSet

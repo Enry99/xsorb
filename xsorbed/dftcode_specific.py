@@ -6,17 +6,27 @@ DFT CODE-specific functions (all others must be code-agnostic)
 """
 
 import shutil, glob, os, json
+from ase.units import create_units
 from ase.constraints import FixScaled
 from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
 from xsorbed.common_definitions import *
 
+#TODO: try to launch, check the xsorb -e, try to fullrelax. 
+#Check that ase-sort.dat is used to sort the files back in the initial order when reading the outputs.
+#It does not work when reading poscar, it should work with outcar/vasprun.xml
 
 SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO']
 
+HYBRID_SCREENING_THRESHOLDS = {
+    'VASP' : [-1], # ~ -4e-2 Ry/Bohr
+    'ESPRESSO' : [5e-3, 5e-2]
+}
+
+
 UNITS_TO_EV_FACTOR = {
     'VASP' : 1,
-    'ESPRESSO': rydbergtoev
+    'ESPRESSO': create_units('2006')['Rydberg']
 }
 
 COMPLETION_STRINGS = {
@@ -127,7 +137,8 @@ def parse_vasp_settings(block_str_list : list):
     dftprogram_settings_dict = {}
     cards = {'GENERAL' : [], 'INCAR' : [], 'KPOINTS': []}
     
-    for line in enumerate(block_str_list):
+    in_card = False
+    for line in block_str_list:
         
         #begin card
         if line.strip()[0] == '&':
@@ -158,6 +169,16 @@ def parse_vasp_settings(block_str_list : list):
     if cards['INCAR']: dftprogram_settings_dict["incar_string"] = '\n'.join(cards['INCAR']) #use as an untouched single string
     if cards['KPOINTS']: dftprogram_settings_dict["kpoints_string"] = '\n'.join(cards['KPOINTS']) #use as an untouched single string
 
+    if 'pymatgen_set' not in dftprogram_settings_dict and 'incar_string' not in dftprogram_settings_dict:
+        pass
+        #raise RuntimeError("")
+    
+    if "vasp_xc_functional" not in dftprogram_settings_dict:
+        dftprogram_settings_dict["vasp_xc_functional"] = 'PBE'
+    
+    if "vasp_pseudo_setups" not in dftprogram_settings_dict:
+        dftprogram_settings_dict["vasp_pseudo_setups"] = {"base": "recommended"}             
+
     return dftprogram_settings_dict
     
 
@@ -185,9 +206,6 @@ def override_settings(settings, calc_type : str):
     if calc_type == 'SCREENING':
         if settings.program == 'ESPRESSO':
 
-            if settings.screening_conv_thr is None:
-                settings.screening_conv_thr = hybrid_screening_thresholds
-
             settings.dftprogram_settings_dict['control'].update({'calculation' : 'relax' })
             settings.dftprogram_settings_dict['control'].update({'restart_mode' : 'from_scratch'})
             settings.dftprogram_settings_dict['control'].update({'etot_conv_thr' : settings.screening_conv_thr[0]})
@@ -199,18 +217,23 @@ def override_settings(settings, calc_type : str):
 
 
         elif settings.program == 'VASP':
-            
-            s = settings.dftprogram_settings_dict['incar_string'].split('\n')
-            
-            if settings.screening_conv_thr is None:
-                settings.screening_conv_thr = hybrid_screening_thresholds
-                settings.screening_conv_thr[0] *= -1
+
+            #fix if user forgot to put the correct IBRION for relax, and add EDIFFG for screening.
+            #EDIFFG is put here so that in any case this will be the final value, even if the user had 
+            #specified a different value explicitly in the &INCAR instead of using one of the RelaxSets
+            if 'incar_string' in settings.dftprogram_settings_dict:
+                s = settings.dftprogram_settings_dict['incar_string'].split('\n')
+            else: s = []
 
             missing_ibrion = True
+            missing_ediffg = True
             for i, line in enumerate(s):
                 if 'EDIFFG' in line:
                     s[i] = f'EDIFFG = {settings.screening_conv_thr[0]}'
-                if 'IBRION' in line: missing_ibrion = False
+                    missing_ediffg = False
+                if 'IBRION' in line: 
+                    missing_ibrion = False
+            if missing_ediffg: s.append(f'EDIFFG = {settings.screening_conv_thr[0]}')
             if missing_ibrion: s.append('IBRION = 2')
 
             settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)
@@ -225,25 +248,30 @@ def override_settings(settings, calc_type : str):
             #settings.dftprogram_settings_dict['ions'].update({'ion_dynamics': settings.ion_dynamics})
         
         elif settings.program == 'VASP':
-            s = settings.dftprogram_settings_dict['incar_string'].split('\n')
             
-            missing_ibrion = True
-            for i, line in enumerate(s):
-                if 'IBRION' in line: missing_ibrion = False
-            if missing_ibrion: s.append('IBRION = 2')
+            #fix if user forgot to put the correct IBRION for relax
+            if 'incar_string' in settings.dftprogram_settings_dict and "pymatgen_set" not in settings.dftprogram_settings_dict:
+                s = settings.dftprogram_settings_dict['incar_string'].split('\n')
+            
+                missing_ibrion = True
+                for i, line in enumerate(s):
+                    if 'IBRION' in line: missing_ibrion = False
+                if missing_ibrion: s.append('IBRION = 2')
 
-            settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)
+                settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)
 
 
 def Calculator(settings, label : str, atoms, directory : str):
     
     if settings.program == 'ESPRESSO':
-        return Espresso(label = label, input_data=settings.dftprogram_settings_dict, pseudopotentials=settings.dftprogram_settings_dict['pseudopotentials'])
-    
+        return Espresso(label = label,
+                        pseudopotentials=settings.dftprogram_settings_dict['pseudopotentials'], 
+                        input_data=settings.dftprogram_settings_dict)
+                            
     elif settings.program == 'VASP':
         
-        preset_incar_settings = {}
-        if settings.dftprogram_settings_dict["pymatgen_set"]:
+        preset_incar_settings = {"xc": settings.dftprogram_settings_dict["vasp_xc_functional"]}
+        if "pymatgen_set" in settings.dftprogram_settings_dict:
             from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
             from pymatgen.io.ase import AseAtomsAdaptor
 
@@ -256,7 +284,7 @@ def Calculator(settings, label : str, atoms, directory : str):
 
             atomscopy = atoms.copy()
             del atomscopy.constraints #to suppress the warning about constraints not supported in pymatgen
-            relax = RelaxSet(AseAtomsAdaptor.get_structure(AseAtomsAdaptor.get_structure(atomscopy)))
+            relax = RelaxSet(AseAtomsAdaptor.get_structure(atomscopy))
             preset_incar_settings = {k.lower(): v for k, v in relax.incar.as_dict().items()} 
             preset_incar_settings.pop('@module')
             preset_incar_settings.pop('@class')
@@ -266,25 +294,24 @@ def Calculator(settings, label : str, atoms, directory : str):
         adjust_constraints(atoms, 'VASP')
         os.environ["VASP_PP_PATH"] = settings.dftprogram_settings_dict["vasp_pp_path"]
         calc = Vasp(directory=directory, 
-                    xc=settings.dftprogram_settings_dict["vasp_xc_functional"], 
                     setups=settings.dftprogram_settings_dict["vasp_pseudo_setups"], 
                     **preset_incar_settings) #set here the default values from pymat recommended
 
 
         #write user-defined settings to string, to be parsed by ASE
-        if settings.dftprogram_settings_dict["incar_string"]:
+        if "incar_string" in settings.dftprogram_settings_dict:
             with open('_temp_incar_', 'w') as f:
                 f.write(settings.dftprogram_settings_dict["incar_string"])
+            calc.read_incar('_temp_incar_')
+            os.remove('_temp_incar_') 
 
-        if settings.dftprogram_settings_dict["kpoints_string"]:
+        if "kpoints_string" in settings.dftprogram_settings_dict:
             with open('_temp_kpts_', 'w') as f:
                 f.write(settings.dftprogram_settings_dict["kpoints_string"])
 
-        calc.read_incar('_temp_incar_') 
-        calc.read_kpoints('_temp_kpts_')
-
-        os.remove('_temp_incar_')
-        os.remove('_temp_kpts_')
+        if "kpoints_string" in settings.dftprogram_settings_dict or "pymatgen_set" in settings.dftprogram_settings_dict:
+            calc.read_kpoints('_temp_kpts_') 
+            os.remove('_temp_kpts_')
         
         return calc
 
@@ -309,12 +336,14 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
 
     for index in indices:
         if program == 'ESPRESSO':
-            with open(IN_FILE_PATHS[calc_type][program].format(index), 'rw') as f:
+            with open(IN_FILE_PATHS[calc_type][program].format(index), 'r') as f:
                 lines = f.readlines()
                 for i, line in enumerate(lines):
                     if 'from_scratch' in line:
                         lines[i] = lines[i].replace('from_scratch','restart')
                         break
+                f.writelines(lines)
+            with open(IN_FILE_PATHS[calc_type][program].format(index), 'w') as f:
                 f.writelines(lines)
 
         elif program == 'VASP':
@@ -325,12 +354,18 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
             vasprun = poscar.replace('POSCAR', 'vasprun.xml')
             oszicar = poscar.replace('POSCAR', 'OSZICAR')
             
-            with open(incar, 'rw') as f:
+            with open(incar, 'r') as f:
                 lines = f.readlines()
+                istart_found = False
                 for i, line in enumerate(lines):
                     if 'ISTART' in line:
-                        lines[i] = 'ISTART = 1'
+                        lines[i] = 'ISTART = 1\n'
+                        istart_found = True
                         break
+                if not istart_found: lines.append('ISTART = 1\n')
+                f.writelines(lines)
+
+            with open(incar, 'w') as f:
                 f.writelines(lines)
 
             #copy files for the first part of the relaxation, to avoid overwriting

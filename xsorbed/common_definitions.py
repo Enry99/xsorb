@@ -1,8 +1,5 @@
 VERSION                  = '2.0'  #program version
 
-rydbergtoev = 13.605703976
-
-hybrid_screening_thresholds = [5e-3, 5e-2]
 N_relax_default             = 5
 
 

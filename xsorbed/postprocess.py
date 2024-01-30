@@ -14,7 +14,6 @@ from ase.io import read, write
 import glob, sys, os, shutil
 from xsorbed.slab import Slab
 from xsorbed.settings import Settings
-from xsorbed.common_definitions import *
 
 
 #OK (code agnostic)

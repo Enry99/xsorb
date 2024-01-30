@@ -324,7 +324,7 @@ def get_diss_energies():
         fragments_dict = json.load(f)
     
     
-    slab_energy = Settings().E_slab_mol[0] * rydbergtoev
+    slab_energy = Settings().E_slab_mol[0] #* rydbergtoev  CHANGE!!!
 
 
     fragments_data = {"mol" : {}}
