@@ -12,13 +12,12 @@ Generation of molecular fragments and dissociation energies calculation
 #TODO: fragments, se atomo isolato aggiungere nosym=.true.
 
 import json, os, shutil, copy, sys
-from settings import Settings
-from molecule import Molecule
-from espresso_mod import Espresso_mod
-from calculations import generate, final_relax
-from io_utils import get_energies, restart_jobs
-from filenames import *
-from slab import Slab
+from xsorbed.settings import Settings
+from xsorbed.molecule import Molecule
+from xsorbed.calculations import generate, final_relax
+from xsorbed.io_utils import get_energies, restart_jobs
+from xsorbed.common_definitions import *
+from xsorbed.slab import Slab
 
 
 TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs

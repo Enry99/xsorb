@@ -13,15 +13,15 @@ import os, shutil
 import numpy as np
 import pandas as pd
 from ase.io import read, write
-from dftcode_specific import edit_files_for_restart, UNITS_TO_EV_FACTOR, COMPLETION_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
-from settings import Settings
-from slab import Slab, mol_bonded_to_slab
-from molecule import Molecule
-from filenames import *
+from xsorbed.dftcode_specific import edit_files_for_restart, COMPLETION_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
+from xsorbed.settings import Settings
+from xsorbed.slab import Slab, mol_bonded_to_slab
+from xsorbed.molecule import Molecule
+from xsorbed.common_definitions import *
 
 import ase_custom
 
-TEST = False #do not actually launch the jobs, simply prints the command
+TEST = True #do not actually launch the jobs, simply prints the command
 
 
 #OK (code agnostic) 
@@ -34,6 +34,9 @@ def is_completed(program : str, calc_type : str, completion_type : str, i_calc :
     - calc_type: 'SCREENING' or 'RELAX'
     - completion_type: 'RELAX_COMPLETED' or 'SCF_NONCONVERGED'
     - i_calc: numeric index of the calculation
+
+    Returns:
+    True or False
     '''
 
     filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
@@ -58,7 +61,7 @@ def _get_configurations_numbers():
     Returns a list of indices
     '''
 
-    site_labels = np.genfromtxt(labels_filename, delimiter=',', names=True)
+    site_labels = np.genfromtxt(labels_filename, delimiter=',', names=True, dtype=int)
     return site_labels['Label']
 
 #OK (code agnostic) 
@@ -125,7 +128,7 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
         if not os.path.isfile(OUT_FILE_PATHS[calc_type][program].format(index)):
             continue #skip if file does not exist yet
 
-        energy = (get_energy(program, calc_type, index) - (E_slab_mol[0]+E_slab_mol[1])) * UNITS_TO_EV_FACTOR[program]
+        energy = (get_energy(program, calc_type, index) - (E_slab_mol[0]+E_slab_mol[1])) 
         relax_completed = is_completed(program, calc_type, 'RELAX_COMPLETED', index)
         scf_nonconverged = is_completed(program, calc_type, 'SCF_NONCONVERGED', index)
 
@@ -160,7 +163,7 @@ def write_results_to_file(TXT=False):
     if os.path.isdir(screening_outdir): #for screening
         screening_results = \
             get_calculations_results(program=settings.program, calc_type='SCREENING', E_slab_mol=settings.E_slab_mol)
-        
+              
         column_name = 'Eads_scr(eV)' if 0 not in settings.E_slab_mol else 'Etot_scr(eV)'
 
         column_data = []
@@ -210,23 +213,28 @@ def write_results_to_file(TXT=False):
 
         datafile[column_name] = column_data
 
-    
     #add bonding info
     slab = Slab(settings.slab_filename)
-    mol = Molecule(settings.molecule_filename)
+    mol = Molecule(settings.molecule_filename, atom_index=settings.selected_atom_index)
     mol_indices = np.arange(mol.natoms) if settings.mol_before_slab else np.arange(mol.natoms) + slab.natoms
     bonding_status = []
-    for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None
-        if i in relax_results['energies']:
+    for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None        
+        if os.path.isdir(relax_outdir) and i in relax_results['energies']: #prioritize status from relax over screening
             status = check_bond_status(settings.program, 
-                                                    calc_type= 'RELAX' if os.path.isdir(relax_outdir) else 'SCREENING', 
+                                                    calc_type='RELAX', 
+                                                    i_calc=i, 
+                                                    mol_indices=mol_indices)
+            bonding_status.append('Yes' if status else 'No')
+        elif i in screening_results['energies']:
+            status = check_bond_status(settings.program, 
+                                                    calc_type='SCREENING', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
             bonding_status.append('Yes' if status else 'No')
         else: #if the file does not exist
             bonding_status.append(None)
 
-    datafile['Bonded'] = column_data   
+    datafile['Bonded'] = bonding_status   
         
 
     if(TXT): #sort by energy column (relax if available, else screening)
@@ -271,25 +279,26 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
 
     for index in indices_list:
 
-        j_dir = f'{screening_outdir if calc_type is "SCREENING" else relax_outdir}/{index}'
+        j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{index}'
         os.makedirs(j_dir, exist_ok=True) #for QE (for VASP they are already created by write_inputs)
         shutil.copyfile(jobscript, f'{j_dir}/{jobscript_stdname}')
         
         os.chdir(j_dir)   ####################
         
         #change job title (only for slumr jobscripts)
-        with open(jobscript_stdname, 'rw') as f:
+        with open(jobscript_stdname, 'r') as f:
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if "job-name" in line:
-                    lines[i] = f"{line.split('=')[0]} = {'scr' if calc_type is 'SCREENING' else 'RELAX'}_{index}\n"
-                    break        
+                    lines[i] = f"{line.split('=')[0]} = {'scr' if calc_type == 'SCREENING' else 'RELAX'}_{index}\n"
+                    break
+        with open(jobscript_stdname, 'w') as f:       
             f.writelines(lines)
 
 
-        launch_string = f"{sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][program].format(main_dir, i)}"
+        launch_string = f"{sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][program].format(main_dir, index)}"
         if(TEST): print(launch_string)
-        else: os.system(launch_string)  #launchs the jobscript in j_dir from j_dir
+        else: os.system(launch_string)  #launches the jobscript in j_dir from j_dir
         os.chdir(main_dir) ####################
 
 #OK (code agnostic) 
@@ -313,7 +322,7 @@ def restart_jobs(calc_type : str):
     #launch the calculations
     main_dir = os.getcwd()
     for index in indices_to_restart:
-        j_dir = f'{screening_outdir if calc_type is "SCREENING" else relax_outdir}/{index}'
+        j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{index}'
         os.chdir(j_dir)
 
         launch_string = f"{settings.sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][settings.program].format(main_dir, index)}"
@@ -335,7 +344,7 @@ def saveas(calc_type : str, i_or_f : str, saveas_format : str):
 
     settings = Settings()
 
-    if i_or_f is 'i':
+    if i_or_f == 'i':
         FILE_PATHS = IN_FILE_PATHS
     elif i_or_f == 'f':
         FILE_PATHS = OUT_FILE_PATHS

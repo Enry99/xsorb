@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from ase.atoms import Atoms, default
+from ase.io.espresso import create_units,_PW_START,_PW_END,_PW_CELL,_PW_POS,_PW_MAGMOM,_PW_FORCE,\
+    _PW_TOTEN,_PW_STRESS,_PW_FERMI,_PW_HIGHEST_OCCUPIED,_PW_HIGHEST_OCCUPIED_LOWEST_FREE,_PW_KPTS,_PW_BANDS,_PW_BANDSTRUCTURE
 from ase.io.espresso import *
+
 
 
 import copy
@@ -379,7 +382,7 @@ def read_espresso_in_custom(fileobj):
         card_lines, n_atoms=data['system']['nat'], cell=cell, alat=alat)
 
     symbols = [label_to_symbol(position[0]) for position in positions_card]
-    custom_labels = [position[0] for position in positions_card]
+    custom_labels = ['{:3}'.format(position[0]) for position in positions_card]
     positions = [position[1] for position in positions_card]
     magmoms = [species_info[label]["magmom"] for label in custom_labels]
     
@@ -778,24 +781,7 @@ def construct_namelist_custom(parameters=None, warn=False, **kwargs):
 
 
 #################################################
-
 units = create_units('2006')
-# Section identifiers
-_PW_START = 'Program PWSCF'
-_PW_END = 'End of self-consistent calculation'
-_PW_CELL = 'CELL_PARAMETERS'
-_PW_POS = 'ATOMIC_POSITIONS'
-_PW_MAGMOM = 'Magnetic moment per site'
-_PW_FORCE = 'Forces acting on atoms'
-_PW_TOTEN = '!    total energy'
-_PW_STRESS = 'total   stress'
-_PW_FERMI = 'the Fermi energy is'
-_PW_HIGHEST_OCCUPIED = 'highest occupied level'
-_PW_HIGHEST_OCCUPIED_LOWEST_FREE = 'highest occupied, lowest unoccupied level'
-_PW_KPTS = 'number of k points='
-_PW_BANDS = _PW_END
-_PW_BANDSTRUCTURE = 'End of band structure calculation'
-
 def read_espresso_out_custom(fileobj, index=-1, results_required=True):
     """Reads Quantum ESPRESSO output files.
 
@@ -942,7 +928,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
             # convert to Atoms object
             symbols = [label_to_symbol(position[0]) for position in
                        positions_card]
-            custom_labels = [position[0] for position in positions_card]
+            custom_labels = ['{:3}'.format(position[0]) for position in positions_card]
             positions = [position[1] for position in positions_card]
             structure = Atoms_custom(symbols=symbols, positions=positions, cell=cell,
                               pbc=True, custom_labels=custom_labels)
@@ -1159,7 +1145,7 @@ def parse_pwo_start_custom(lines, index=0):
             for at_line in lines[idx + 1:idx + 1 + info['nat']]:
                 sym, x, y, z = parse_position_line(at_line)
                 info['symbols'].append(label_to_symbol(sym))
-                custom_labels.append(sym)
+                custom_labels.append('{:3}'.format(sym))
                 info['positions'].append([x * info['celldm(1)'],
                                           y * info['celldm(1)'],
                                           z * info['celldm(1)']])

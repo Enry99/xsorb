@@ -22,7 +22,7 @@ import matplotlib.patheffects as PathEffects
 import numpy as np
 from ase.constraints import FixCartesian
 
-import ase_custom
+from xsorbed import ase_custom
 
 #NOTE: ALL MODIFICATIONS DONE
 class Slab:
@@ -116,8 +116,8 @@ class Slab:
         return fixed_atoms_indices
 
 
-    def find_adsorption_sites(self, symm_reduce_thr : float = 0.01, 
-                              near_reduce_thr : float = 0.01, 
+    def find_adsorption_sites(self, symm_reduce : float = 0.01, 
+                              near_reduce : float = 0.01, 
                               no_obtuse_hollow : bool = True, 
                               selected_sites : list = None,   
                               save_image : bool = False,
@@ -128,8 +128,8 @@ class Slab:
         Optionally it saves a figure with the sites on the surface.
 
         Args:
-            -symm_reduce_thr: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. It is a theshold for removing symmetrically equivalent sites.
-            -near_reduce_thr: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. Threshold for removing sites duplicates (increase it to reduce duplicates).
+            -symm_reduce: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. It is a theshold for removing symmetrically equivalent sites.
+            -near_reduce: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. Threshold for removing sites duplicates (increase it to reduce duplicates).
             -no_obtuse_hollow: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. Avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation of topmost layer used to find sites.
             -selected_sites: indices of the sites to be returned by this function, selected between those found by AdsorbateSiteFinder
             -save_image: decide wether to save a png image of the sites
@@ -139,8 +139,8 @@ class Slab:
         if VERBOSE: print('Finding adsorption sites...')
 
         adsites = self.asf.find_adsorption_sites(distance=0, 
-                                                 symm_reduce=symm_reduce_thr, 
-                                                 near_reduce=near_reduce_thr, 
+                                                 symm_reduce=symm_reduce, 
+                                                 near_reduce=near_reduce, 
                                                  no_obtuse_hollow=no_obtuse_hollow)
         if selected_sites:
             sel_adsites = [adsites['all'][i] for i in selected_sites]
@@ -188,7 +188,7 @@ class Slab:
         if VERBOSE: print('Adsorption sites found.')
 
         if(save_image): #save png to visualize the identified sites
-            self.save_adsites_image(sel_adsites, adsite_labels, self.slab_pymat, figname, VERBOSE)
+            save_adsites_image(sel_adsites, adsite_labels, self.slab_pymat, figname, VERBOSE)
 
         return sel_adsites, adsite_labels
 
@@ -234,7 +234,7 @@ class Slab:
                 
 
             adsorption_structures.append(mol + self.slab_ase if mol_before_slab else self.slab_ase + mol)
-            full_labels.append(rotation_label+site_label+',{:.3f}'.format(final_deltaz))
+            full_labels.append(rotation_label+site_label+'{:.3f}'.format(final_deltaz))
 
         return adsorption_structures, full_labels
 
@@ -313,10 +313,10 @@ def save_adsites_image(adsites : list,
         '''
         Internal helper function to save an image of the adsorption sites with their numeric label
         Args:
-        -adsites: list of cartesian coordinates of the sites
-        -adsite_labels: list of the adsites labels (used to color code the sites)
-        -slab_pymat: Pymatgen Structure of the slab
-        -figname: filename of the image
+        - adsites: list of cartesian coordinates of the sites
+        - adsite_labels: list of the adsites labels (used to color code the sites)
+        - slab_pymat: Pymatgen Structure of the slab
+        - figname: filename of the image
         '''
 
         if VERBOSE: print("Saving image to {0}".format(figname))

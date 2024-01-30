@@ -5,7 +5,7 @@ Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
 
 Small module with function definitions to read settings from input file
-and return them as two dictionaries (script settings and Espresso settings)
+and return them as two dictionaries (script settings and dft program settings)
 
 """
 
@@ -63,6 +63,12 @@ def read_input_file(filename: str):
 
     Args:
     - filename: path of the settings.in file
+
+    Returns:
+    - script_settings_dict: dictionary with the settings for adsorption structures generation. In the dictionary
+    the values are here ALL inserted as strings, and need to be converted later to the appropriate format
+    - dftprogram_settings_dict: dictionary with the specific settings for the dft program
+    - PROGRAM: name of the DFT program
     '''
 
     script_settings_dict   = {}    
@@ -137,4 +143,4 @@ def read_input_file(filename: str):
     if(not dftprogram_settings_dict):
         raise RuntimeError(f'{PROGRAM} settings not read correctly.')
 
-    return script_settings_dict, dftprogram_settings_dict
+    return script_settings_dict, dftprogram_settings_dict, PROGRAM

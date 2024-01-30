@@ -6,21 +6,20 @@ Main functions to generate the adsorption configurations and set up the calculat
 
 """
 
-from ase.io import read, write
+from ase.io import read
 import numpy as np
 import os, sys
-import glob
 from operator import itemgetter
 #
 from ase.constraints import FixCartesian
-from slab import Slab
-from molecule import Molecule
-from io_utils import launch_jobs, get_calculations_results, _get_configurations_numbers
-from settings import Settings
-from dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS
-from filenames import *
+from xsorbed.slab import Slab
+from xsorbed.molecule import Molecule
+from xsorbed.io_utils import launch_jobs, get_calculations_results, _get_configurations_numbers
+from xsorbed.settings import Settings
+from xsorbed.dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS
+from xsorbed.common_definitions import *
 
-import ase_custom
+from xsorbed import ase_custom
 
 
 #OK (code agnostic)
@@ -110,7 +109,7 @@ def write_labels_csvfile(full_labels : list, labels_filename : str):
     '''
     with open(labels_filename, 'w') as csvfile:
         csvfile.write('Label' + ',' + 'xrot' + ',' + 'yrot' + ',' + 'zrot' + ',' + 'site' + ',' + 'x' + ',' + 'y' + ',' + 'z' +'\n')
-        for i, label in full_labels:
+        for i, label in enumerate(full_labels):
             csvfile.write(f'{i},{label}\n')
 
 #OK (code agnostic)
@@ -172,7 +171,7 @@ def write_inputs(settings : Settings,
             if answer == 'no' or answer == 'n' or answer == 'nall': continue #skip if user does not want to overwrite
         
         
-        j_dir = f'{screening_outdir if calc_type is "SCREENING" else relax_outdir}/{i}'
+        j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{i}'
         calc = Calculator(settings, file_label, atoms, j_dir) 
         calc.write_input(atoms)
 
@@ -240,7 +239,7 @@ def obtain_fullrelax_indices(settings : Settings,
         calculations_indices = []
         for indiceslist_at_site in site_grouped_index_list:                
             #list of {index: energy} for the indices at the site
-            indices_and_energies_at_site = [(index, energy) for index, energy in screening_results['energies'] \
+            indices_and_energies_at_site = [(index, energy) for index, energy in screening_results['energies'].items() \
                                             if index in indiceslist_at_site and index not in exclude and energy is not None] 
 
             if n_configs is not None: #sort indices from lower to higher energy, and choose the first n_configs
@@ -250,7 +249,7 @@ def obtain_fullrelax_indices(settings : Settings,
                 e_min = min([x[1] for x in indices_and_energies_at_site])
                 calculations_indices += [x[0] for x in indices_and_energies_at_site if x[1] - e_min <= threshold]
     else:
-        indices_and_energies = [(index, energy) for index, energy in screening_results['energies'] \
+        indices_and_energies = [(index, energy) for index, energy in screening_results['energies'].items() \
                                     if index not in exclude and energy is not None]
         if n_configs is not None: 
             sorted_items = sorted(indices_and_energies,key=itemgetter(1))               
@@ -297,7 +296,7 @@ def obtain_fullrelax_structures(settings : Settings, calculations_indices : list
         
         all_mol_on_slab_configs_ase = []
         for index in calculations_indices:
-            atoms = read(OUT_FILE_PATHS['SCREENING'][settings.program])
+            atoms = read(OUT_FILE_PATHS['SCREENING'][settings.program].format(index))
             #set constraints from mol and slab if when we are reading the whole pre-relaxed structure
             
             if settings.mol_before_slab:
@@ -329,8 +328,11 @@ def generate(SAVEFIG=False):
 
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
+    indices_list = np.arange(len(all_mol_on_slab_configs_ase))
+
     write_inputs(settings, 
                  all_mol_on_slab_configs_ase,
+                 indices_list,
                  calc_type='SCREENING',
                  OVERRIDE_SETTINGS=False)
 
@@ -355,7 +357,7 @@ def launch_screening(SAVEFIG : bool = False):
                 all_mol_on_slab_configs_ase,
                 indices_list,
                 calc_type='SCREENING', 
-                VERBOSE=True)
+                INTERACTIVE=True)
 
     launch_jobs(program=settings.program,
                 calc_type='SCREENING',
@@ -398,7 +400,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
                 all_mol_on_slab_configs_ase,
                 calculations_indices,
                 calc_type='RELAX', 
-                VERBOSE=True)
+                INTERACTIVE=True)
 
     launch_jobs(program=settings.program,
                 calc_type='RELAX',

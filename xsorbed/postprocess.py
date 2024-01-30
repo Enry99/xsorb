@@ -12,9 +12,9 @@ from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
 import glob, sys, os, shutil
-from slab import Slab
-from settings import Settings
-from filenames import *
+from xsorbed.slab import Slab
+from xsorbed.settings import Settings
+from xsorbed.common_definitions import *
 
 
 #OK (code agnostic)
@@ -32,7 +32,7 @@ def plot_adsorption_sites(ALL : bool = False):
     slab = Slab(slab_filename=settings.slab_filename, 
                 surface_sites_height=settings.surface_height, 
                 sort_atoms_by_z=settings.sort_atoms_by_z,
-                translate_slab_from_below_cell_bottom=settings.translate_slab_from_below_cell_bottom)
+                translate_slab_from_below_cell_bottom=settings.translate_slab)
 
     slab.find_adsorption_sites(symm_reduce = 0 if ALL else settings.symm_reduce, 
                                near_reduce = settings.near_reduce, 
@@ -416,7 +416,7 @@ def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
     print('All animations saved to {0}.'.format('relax_'+images_dirname))
 
 
-def plot_energy_evolution(which='relax'):
+def plot_energy_evolution(calc_type : str):
 
     settings = Settings()
     Eslab, Emol = (settings.E_slab_mol[0], settings.E_slab_mol[1])

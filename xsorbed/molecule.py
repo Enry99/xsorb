@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 from ase.visualize.plot import plot_atoms
 from ase.constraints import FixCartesian
 
-import ase_custom 
+from xsorbed import ase_custom 
 
 #NOTE: ALL MODIFICATIONS DONE
 class Molecule:
