@@ -8,12 +8,15 @@ Collection of functions for generating images
 
 """
 
+import numpy as np
+import glob, sys, os, shutil
 from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
-import glob, sys, os, shutil
 from xsorbed.slab import Slab
 from xsorbed.settings import Settings
+from xsorbed.io_utils import get_calculations_results
+from dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
 
 
 #OK (code agnostic)
@@ -41,7 +44,107 @@ def plot_adsorption_sites(ALL : bool = False):
                                VERBOSE = True)
 
 
-def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, index : str = None, rotations : str = None):
+def render_image(atoms : Atoms, 
+                 label : str, 
+                 povray : bool = True, 
+                 width_res : int = 700, 
+                 rotations : str = '',
+                 supercell : list = None,
+                 depth_cueing : float = None,
+                 range_cut : tuple = None,
+                 custom_settings = None):
+     
+
+    #scaling factors for drawing atoms and bonds
+    ATOMIC_RADIUS_DEFAULT = 0.6
+    BOND_RADIUS_DEFAULT = 0.8
+    BOND_LINE_WIDTH_DEFAULT = 0.1
+
+
+    if supercell:
+        atoms *= supercell
+
+    #cut the vacuum above the top slab
+    #cell = atoms.cell.lengths()
+    #cell[2] = np.max([atom.z for atom in atoms]) + 2
+    #atoms.set_cell(cell, scale_atoms = False)
+
+    if range_cut is not None:
+        del atoms[[atom.index for atom in atoms if atom.z < range_cut[0] or atom.z > range_cut[1]]]
+
+    #set custom colors if present ################################################
+    from ase.data.colors import jmol_colors
+    ATOM_COLORS = jmol_colors.copy()
+
+    if custom_settings is not None:
+        USER_COLORS       = custom_settings["atomic_colors"] if "atomic_colors" in custom_settings else []
+        ATOMIC_RADIUS     = custom_settings["atomic_radius"] if "atomic_radius" in custom_settings else ATOMIC_RADIUS_DEFAULT
+        BOND_RADIUS       = custom_settings["bond_radius"] if "bond_radius" in custom_settings else BOND_RADIUS_DEFAULT
+        BOND_LINE_WIDTH   = custom_settings["bond_line_width"] if "bond_line_width" in custom_settings else BOND_LINE_WIDTH_DEFAULT
+        CELLLINEWIDTH     = custom_settings["cell_line_width"] if "cell_line_width" in custom_settings else 0
+    else:
+        USER_COLORS  = []
+        ATOMIC_RADIUS     = ATOMIC_RADIUS_DEFAULT
+        BOND_RADIUS       = BOND_RADIUS_DEFAULT
+        BOND_LINE_WIDTH   = BOND_LINE_WIDTH_DEFAULT
+        CELLLINEWIDTH     = 0
+
+    for color in USER_COLORS:
+        ATOM_COLORS[color[0]] = color[1]
+
+    colors = [ ATOM_COLORS[atom.number] for atom in atoms]
+
+
+    #fading color for lower layers in top view
+    if (depth_cueing is not None):
+        zmax = max([atom.z for atom in atoms])
+        zmin = min([atom.z for atom in atoms])
+        delta = zmax - zmin
+        if depth_cueing < 0:
+            raise ValueError("depth_cueing_intensity must be >=0.")
+        for atom in atoms:       
+            r,g,b = colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta * depth_cueing
+            if r>1: r=1
+            if g>1: g=1
+            if b>1: b=1
+            colors[atom.index] = [r,g,b]
+    ############################################################################
+
+
+    if(povray): #use POVray renderer (high quality, CPU intensive)
+        config_copy = atoms.copy()
+        #config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
+
+        write('{0}.pov'.format(label), 
+            atoms, 
+            format='pov',
+            radii = ATOMIC_RADIUS, 
+            rotation=rotations,
+            colors=colors,
+            povray_settings=dict(canvas_width=width_res, 
+                                 celllinewidth=CELLLINEWIDTH, 
+                                 transparent=False, 
+                                 camera_type='orthographic',
+                                 textures = (['pale'] if depth_cueing else ['ase3']) * len(atoms),
+                                 camera_dist=1, 
+                                 bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS),
+                                 bondlinewidth=BOND_LINE_WIDTH
+                                )                                
+        ).render()
+        os.remove('{0}.pov'.format(label))
+        os.remove('{0}.ini'.format(label))
+
+    else: # use ASE renderer (low quality, does not draw bonds)
+        write(label + '.png', atoms, 
+              format='png', 
+              radii = ATOMIC_RADIUS, 
+              rotation=rotations, 
+              colors=colors,
+              maxwidth=width_res,
+              scale=100)
+
+
+def config_images(calc_type : str, i_or_f = 'f', povray : bool = False, witdth_res : int = None, index : str = None, rotations : str = None):
 
     if witdth_res is None and povray: witdth_res = 500  # I used 3000. From 1500 is still quite good. 2000 maybe best compromise (still very high res)
     if i_or_f == 'i':
@@ -266,22 +369,35 @@ def config_images(which : str, i_or_f = 'f', povray = False, witdth_res=500, ind
 
     print('All images saved in {0}.'.format(which+'_'+images_dirname))
 
+#OK (code agnostic)
+def view_config(calc_type : str, in_or_out : str, index : int):
+    '''
+    View the selected config with ASE viewer
 
-def view_config(which : str, index : int):
-    if which == 's':
-        which = 'screening'
-        pw = 'pwi'
-    elif which == 'r':
-        which = 'relax'
-        pw = 'pwo'
-    file = which+'_{0}.'.format(index)+pw
+    Args:
+    - calc_type: 'SCREENING' or 'RELAX'
+    - in_or_out: read from input or from output
+    - index: index of the configuration
+    '''
+
+    settings = Settings()
+    
+    if in_or_out == 'in':
+        FILE_PATHS = IN_FILE_PATHS
+    elif in_or_out == 'f':
+        FILE_PATHS = OUT_FILE_PATHS
+    else:
+        raise ValueError(f'in or out not recongized. You provided {in_or_out}.')
+
+    file = FILE_PATHS[calc_type][settings.program].format(index)
+
     try:
+        import ase_custom #to make sure that read is correctly monkey-patched
         config = read(file, index=':')
+        view(config)
     except:
-        config =  read(file) if pw == 'pwi' else read(file, results_required=False)
-        print('Not possible to load the full relaxation history because of the ase bug for Espresso > 6.7. Showing only the last configuration.')
-    view(config)        
-
+        print('It was not possible to read the requested configuration.')
+            
 
 def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
 
@@ -414,67 +530,49 @@ def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
 
     print('All animations saved to {0}.'.format('relax_'+images_dirname))
 
-
+#OK (code agnostic)
 def plot_energy_evolution(calc_type : str):
 
+    from matplotlib import pyplot as plt
+    import numpy as np
+    
     settings = Settings()
-    Eslab, Emol = (settings.E_slab_mol[0], settings.E_slab_mol[1])
 
-    print('Reading files...')
-    pwo_list=natsorted(glob.glob(which+'_*.pwo'))
-    labels = [int(pwo.split('.pwo')[0].split('_')[-1]) for pwo in pwo_list]
-
-    totens = []
-    relax_terminated = []
-    non_conv_scf = []
+    results = get_calculations_results(program=settings.program, 
+                                        calc_type=calc_type,
+                                        E_slab_mol=settings.E_slab_mol,
+                                        full_evolution=True)
 
     
-    for file in pwo_list:
-
-        totens.append([])
-
-        with open(file, 'r') as f:
-            pwo = f.readlines()
-
-        end = False
-        NONCONV = False
-        for line in pwo: #make sure to get the last one (useful in relaxations)
-            if '!' in line: 
-                totens[-1].append( (float(line.split()[4]) - (Eslab+Emol)) * rydbergtoev )
-            if 'convergence NOT achieved' in line:
-                NONCONV = True
-            if 'convergence has been achieved' in line:
-                NONCONV = False    
-            if 'Final energy' in line:
-                end = True
-                break
-        relax_terminated.append(end)
-        non_conv_scf.append(NONCONV)
-    print('All files read.')
-
-
-    from matplotlib import pyplot as plt
     plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
-    for i, config_e in enumerate(totens):
-        if(False):#len(config_e) > 10): #skip first 10 steps
-            plt.plot([*range(10, len(config_e))], config_e[10:], '-', label=labels[i])
-            plt.xlim(xmin=10)
+    for i_config, energy_array in results['energies'].items():
+        if energy_array:
+
+            #completion status of the calculations
+            if results['relax_completed'][i_config]:
+                status = ''
+            elif results['scf_nonconverged'][i_config]:
+                status = '**'
+            else: 
+                status = '*' #relax not completed, but scf converged
+            
+            plt.plot(energy_array, '-', label=f'{i_config}: {energy_array[-1]:.2f}{status} eV')
+
+            if ('*' in status): 
+                symbol = 'x' if status == '*' else '^'
+                color = 'black' if status == '*' else 'red'
+                plt.plot(len(energy_array)-1, energy_array[-1], symbol, color=color)
         else:
-            if config_e:
-                plt.plot(config_e, '-', label='{0}: {1:.2f}{2} eV'.format(labels[i], config_e[-1], '' if relax_terminated[i] else '*' if not non_conv_scf[i] else '**'))
-                if (not relax_terminated[i]): 
-                    plt.plot(len(config_e)-1, config_e[-1], 'x' if not non_conv_scf[i] else '^', color='black' if not non_conv_scf[i] else 'red')
-            else:
-                print('Config. {0} job has not reached the first scf convergence. It will be skipped.'.format(labels[i]))
-            #plt.xlim(xmin=0)
+            print(f'Config. {i_config} job has not reached the first scf convergence. It will be skipped.')
             
     
     plt.title('Energy evolution during optimization')
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
-    import math
-    plt.legend(title="Config, energy", ncols=math.ceil(len(totens)/10), prop={'size': 6  if which == 'screening' else 8})
-    energy_plot_filename = '{0}_energies.png'.format(which)
+    plt.legend(title="Config, energy", 
+               ncols=np.ceil(len([x for x in results['energies'].values() if x is not None])/10), 
+               prop={'size': 6  if calc_type == 'SCREENING' else 8})
+    energy_plot_filename = f'{calc_type.lower()}_energies.png'
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
-    print('plot saved in {0}'.format(energy_plot_filename))
+    print(f'Plot saved in {energy_plot_filename}')

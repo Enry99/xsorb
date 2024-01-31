@@ -82,7 +82,7 @@ def _get_actually_present_outputs(program : str, calc_type : str):
     return existing_indices
 
 #OK (code agnostic) 
-def get_energy(program : str, calc_type : str, i_calc : int):
+def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bool = False):
     '''
     Returns the TOTAL energy for a given configuration, or None if not available
 
@@ -90,18 +90,23 @@ def get_energy(program : str, calc_type : str, i_calc : int):
     - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
     - calc_type: 'SCREENING' or 'RELAX'
     - i_calc: numeric index of the calculation
+    - full_evolution: if True, returns a NDarray with the energies of the relaxation
     '''
     
     filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
 
     try:
-        atoms = read(filename)
-        return atoms.get_potential_energy()
+        if not full_evolution:
+            atoms = read(filename)
+            return atoms.get_potential_energy()
+        else:
+            atoms_list = read(filename, index=':')
+            return np.array([a.get_potential_energy() for a in atoms_list])
     except:
         return None
 
 #OK (code agnostic) 
-def get_calculations_results(program : str, calc_type : str, E_slab_mol : list = [0,0], VERBOSE : bool =True):
+def get_calculations_results(program : str, calc_type : str, E_slab_mol : list = [0,0], full_evolution : bool = False, VERBOSE : bool =True):
     '''
     Returns a dictionary in the format
 
@@ -117,6 +122,7 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
     - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
     - calc_type: 'SCREENING' or 'RELAX'
     - E_slab_mol: if not [0,0] returns the adsorption energy in eV
+    - full_evolution: if True, each config in 'energies' will contain an array with the energies during relaxation
     - VERBOSE: give warning messages for noncompleted calculations
     '''
 
@@ -128,7 +134,7 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
         if not os.path.isfile(OUT_FILE_PATHS[calc_type][program].format(index)):
             continue #skip if file does not exist yet
 
-        energy = (get_energy(program, calc_type, index) - (E_slab_mol[0]+E_slab_mol[1])) 
+        energy = (get_energy(program, calc_type, index, full_evolution) - (E_slab_mol[0]+E_slab_mol[1])) 
         relax_completed = is_completed(program, calc_type, 'RELAX_COMPLETED', index)
         scf_nonconverged = is_completed(program, calc_type, 'SCF_NONCONVERGED', index)
 
@@ -175,11 +181,11 @@ def write_results_to_file(TXT=False):
                 if screening_results['scf_nonconverged'][i]:
                     print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep.\
                            The energy will be marked with **')
-                    column_data[-1] = str(column_data[-1])+'**'
+                    column_data[-1] = f'{column_data[-1]:.3f}**'
                 if not screening_results['relax_completed'][i]:
                     print(f'Warning! {i} relaxation has not reached final configuration. \
                            The energy will be marked with a *')
-                    column_data[-1] = str(column_data[-1])+'*'
+                    column_data[-1] = f'{column_data[-1]:.3f}*'
 
             else: #if the file does not exist
                 column_data.append(None)
@@ -202,11 +208,11 @@ def write_results_to_file(TXT=False):
                 if relax_results['scf_nonconverged'][i]:
                     print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep.\
                            The energy will be marked with **')
-                    column_data[-1] = str(column_data[-1])+'**'
+                    column_data[-1] = f'{column_data[-1]:.3f}**'
                 if not relax_results['relax_completed'][i]:
                     print(f'Warning! {i} relaxation has not reached final configuration. \
                            The energy will be marked with a *')
-                    column_data[-1] = str(column_data[-1])+'*'
+                    column_data[-1] = f'{column_data[-1]:.3f}*'
 
             else: #if the file does not exist
                 column_data.append(None)

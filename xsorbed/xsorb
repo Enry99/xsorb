@@ -81,7 +81,7 @@ def main():
         relax_animations(povray=args.povray, witdth_res=args.width_res, SCREEN_ONLY=args.screening_animations)
 
     elif(args.view):
-        view_config(which=args.view[0], index=int(args.view[1:]))
+        view_config('SCREENING' if args.view[0] == 's' else 'RELAX', in_or_out = args.view[1], index=int(args.view[2]))
 
     elif(args.savefiles is not None):
         saveas(calc_type=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])

@@ -53,7 +53,7 @@ def build_xsorb_parser():
     #main_visual.add_argument('-render-image', nargs=2, help='select which image to render and the rotations list for the camera (syntax: [s/r][index] [rotations], e.g. r12 -10z,-80x)')
     main_visual.add_argument('-screening-animations', action='store_true', help='save animations of the screening in gif (default) or mp4 format (for povray)')
     main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the full relaxations (screen.+final) in gif (default) or mp4 format (for povray)')
-    main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
+    main_visual.add_argument('-view', nargs=3, type=str, help='select which config to open with ase gui (syntax: [s/r] [in/out] [index], e.g. s in 3)')
     main_visual.add_argument('-savefiles', nargs=3, help='save files in specific format (syntax: [format] [calc_type] [i/f], e.g. cif screening i or xyz relax f)')
     #optional flags
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
