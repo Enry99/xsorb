@@ -9,14 +9,16 @@ Collection of functions for generating images
 """
 
 import numpy as np
-import glob, sys, os, shutil
+import glob, os, shutil
 from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
 from xsorbed.slab import Slab
+from xsorbed.molecule import Molecule
 from xsorbed.settings import Settings
-from xsorbed.io_utils import get_calculations_results
-from dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
+from xsorbed.io_utils import get_calculations_results, _get_configurations_numbers
+from xsorbed.dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
+from xsorbed.common_definitions import *
 
 
 #OK (code agnostic)
@@ -44,174 +46,73 @@ def plot_adsorption_sites(ALL : bool = False):
                                VERBOSE = True)
 
 
-def render_image(atoms : Atoms, 
-                 label : str, 
-                 povray : bool = True, 
-                 width_res : int = 700, 
-                 rotations : str = '',
-                 supercell : list = None,
-                 depth_cueing : float = None,
-                 range_cut : tuple = None,
-                 custom_settings = None):
-     
+def get_data_for_config_images(calc_type : str, i_or_f = 'f'):
+    
+    settings = Settings()
 
-    #scaling factors for drawing atoms and bonds
-    ATOMIC_RADIUS_DEFAULT = 0.6
-    BOND_RADIUS_DEFAULT = 0.8
-    BOND_LINE_WIDTH_DEFAULT = 0.1
-
-
-    if supercell:
-        atoms *= supercell
-
-    #cut the vacuum above the top slab
-    #cell = atoms.cell.lengths()
-    #cell[2] = np.max([atom.z for atom in atoms]) + 2
-    #atoms.set_cell(cell, scale_atoms = False)
-
-    if range_cut is not None:
-        del atoms[[atom.index for atom in atoms if atom.z < range_cut[0] or atom.z > range_cut[1]]]
-
-    #set custom colors if present ################################################
-    from ase.data.colors import jmol_colors
-    ATOM_COLORS = jmol_colors.copy()
-
-    if custom_settings is not None:
-        USER_COLORS       = custom_settings["atomic_colors"] if "atomic_colors" in custom_settings else []
-        ATOMIC_RADIUS     = custom_settings["atomic_radius"] if "atomic_radius" in custom_settings else ATOMIC_RADIUS_DEFAULT
-        BOND_RADIUS       = custom_settings["bond_radius"] if "bond_radius" in custom_settings else BOND_RADIUS_DEFAULT
-        BOND_LINE_WIDTH   = custom_settings["bond_line_width"] if "bond_line_width" in custom_settings else BOND_LINE_WIDTH_DEFAULT
-        CELLLINEWIDTH     = custom_settings["cell_line_width"] if "cell_line_width" in custom_settings else 0
-    else:
-        USER_COLORS  = []
-        ATOMIC_RADIUS     = ATOMIC_RADIUS_DEFAULT
-        BOND_RADIUS       = BOND_RADIUS_DEFAULT
-        BOND_LINE_WIDTH   = BOND_LINE_WIDTH_DEFAULT
-        CELLLINEWIDTH     = 0
-
-    for color in USER_COLORS:
-        ATOM_COLORS[color[0]] = color[1]
-
-    colors = [ ATOM_COLORS[atom.number] for atom in atoms]
-
-
-    #fading color for lower layers in top view
-    if (depth_cueing is not None):
-        zmax = max([atom.z for atom in atoms])
-        zmin = min([atom.z for atom in atoms])
-        delta = zmax - zmin
-        if depth_cueing < 0:
-            raise ValueError("depth_cueing_intensity must be >=0.")
-        for atom in atoms:       
-            r,g,b = colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta * depth_cueing
-            if r>1: r=1
-            if g>1: g=1
-            if b>1: b=1
-            colors[atom.index] = [r,g,b]
-    ############################################################################
-
-
-    if(povray): #use POVray renderer (high quality, CPU intensive)
-        config_copy = atoms.copy()
-        #config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
-
-        write('{0}.pov'.format(label), 
-            atoms, 
-            format='pov',
-            radii = ATOMIC_RADIUS, 
-            rotation=rotations,
-            colors=colors,
-            povray_settings=dict(canvas_width=width_res, 
-                                 celllinewidth=CELLLINEWIDTH, 
-                                 transparent=False, 
-                                 camera_type='orthographic',
-                                 textures = (['pale'] if depth_cueing else ['ase3']) * len(atoms),
-                                 camera_dist=1, 
-                                 bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS),
-                                 bondlinewidth=BOND_LINE_WIDTH
-                                )                                
-        ).render()
-        os.remove('{0}.pov'.format(label))
-        os.remove('{0}.ini'.format(label))
-
-    else: # use ASE renderer (low quality, does not draw bonds)
-        write(label + '.png', atoms, 
-              format='png', 
-              radii = ATOMIC_RADIUS, 
-              rotation=rotations, 
-              colors=colors,
-              maxwidth=width_res,
-              scale=100)
-
-
-def config_images(calc_type : str, i_or_f = 'f', povray : bool = False, witdth_res : int = None, index : str = None, rotations : str = None):
-
-    if witdth_res is None and povray: witdth_res = 500  # I used 3000. From 1500 is still quite good. 2000 maybe best compromise (still very high res)
-    if i_or_f == 'i':
-        pw = 'pwi'
-    else:
-        pw = 'pwo'
     print('Reading files...')
-    pw_list=natsorted(glob.glob(which+'_*.'+pw))
-    if(not pw_list):
-        print("Files not found. Quitting.")
-        sys.exit(1)
 
-    configs = []
-    labels = []
-    uncompleted = []  #IMPOSSIBILE TO READ PWOs of non-converged scf, due to an error: /ase/ase/io/espresso.py", line 368, in read_espresso_out 
-    #assert len(eigenvalues[0]) == len(ibzkpts), \AssertionError: ((2, 0), 1).      So skipping those configs
-    for file in pw_list:
-        with open(file, 'r') as f:
-            lines = f.readlines()
-        STOP = False
-        for line in lines:
-            if 'convergence NOT achieved' in line:
-                STOP = True            
-            if 'bfgs converged' in line:
-                STOP = False
-                break          
-        if(STOP): 
-            print("Found 'convergence NOT achieved' in {0}, so relaxation was not completed. It will be skipped.".format(file))
-            uncompleted.append(file)
-            continue
-        configs.append(read(file) if pw == 'pwi' else read(file, results_required=False))
-        labels.append(file.split('.'+pw)[0].split('_')[-1])
+    if i_or_f == 'i': #read from input file
+        
+        results = None
+        calc_indices = _get_configurations_numbers()
+        configs = [read(IN_FILE_PATHS[calc_type][settings.program].format(i)) for i in calc_indices]
+
+    elif i_or_f == 'f': #read from output file
+
+        results = get_calculations_results(settings.program, calc_type, settings.E_slab_mol)
+        calc_indices = [key for key, val in results['energies'].items() if val is not None]
+        configs = [read(OUT_FILE_PATHS[calc_type][settings.program].format(i)) for i in calc_indices]
+
+    
+    #read slab and mol 
+    slab = Slab(slab_filename=settings.slab_filename, 
+                layers_threshold=settings.layers_height, 
+                surface_sites_height=settings.surface_height, 
+                fixed_layers_slab=settings.fixed_layers_slab, 
+                fixed_indices_slab=settings.fixed_indices_slab, 
+                fix_slab_xyz=settings.fix_slab_xyz,
+                sort_atoms_by_z=settings.sort_atoms_by_z,
+                translate_slab_from_below_cell_bottom=settings.translate_slab)
+
+    mol = Molecule(molecule_filename=settings.molecule_filename,
+                   atom_index=settings.selected_atom_index,
+                   molecule_axis_atoms=settings.molecule_axis_atoms, 
+                   axis_vector=settings.axis_vector, 
+                   atoms_subset=settings.mol_subset_atoms, 
+                   fixed_indices_mol=settings.fixed_indices_mol, 
+                   fix_mol_xyz=settings.fix_mol_xyz)
+    
+
+    #TODO: put here the reindexing for VASP
+    mol_atoms_indices = np.arange(mol.natoms) if settings.mol_before_slab else np.arange(mol.natoms) + slab.natoms
+    slab_atoms_indices = np.arange(slab.natoms) if not settings.mol_before_slab else np.arange(slab.natoms) + mol.natoms
 
     print('All files read.')
-
-    if index is not None:
-        configs = [configs[labels.index(index)]] #just one
-        labels = [labels[labels.index(index)]]
-
-    print('Saving images...')
-
-    #try:
-    settings = Settings()
-    E_slab_mol = settings.E_slab_mol
-    slab_filename = settings.slab_filename
-    Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
-    
 
     from ase.data.colors import jmol_colors
     ATOM_COLORS_SLAB = jmol_colors.copy()
     ATOM_COLORS_MOL  = jmol_colors.copy()
 
-    if os.path.isfile("custom_colors.json"):
+    if os.path.isfile(custom_colors_filename):
         import json
-        with open("custom_colors.json", "r") as f:
+        with open(custom_colors_filename, "r") as f:
             custom_colors = json.load(f)
 
         print("Custom colors read from file.")
 
         USER_COLORS_SLAB  = custom_colors["slab_colors"] if "slab_colors" in custom_colors else []
         USER_COLORS_MOL   = custom_colors["mol_colors"] if "mol_colors" in custom_colors else []
-        BOND_RADIUS       = custom_colors["bond_radius"] if "bond_radius" in custom_colors else RADIUS_DEFAULT
+        ATOMIC_RADIUS     = custom_colors["atomic_radius"] if "atomic_radius" in custom_colors else ATOMIC_RADIUS_DEFAULT
+        BOND_RADIUS       = custom_colors["bond_radius"] if "bond_radius" in custom_colors else BOND_RADIUS_DEFAULT
+        BOND_LINE_WIDTH   = custom_colors["bond_line_width"] if "bond_line_width" in custom_colors else BOND_LINE_WIDTH_DEFAULT
         CELLLINEWIDTH     = custom_colors["cell_line_width"] if "cell_line_width" in custom_colors else 0
     else:
         USER_COLORS_SLAB  = []
         USER_COLORS_MOL   = []
-        BOND_RADIUS       = RADIUS_DEFAULT
+        ATOMIC_RADIUS     = ATOMIC_RADIUS_DEFAULT
+        BOND_RADIUS       = BOND_RADIUS_DEFAULT
+        BOND_LINE_WIDTH   = BOND_LINE_WIDTH_DEFAULT
         CELLLINEWIDTH     = 0
 
     for color in USER_COLORS_SLAB:
@@ -219,31 +120,26 @@ def config_images(calc_type : str, i_or_f = 'f', povray : bool = False, witdth_r
     for color in USER_COLORS_MOL:
         ATOM_COLORS_MOL[color[0]] = color[1]
 
-    if(True):
-        from ase.build import make_supercell
-        Nbulk_original = Nbulk
 
-    main_dir = os.getcwd()
+    return configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH, CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices
 
-    figures_dir = '{0}/{1}'.format(which+'_'+images_dirname, 'initial' if i_or_f == 'i' else 'final')
 
-    if(not os.path.exists(figures_dir)):
-        os.makedirs(figures_dir)
-    os.chdir(figures_dir) 
+def get_decorated_structures(configs : list, 
+                             mol_atoms_indices : list, 
+                             slab_atoms_indices : list,
+                             ATOM_COLORS_SLAB : list,
+                             ATOM_COLORS_MOL : list, 
+                             extend_slab : bool = True, 
+                             depth_cueing : float = None):
+    
+    for config in configs:
 
-    for i, config in enumerate(configs):
-        label = labels[i]
+        mol = config[mol_atoms_indices]
+        slab = config[slab_atoms_indices]
 
         #section to repeat the bulk if mol is partially outside###############
-        if(True):
-            mol = config[Nbulk_original:]
-            slab = config[:Nbulk_original]
-            #print(config.get_scaled_positions())
-            #print(config.cell[:])
-
-            x_rep, y_rep = (3,3)
-            slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False) 
-
+        if(extend_slab):
+            slab *= [3,3,1]
             mol.cell = slab.cell          
             mol.translate(+(config.cell[:][0] + config.cell[:][1]) )
 
@@ -257,117 +153,166 @@ def config_images(calc_type : str, i_or_f = 'f', povray : bool = False, witdth_r
             min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
 
             del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
-            Nbulk = len(slab)
+            Nslab = len(slab)
             slab.translate(-(config.cell[:][0] + config.cell[:][1]) )
             mol.translate(-(config.cell[:][0] + config.cell[:][1]) )
             slab.cell = config.cell
             mol.cell = config.cell
             config = slab + mol
-            #print(config.cell[:])
         #######################################################################
 
 
-        #fading color for lower layers in top view
-        zmax = max([atom.z for atom in config if atom.index < Nbulk])
-        zmin = min([atom.z for atom in config if atom.index < Nbulk])
+    config = configs[0] #just choose one to set the colors
+    
+    colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nslab else ATOM_COLORS_MOL[atom.number] for atom in config]
+    colors_depthcued = colors.copy()
+    textures = ['ase3'] * (len(config))  
+    textures_depthcued = textures.copy() 
+  
+
+    #fading color for lower layers in top view
+    if (depth_cueing):
+        zmax = max([atom.z for atom in config if atom.index < Nslab])
+        zmin = min([atom.z for atom in config if atom.index < Nslab])
         delta = zmax - zmin
-        import numpy as np
+        if depth_cueing < 0:
+            raise ValueError("depth_cueing_intensity must be >=0.")
+        for atom in config[np.arange(Nslab)]:       
+            r,g,b = colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta * depth_cueing
+            if r>1: r=1
+            if g>1: g=1
+            if b>1: b=1
+            colors_depthcued[atom.index] = [r,g,b]
+        
+        textures_depthcued = ['pale'] * Nslab + ['ase3'] * (len(config)-Nslab) 
 
-        colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nbulk else ATOM_COLORS_MOL[atom.number] for atom in config]
-        colors_top = [ (colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta).round(4) if atom.index < Nbulk else colors[atom.index] for atom in config ]
+    return configs, colors, colors_depthcued, textures, textures_depthcued
 
-        if(povray):
-            config_copy = config.copy()
-            config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
 
-            if rotations is not None: #use specified rotation
-                write(which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')), 
+def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, povray : bool, results : dict):
+
+    from matplotlib import pyplot as plt
+    import matplotlib.image as mpimg
+
+    #calculate aspect ratio for one image:
+    img = mpimg.imread(f"{calc_type.lower()}_{calc_indices[0]}_{rot_label}{'_pov' if povray else ''}.png") 
+    ar = float(img.shape[1]) / float(img.shape[0]) #width/height
+
+
+    n_rows_fig = max(int(np.ceil(len(calc_indices)/5.)), 1)
+    n_cols_fig = max(int(np.ceil(len(calc_indices)/float(n_rows_fig))), 1)
+    height = n_rows_fig * 2
+    width  = n_cols_fig * ar * 2
+    fig = plt.figure(figsize=(width, height))
+    fig.subplots_adjust(wspace=0.1)
+    axes = [fig.add_subplot(n_rows_fig,n_cols_fig,i) for i in range(1,len(calc_indices) + 1)]
+
+    imin = np.argmin([results['energies'][calc_index] for calc_index in calc_indices])
+    for i, calc_index in enumerate(calc_indices):
+        img = mpimg.imread(f"{calc_type.lower()}_{calc_index}_{rot_label}{'_pov' if povray else ''}.png")
+        axes[i].imshow(img)
+        axes[i].axis('equal') #ensures all images are in identical rectangular boxes, rescaling the size of the image if necessary
+        energy = results['energies'][calc_index]
+        status = '**' if results['scf_nonconverged'][calc_index] else '*' if not results['relax_completed'][calc_index] else ''
+        axes[i].set_title(f'{energy:.2f}{status} eV', fontsize = 5, pad=1, color='red' if i == imin else 'black')
+        #rect = plt.patches.Rectangle((0.0, 0.93), 0.08, 0.07, transform=axes[i].transAxes, facecolor='white', edgecolor='black', linewidth=0.5)
+        #axes[i].add_artist(rect)
+        #axes[i].text(0.04, 0.985 ...
+        axes[i].text(0.045, 0.988, calc_index, fontsize = 3.5, transform=axes[i].transAxes, horizontalalignment="left", verticalalignment="top",
+            bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),) 
+            #fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
+        axes[i].set_xticks([])
+        axes[i].set_yticks([])
+    fig.savefig(f"{calc_type.lower()}_overview{'_pov' if povray else ''}.png", dpi=700, bbox_inches='tight')
+
+
+def config_images(calc_type : str, 
+                  i_or_f = 'f', 
+                  povray : bool = False, 
+                  width_res : int = None, 
+                  rotations : str = None, 
+                  extend_slab: bool = True, 
+                  depth_cueing : float = None):
+
+
+    if width_res is None and povray: width_res = 500  # I used 3000. From 1500 is still quite good. 2000 maybe best compromise (still very high res)
+
+    configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
+        CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images(calc_type, i_or_f)
+    
+
+    configs, colors, colors_depthcued, \
+          textures, textures_depthcued = get_decorated_structures(configs=configs,
+                                                           mol_atoms_indices=mol_atoms_indices,
+                                                           slab_atoms_indices=slab_atoms_indices,
+                                                           ATOM_COLORS_SLAB=ATOM_COLORS_SLAB,
+                                                           ATOM_COLORS_MOL=ATOM_COLORS_MOL,
+                                                           extend_slab=extend_slab,
+                                                           depth_cueing=depth_cueing)
+    
+
+    if not rotations: #top, lateral
+        rot_list = ['', '-5z,-85x'] 
+        rotations_labels = ['top', 'lateral']
+        color_list = [colors_depthcued, colors]
+        textures_list = [textures_depthcued, textures]
+    else: #use specified rotation
+        rot_list = [rotations]
+        rotations_labels = [rotations.replace(',','_')]
+        color_list = [colors_depthcued]
+        textures_list = [textures_depthcued]
+
+
+    print('Saving images...')
+
+    main_dir = os.getcwd()
+    
+    figures_dir = f"{calc_type.lower()}_{images_dirname}/{'initial' if i_or_f == 'i' else 'final'}"    
+    os.makedirs(figures_dir, exist_ok=True)
+    
+    os.chdir(figures_dir)     
+    
+    for i, config in zip(calc_indices, configs):
+        
+        for rot, rot_label, color, texture in zip(rot_list, rotations_labels, color_list, textures_list):
+
+            file_label = f"{calc_type.lower()}_{i}_{rot_label}{'_pov' if povray else ''}"
+            
+            if(povray): #use POVray renderer (high quality, CPU intensive)
+                config_copy = config.copy()
+                #config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
+
+                write(f'{file_label}.pov', 
                     config, 
                     format='pov',
-                    radii = 0.65, 
-                    rotation=rotations,
-                    colors=colors,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
-                    #camera_type='perspective'
+                    radii = ATOMIC_RADIUS, 
+                    rotation=rot,
+                    colors=color,
+                    povray_settings=dict(canvas_width=width_res, 
+                                        celllinewidth=CELLLINEWIDTH, 
+                                        transparent=False, 
+                                        camera_type='orthographic',
+                                        #textures = texture,
+                                        camera_dist=1, 
+                                        bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS),
+                                        bondlinewidth=BOND_LINE_WIDTH,
+                                        #area_light = [(-1.0, -1.0, 200.), 'White', 22.0, 102.0, 20, 2],
+                                        )                                
                 ).render()
-                os.remove(which+'_{0}_{1}_pov.pov'.format(label, rotations.replace(',','_')))
-                os.remove(which+'_{0}_{1}_pov.ini'.format(label, rotations.replace(',','_')))
-            else: #front and top view
-                #front view
-                write(which+'_{0}_pov.pov'.format(label), 
-                    config, 
-                    format='pov',
-                    radii = 0.65, 
-                    rotation='-5z,-85x', 
-                    colors=colors,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
-                    #camera_type='perspective'
-                ).render()
-                os.remove(which+'_{0}_pov.pov'.format(label))
-                os.remove(which+'_{0}_pov.ini'.format(label))
+                os.remove(f'{file_label}.pov')
+                os.remove(f'{file_label}.ini')
 
-                #top view
+            else:
+                write(f'{file_label}.png', config, rotation=rot, scale = 100, colors=color)
 
-                textures = ['pale'] * Nbulk + ['ase3'] * (len(config)-Nbulk)
-                write(which+'_{0}_top_pov.pov'.format(label), 
-                    config, 
-                    format='pov',
-                    radii = 0.65, 
-                    colors=colors_top,
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, textures = textures,
-                        camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS))
-                    #camera_type='perspective'
-                ).render()
-                os.remove(which+'_{0}_top_pov.pov'.format(label))
-                os.remove(which+'_{0}_top_pov.ini'.format(label))
-
-        else:
-            if rotations is not None: #use specified rotation
-                write(which+'_{0}_{1}.png'.format(label, rotations), config, rotation=rotations, scale = 100, colors=colors)
-            else: #front and top view           
-                write(which+'_{0}.png'.format(label), config, rotation='-10z,-80x', scale = 100, colors=colors) #front view
-                write(which+'_{0}_top.png'.format(label), config, scale = 100, colors=colors_top) #top view
+    if(i_or_f == 'f'):
+        plot_overview_grid(calc_type, rotations_labels[1], calc_indices, povray, results)
+        #rotations_labels[0]: use top if not customrot, else use customrot for the grid
 
     os.chdir(main_dir)
 
-    if(pw=='pwo' and index is None):
-        
-        import numpy as np
-        from matplotlib import pyplot as plt
-        import matplotlib.image as mpimg
+    print(f'All images saved in {figures_dir}.')
 
-        #calculate aspect ratio for one image:
-        img = mpimg.imread(figures_dir+'/'+which+'_{0}{1}.png'.format(labels[0], '_pov' if povray else ''))
-        ar = float(img.shape[1]) / float(img.shape[0]) #width/height
-
-        n_rows_fig = max(int(np.ceil(len(configs)/5.)), 1)
-        n_cols_fig = max(int(np.ceil(len(configs)/float(n_rows_fig))), 1)
-        height = n_rows_fig * 2
-        width  = n_cols_fig * ar * 2
-        fig = plt.figure(figsize=(width, height))
-        fig.subplots_adjust(wspace=0.1)
-        axes = [fig.add_subplot(n_rows_fig,n_cols_fig,i) for i in range(1,len(configs) + 1)]
-    
-        energies = [read_energy(file, *E_slab_mol) for file in pw_list if file not in uncompleted]
-
-        for i, conf in enumerate(configs):
-            if energies[i] == None : continue
-            label = labels[i]
-            img = mpimg.imread(figures_dir+'/'+which+'_{0}{1}.png'.format(label, '_pov' if povray else ''))
-            axes[i].imshow(img)
-            axes[i].axis('equal') #ensures all images are in identical rectangular boxes, rescaling the size of the image if necessary
-            axes[i].set_title('{0:.2f} eV'.format(energies[i]), fontsize = 5, pad=1)
-            #rect = plt.patches.Rectangle((0.0, 0.93), 0.08, 0.07, transform=axes[i].transAxes, facecolor='white', edgecolor='black', linewidth=0.5)
-            #axes[i].add_artist(rect)
-            #axes[i].text(0.04, 0.985 ...
-            axes[i].text(0.045, 0.988, label, fontsize = 3.5, transform=axes[i].transAxes, horizontalalignment="left", verticalalignment="top",
-                bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),) 
-                #fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
-            axes[i].set_xticks([])
-            axes[i].set_yticks([])
-        fig.savefig('{1}/{0}_overview{2}.png'.format(which, figures_dir,'_pov' if povray else ''), dpi=700, bbox_inches='tight')
-
-    print('All images saved in {0}.'.format(which+'_'+images_dirname))
 
 #OK (code agnostic)
 def view_config(calc_type : str, in_or_out : str, index : int):
@@ -546,7 +491,7 @@ def plot_energy_evolution(calc_type : str):
     
     plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
     for i_config, energy_array in results['energies'].items():
-        if energy_array:
+        if energy_array[0]:
 
             #completion status of the calculations
             if results['relax_completed'][i_config]:

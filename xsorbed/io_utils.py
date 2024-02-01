@@ -248,6 +248,8 @@ def write_results_to_file(TXT=False):
   
     datafile.to_csv(results_filename.replace('csv', 'txt' if TXT else 'csv'), sep='\t' if TXT else ',')
 
+    print('Results file written.')
+
 #OK (code agnostic) 
 def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices : list):
     '''

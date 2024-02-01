@@ -12,6 +12,10 @@ images_dirname              = 'images'
 screening_outdir            = 'screening_outdirs'
 relax_outdir                = 'relax_outdirs'
 jobscript_stdname           = 'jobscript' #standard name used in the copied version inside the outdirs
+custom_colors_filename      = "custom_colors.json"
 
-RADIUS_DEFAULT = 0.8  #radius for bondpairs in povray
+
+ATOMIC_RADIUS_DEFAULT = 0.6
+BOND_RADIUS_DEFAULT = 0.8
+BOND_LINE_WIDTH_DEFAULT = 0.1
 

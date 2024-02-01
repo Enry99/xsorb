@@ -58,6 +58,8 @@ def build_xsorb_parser():
     #optional flags
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
     visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
+    visualization_group.add_argument('--depth-cueing', nargs='?', type=float, const=1, help='Enable depth cueing. Optional parameter: intensity (>=0, default=1).') 
+    visualization_group.add_argument('--rotation', nargs=1, type=str, help='Rotation for saving images, in ASE format, e.g. 10z,5x') 
 
     return parser
 
