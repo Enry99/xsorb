@@ -2,12 +2,12 @@ ase_custom:       OK
 calculations:     OK
 cli_parser:       OK
 dftcode_specific:
-filenames:        --      
+common_defs:      --      
 fragments:        --
 input:            OK
 io_utils:         OK
 molecule:         OK
-postprocess:      --
+postprocess:      OK
 settings:         OK
 slab:             OK
 xfrag:            --

@@ -20,7 +20,6 @@ from xsorbed.io_utils import get_calculations_results, _get_configurations_numbe
 from xsorbed.dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
 from xsorbed.common_definitions import *
 
-
 #OK (code agnostic)
 def plot_adsorption_sites(ALL : bool = False):
     '''
@@ -45,12 +44,16 @@ def plot_adsorption_sites(ALL : bool = False):
                                figname = 'adsorption_sites_all.png' if ALL else 'adsorption_sites.png',
                                VERBOSE = True)
 
-
-def get_data_for_config_images(calc_type : str, i_or_f = 'f'):
+#OK (code agnostic)
+def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : bool = False):
     
     settings = Settings()
 
     print('Reading files...')
+
+    if read_evolution:
+        index=':'
+    else: index='-1'
 
     if i_or_f == 'i': #read from input file
         
@@ -62,7 +65,7 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f'):
 
         results = get_calculations_results(settings.program, calc_type, settings.E_slab_mol)
         calc_indices = [key for key, val in results['energies'].items() if val is not None]
-        configs = [read(OUT_FILE_PATHS[calc_type][settings.program].format(i)) for i in calc_indices]
+        configs = [read(OUT_FILE_PATHS[calc_type][settings.program].format(i), index=index) for i in calc_indices]
 
     
     #read slab and mol 
@@ -123,7 +126,7 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f'):
 
     return configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH, CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices
 
-
+#OK (code agnostic)
 def get_decorated_structures(configs : list, 
                              mol_atoms_indices : list, 
                              slab_atoms_indices : list,
@@ -134,35 +137,75 @@ def get_decorated_structures(configs : list,
     
     for config in configs:
 
-        mol = config[mol_atoms_indices]
-        slab = config[slab_atoms_indices]
+        if isinstance(config, list): #for full evolution
+        
+            first_frame = True
+            
+            for config_j in config:
+            
+                mol = config_j[mol_atoms_indices]
+                slab = config_j[slab_atoms_indices]
 
-        #section to repeat the bulk if mol is partially outside###############
-        if(extend_slab):
-            slab *= [3,3,1]
-            mol.cell = slab.cell          
-            mol.translate(+(config.cell[:][0] + config.cell[:][1]) )
+                #section to repeat the bulk if mol is partially outside###############
+                if(extend_slab):
+                    slab *= [3,3,1]
+                    mol.cell = slab.cell          
+                    mol.translate(+(config_j.cell[:][0] + config_j.cell[:][1]) )
 
-            max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
-            max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
-            dx_angstrom = 0.01 #distance in angstrom of surface extending beyond the molecule
-            a, b = config.cell.lengths()[:2]
-            max_a = max(2/3-0.05/a, max_a + dx_angstrom/a)
-            min_a = min(1/3-0.05/a, min_a - dx_angstrom/a)
-            max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
-            min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
+                    
+                    if first_frame: #set borders only in first frame for each config
+                        max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
+                        max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
+                        dx_angstrom = 0.01 #distance in angstrom of surface extending beyond the molecule
+                        a, b = config_j.cell.lengths()[:2]
+                        max_a = max(2/3-0.05/a, max_a + dx_angstrom/a)
+                        min_a = min(1/3-0.05/a, min_a - dx_angstrom/a)
+                        max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
+                        min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
 
-            del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
-            Nslab = len(slab)
-            slab.translate(-(config.cell[:][0] + config.cell[:][1]) )
-            mol.translate(-(config.cell[:][0] + config.cell[:][1]) )
-            slab.cell = config.cell
-            mol.cell = config.cell
+                        first_frame = False
+
+                    del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
+                    Nslab = len(slab)
+                    slab.translate(-(config_j.cell[:][0] + config_j.cell[:][1]) )
+                    mol.translate(-(config_j.cell[:][0] + config_j.cell[:][1]) )
+                    slab.cell = config_j.cell
+                    mol.cell = config_j.cell
+                #######################################################################
+                config_j = slab + mol
+    
+        else: #for just single configurations
+
+            mol = config[mol_atoms_indices]
+            slab = config[slab_atoms_indices]
+
+            #section to repeat the bulk if mol is partially outside###############
+            if(extend_slab):
+                slab *= [3,3,1]
+                mol.cell = slab.cell          
+                mol.translate(+(config.cell[:][0] + config.cell[:][1]) )
+
+                max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
+                max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
+                dx_angstrom = 0.01 #distance in angstrom of surface extending beyond the molecule
+                a, b = config.cell.lengths()[:2]
+                max_a = max(2/3-0.05/a, max_a + dx_angstrom/a)
+                min_a = min(1/3-0.05/a, min_a - dx_angstrom/a)
+                max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
+                min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
+
+                del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
+                Nslab = len(slab)
+                slab.translate(-(config.cell[:][0] + config.cell[:][1]) )
+                mol.translate(-(config.cell[:][0] + config.cell[:][1]) )
+                slab.cell = config.cell
+                mol.cell = config.cell
+            #######################################################################
             config = slab + mol
-        #######################################################################
 
 
-    config = configs[0] #just choose one to set the colors
+
+    config = configs[0][0] if isinstance(configs[0], list) else configs[0]  #just choose one to set the colors
     
     colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nslab else ATOM_COLORS_MOL[atom.number] for atom in config]
     colors_depthcued = colors.copy()
@@ -188,7 +231,7 @@ def get_decorated_structures(configs : list,
 
     return configs, colors, colors_depthcued, textures, textures_depthcued
 
-
+#OK (code agnostic)
 def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, povray : bool, results : dict):
 
     from matplotlib import pyplot as plt
@@ -225,7 +268,7 @@ def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, po
         axes[i].set_yticks([])
     fig.savefig(f"{calc_type.lower()}_overview{'_pov' if povray else ''}.png", dpi=700, bbox_inches='tight')
 
-
+#OK (code agnostic)
 def config_images(calc_type : str, 
                   i_or_f = 'f', 
                   povray : bool = False, 
@@ -251,11 +294,11 @@ def config_images(calc_type : str,
                                                            depth_cueing=depth_cueing)
     
 
-    if not rotations: #top, lateral
-        rot_list = ['', '-5z,-85x'] 
-        rotations_labels = ['top', 'lateral']
-        color_list = [colors_depthcued, colors]
-        textures_list = [textures_depthcued, textures]
+    if not rotations: #lateral, top, 
+        rot_list = ['-5z,-85x', ''] 
+        rotations_labels = ['lateral', 'top', ]
+        color_list = [colors, colors_depthcued]
+        textures_list = [textures, textures_depthcued]
     else: #use specified rotation
         rot_list = [rotations]
         rotations_labels = [rotations.replace(',','_')]
@@ -271,6 +314,8 @@ def config_images(calc_type : str,
     os.makedirs(figures_dir, exist_ok=True)
     
     os.chdir(figures_dir)     
+
+    import xsorbed.ase_custom #monkey patching
     
     for i, config in zip(calc_indices, configs):
         
@@ -296,7 +341,7 @@ def config_images(calc_type : str,
                                         camera_dist=1, 
                                         bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS),
                                         bondlinewidth=BOND_LINE_WIDTH,
-                                        #area_light = [(-1.0, -1.0, 200.), 'White', 22.0, 102.0, 20, 2],
+                                        #area_light=[(2., 3., 40.), 'White', .7, .7, 3, 3],
                                         )                                
                 ).render()
                 os.remove(f'{file_label}.pov')
@@ -306,7 +351,7 @@ def config_images(calc_type : str,
                 write(f'{file_label}.png', config, rotation=rot, scale = 100, colors=color)
 
     if(i_or_f == 'f'):
-        plot_overview_grid(calc_type, rotations_labels[1], calc_indices, povray, results)
+        plot_overview_grid(calc_type, rotations_labels[0], calc_indices, povray, results)
         #rotations_labels[0]: use top if not customrot, else use customrot for the grid
 
     os.chdir(main_dir)
@@ -337,143 +382,108 @@ def view_config(calc_type : str, in_or_out : str, index : int):
     file = FILE_PATHS[calc_type][settings.program].format(index)
 
     try:
-        import ase_custom #to make sure that read is correctly monkey-patched
+        import xsorbed.ase_custom #to make sure that read is correctly monkey-patched
         config = read(file, index=':')
         view(config)
     except:
         print('It was not possible to read the requested configuration.')
             
+#OK (code agnostic)
+def relax_animations(calc_type : str,
+                     povray : bool = False, 
+                     width_res : int = None, 
+                     extend_slab: bool = True, 
+                     depth_cueing : float = None):
 
-def relax_animations(povray = False, witdth_res=500, SCREEN_ONLY = False):
 
-
-    print('Reading files...')
-    pwo_list=glob.glob('relax_*.pwo')
-    if SCREEN_ONLY:
-        configs = [read(file.replace('relax', 'screening'), index=':')[:] for file in pwo_list]
-    else:
-        configs = [read(file.replace('relax', 'screening'), index=':')[:]+read(file, index=':')[:] for file in pwo_list] #full relax (screening+final)
-    labels = [pwo.split('.pwo')[0].split('_')[-1] for pwo in pwo_list]
-    print('All files read.')
+    if width_res is None and povray: width_res = 500
     
+
+    if calc_type == 'SCREENING':
+        configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
+            CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images('SCREENING', read_evolution=True)
+    else: #screening + relax
+        configs_scr, calc_indices_scr, _, _, _, _, _, _, _, _, _ = get_data_for_config_images('SCREENING', read_evolution=True)
+        
+        configs_rel, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
+            CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images('RELAX', read_evolution=True)
+
+        configs = []
+
+        for conf_rel, i_rel in zip(configs_rel, calc_indices):
+            configs.append(configs_scr[calc_indices_scr.index(i_rel)] + conf_rel )
+
+
+    configs, colors, colors_depthcued, \
+          textures, textures_depthcued = get_decorated_structures(configs=configs,
+                                                           mol_atoms_indices=mol_atoms_indices,
+                                                           slab_atoms_indices=slab_atoms_indices,
+                                                           ATOM_COLORS_SLAB=ATOM_COLORS_SLAB,
+                                                           ATOM_COLORS_MOL=ATOM_COLORS_MOL,
+                                                           extend_slab=extend_slab,
+                                                           depth_cueing=depth_cueing)
+    
+
+
+
     print('Generating animation(s)...')
 
-    #try:
-    settings = Settings()
-    slab_filename = settings.slab_filename
-    Nbulk = len(read(filename=slab_filename, results_required=False) if slab_filename.split('.')[-1]=='pwo' else read(filename=slab_filename))
- 
+    
+    savedir = f'relax_{images_dirname}'
+    os.makedirs(savedir, exist_ok=True)
 
-    from ase.data.colors import jmol_colors
-    ATOM_COLORS_SLAB = jmol_colors.copy()
-    ATOM_COLORS_MOL  = jmol_colors.copy()
+   
+    os.chdir(savedir)
+    cwd = os.getcwd()
 
-    if os.path.isfile("custom_colors.json"):
-        import json
-        with open("custom_colors.json", "r") as f:
-            custom_colors = json.load(f)
+    import xsorbed.ase_custom #monkey patching
+    
+    for i, config in zip(calc_indices, configs):
 
-        print("Custom colors read from file.")
+        if(povray):
 
-        USER_COLORS_SLAB = custom_colors["slab_colors"] if "slab_colors" in custom_colors else []
-        USER_COLORS_MOL  = custom_colors["mol_colors"] if "mol_colors" in custom_colors else []
-        BOND_RADIUS      = custom_colors["bond_radius"] if "bond_radius" in custom_colors else RADIUS_DEFAULT
-        CELLLINEWIDTH     = custom_colors["cell_line_width"] if "cell_line_width" in custom_colors else 0
-    else:
-        USER_COLORS_SLAB = []
-        USER_COLORS_MOL  = []
-        BOND_RADIUS      = RADIUS_DEFAULT 
-        CELLLINEWIDTH    = 0
-
-    for color in USER_COLORS_SLAB:
-        ATOM_COLORS_SLAB[color[0]] = color[1]
-    for color in USER_COLORS_MOL:
-        ATOM_COLORS_MOL[color[0]] = color[1]
-
-    if(True):
-        from ase.build import make_supercell
-        Nbulk_original = Nbulk
-
-
-    if(not os.path.exists('relax_'+images_dirname)):
-        os.mkdir('relax_'+images_dirname)
-    os.chdir('relax_'+images_dirname)
-
-    if(povray):
-        if witdth_res is None: witdth_res = 500 
-
-        for i, config in enumerate(configs): 
-
-            if os.path.isfile('relax_{}_pov.mp4'.format(labels[i])):
-                print('relax_{}_pov.mp4 already present. Skipping.'.format(labels[i]))
+            if os.path.isfile(f'relax_{config}_pov.mp4'):
+                print(f'relax_{config}_pov.mp4 already present. Skipping.')
                 continue      
             
             if os.path.exists('temp'):
                 shutil.rmtree('temp')
             os.mkdir('temp')  
-
             os.chdir('temp')
 
             for j, step in enumerate(config[:]):
                 
-
-                #section to repeat the bulk if mol is partially outside###############
-                #TODO: prendere le coordinate max tra gli step, in modo da usare sempre quelle per tutti gli step
-                if(True):
-                    mol = step[Nbulk_original:]
-                    slab = step[:Nbulk_original]
-                    #print(step.get_scaled_positions())
-                    #print(step.cell[:])
-
-                    x_rep, y_rep = (3,3)
-                    slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=True) 
-
-                    mol.cell = slab.cell          
-                    mol.translate(+(step.cell[:][0] + step.cell[:][1]) )
-
-                    max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
-                    max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
-                    dx_angstrom = 0.1 #distance in angstrom of surface extending beyond the molecule
-                    a, b = step.cell.lengths()[:2]
-                    max_a = max(2/3-0.05/a, max_a + dx_angstrom/a)
-                    min_a = min(1/3-0.05/a, min_a - dx_angstrom/a)
-                    max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
-                    min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
-
-                    del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
-                    Nbulk = len(slab)
-                    slab.translate(-(step.cell[:][0] + step.cell[:][1]) )
-                    mol.translate(-(step.cell[:][0] + step.cell[:][1]) )
-                    slab.cell = step.cell
-                    mol.cell = step.cell
-                    step = slab + mol
-                    #print(step.cell[:])
-                #######################################################################
-  
-                
-                colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nbulk else ATOM_COLORS_MOL[atom.number] for atom in step]
-                
                 step_copy = step.copy()
-                step_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
-                write('step_{:04d}.pov'.format(j), 
-                    step, 
+                #step_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
+                write(f'step_{j:04d}.pov', 
+                    step_copy, 
                     format='pov',
-                    radii = 0.65, 
+                    radii = ATOMIC_RADIUS, 
+                    colors=colors,
                     rotation='-5z,-85x', 
-                    povray_settings=dict(canvas_width=witdth_res, celllinewidth=CELLLINEWIDTH, transparent=False, camera_type='orthographic', camera_dist=50., bondatoms=get_bondpairs(step_copy, radius=BOND_RADIUS))
-                    #camera_type='perspective'
+                    povray_settings=dict(canvas_width=width_res, 
+                                        celllinewidth=CELLLINEWIDTH, 
+                                        transparent=False, 
+                                        camera_type='orthographic',
+                                        textures = textures,
+                                        camera_dist=1, 
+                                        bondatoms=get_bondpairs(step_copy, radius=BOND_RADIUS),
+                                        bondlinewidth=BOND_LINE_WIDTH,
+                                        #area_light=[(2., 3., 40.), 'White', .7, .7, 3, 3],
+                                        )   
                 ).render()
 
-            os.chdir('..')
+            os.chdir(cwd)
             #os.system('convert -delay 20 temp/step_*.png '+'relax_{0}_pov.gif'.format(labels[i]))
-            os.system('ffmpeg -framerate 10 -i temp/step_%04d.png  -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2"  -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '+'relax_{0}_pov.mp4'.format(labels[i]))
+            os.system(f'ffmpeg -framerate 8 -i temp/step_%04d.png  -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" \
+                       -c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p relax_{i}_pov.mp4')
             shutil.rmtree('temp')
 
-    else:
-        for i, config in enumerate(configs):
-            write('relax_{0}.gif'.format(labels[i]), config, rotation='-5z,-85x', interval=150, scale = 100, colors=colors, save_count=None)
+        else:
+            write(f'relax_{i}.gif', config, rotation='-5z,-85x', interval=150, scale = 100, colors=colors, save_count=None)
 
-    print('All animations saved to {0}.'.format('relax_'+images_dirname))
+
+    print(f'All animations saved to {savedir}.')
 
 #OK (code agnostic)
 def plot_energy_evolution(calc_type : str):

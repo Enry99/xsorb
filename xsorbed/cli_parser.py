@@ -22,6 +22,7 @@ def build_xsorb_parser():
     main_calc.add_argument('-s', action='store_true', help='launch screening.')
     main_calc.add_argument('-r', action='store_true', help='launch final relaxations')
     main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) screening or relax calculations')
+    main_calc.add_argument('-regenerate_labels', action='store_true', help='Regenerate site_labels.csv if accidentally deleted.')
     #optional flags
     relax_options = calc_group.add_mutually_exclusive_group()
     relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum) for the final relaxation. Default 5 (or 1 with --by-site)')
@@ -59,7 +60,7 @@ def build_xsorb_parser():
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
     visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
     visualization_group.add_argument('--depth-cueing', nargs='?', type=float, const=1, help='Enable depth cueing. Optional parameter: intensity (>=0, default=1).') 
-    visualization_group.add_argument('--rotation', nargs=1, type=str, help='Rotation for saving images, in ASE format, e.g. 10z,5x') 
+    visualization_group.add_argument('--rotation', type=str, help='Rotation for saving images, in ASE format, e.g. 10z,5x') 
 
     return parser
 

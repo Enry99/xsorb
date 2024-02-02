@@ -33,7 +33,7 @@ def main():
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
     from io_utils import write_results_to_file, restart_jobs, saveas
-    from calculations import generate, launch_screening, final_relax
+    from calculations import generate, launch_screening, final_relax, regenerate_missing_sitelabels
     from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
     ############################################################################################
 
@@ -49,6 +49,9 @@ def main():
 
     elif(args.restart):
         restart_jobs(calc_type = 'SCREENING' if args.restart == 's' else 'RELAX')
+
+    elif(args.regenerate_labels):
+        regenerate_missing_sitelabels()
 
 
 
@@ -78,7 +81,7 @@ def main():
     #        rotations = args.render_image[1], povray=args.povray, width_res=args.width_res)
 
     elif(args.relax_animations or args.screening_animations):
-        relax_animations(povray=args.povray, width_res=args.width_res, SCREEN_ONLY=args.screening_animations)
+        relax_animations('SCREENING' if args.screening_animations else 'RELAX', povray=args.povray, width_res=args.width_res, depth_cueing=args.depth_cueing)
 
     elif(args.view):
         view_config('SCREENING' if args.view[0] == 's' else 'RELAX', in_or_out = args.view[1], index=int(args.view[2]))

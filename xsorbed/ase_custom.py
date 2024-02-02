@@ -1530,12 +1530,302 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
             fileobj.write(fmt % tuple(data[i]))
 
 
+#################################################
+#fix for ASE 3.22.1 with the content of the GitLab repository, as of 2023. REMOVE in future release of ASE.
+
+from ase.io.pov import pa, pc
+def write_pov(self, path):
+    """Write pov file."""
+
+    point_lights = '\n'.join(f"light_source {{{pa(loc)} {pc(rgb)}}}"
+                                for loc, rgb in self.point_lights)
+
+    area_light = ''
+    if self.area_light is not None:
+        loc, color, width, height, nx, ny = self.area_light
+        area_light += f"""\nlight_source {{{pa(loc)} {pc(color)}
+area_light <{width:.2f}, 0, 0>, <0, {height:.2f}, 0>, {nx:n}, {ny:n}
+adaptive 1 jitter}}"""
+
+    fog = ''
+    if self.depth_cueing and (self.cue_density >= 1e-4):
+        # same way vmd does it
+        if self.cue_density > 1e4:
+            # larger does not make any sense
+            dist = 1e-4
+        else:
+            dist = 1. / self.cue_density
+        fog += f'fog {{fog_type 1 distance {dist:.4f} '\
+                f'color {pc(self.background)}}}'
+
+    mat_style_keys = (f'#declare {k} = {v}'
+                        for k, v in self.material_styles_dict.items())
+    mat_style_keys = '\n'.join(mat_style_keys)
+
+    # Draw unit cell
+    cell_vertices = ''
+    if self.cell_vertices is not None:
+        for c in range(3):
+            for j in ([0, 0], [1, 0], [1, 1], [0, 1]):
+                p1 = self.cell_vertices[tuple(j[:c]) + (0,) + tuple(j[c:])]
+                p2 = self.cell_vertices[tuple(j[:c]) + (1,) + tuple(j[c:])]
+
+                distance = np.linalg.norm(p2 - p1)
+                if distance < 1e-12:
+                    continue
+
+                cell_vertices += f'cylinder {{{pa(p1)}, {pa(p2)}, '\
+                                    f'Rcell pigment {{Black}}}}\n'
+                # all strings are f-strings for consistency
+        cell_vertices = cell_vertices.strip('\n')
+
+    # Draw atoms
+    a = 0
+    atoms = ''
+    for loc, dia, col in zip(self.positions, self.diameters, self.colors):
+        tex = 'ase3'
+        trans = 0.
+        if self.textures is not None:
+            tex = self.textures[a]
+        if self.transmittances is not None:
+            trans = self.transmittances[a]
+        atoms += f'atom({pa(loc)}, {dia/2.:.2f}, {pc(col)}, '\
+                    f'{trans}, {tex}) // #{a:n}\n'
+        a += 1
+    atoms = atoms.strip('\n')
+
+    # Draw atom bonds
+    bondatoms = ''
+    for pair in self.bondatoms:
+        # Make sure that each pair has 4 componets: a, b, offset,
+        #                                           bond_order, bond_offset
+        # a, b: atom index to draw bond
+        # offset: original meaning to make offset for mid-point.
+        # bond_oder: if not supplied, set it to 1 (single bond).
+        #            It can be  1, 2, 3, corresponding to single,
+        #            double, triple bond
+        # bond_offset: displacement from original bond position.
+        #              Default is (bondlinewidth, bondlinewidth, 0)
+        #              for bond_order > 1.
+        if len(pair) == 2:
+            a, b = pair
+            offset = (0, 0, 0)
+            bond_order = 1
+            bond_offset = (0, 0, 0)
+        elif len(pair) == 3:
+            a, b, offset = pair
+            bond_order = 1
+            bond_offset = (0, 0, 0)
+        elif len(pair) == 4:
+            a, b, offset, bond_order = pair
+            bond_offset = (self.bondlinewidth, self.bondlinewidth, 0)
+        elif len(pair) > 4:
+            a, b, offset, bond_order, bond_offset = pair
+        else:
+            raise RuntimeError('Each list in bondatom must have at least '
+                                '2 entries. Error at %s' % pair)
+
+        if len(offset) != 3:
+            raise ValueError('offset must have 3 elements. '
+                                'Error at %s' % pair)
+        if len(bond_offset) != 3:
+            raise ValueError('bond_offset must have 3 elements. '
+                                'Error at %s' % pair)
+        if bond_order not in [0, 1, 2, 3]:
+            raise ValueError('bond_order must be either 0, 1, 2, or 3. '
+                                'Error at %s' % pair)
+
+        # Up to here, we should have all a, b, offset, bond_order,
+        # bond_offset for all bonds.
+
+        # Rotate bond_offset so that its direction is 90 deg. off the bond
+        # Utilize Atoms object to rotate
+        if bond_order > 1 and np.linalg.norm(bond_offset) > 1.e-9:
+            tmp_atoms = Atoms('H3')
+            tmp_atoms.set_cell(self.cell)
+            tmp_atoms.set_positions([
+                self.positions[a],
+                self.positions[b],
+                self.positions[b] + np.array(bond_offset),
+            ])
+            tmp_atoms.center()
+            tmp_atoms.set_angle(0, 1, 2, 90)
+            bond_offset = tmp_atoms[2].position - tmp_atoms[1].position
+
+        R = np.dot(offset, self.cell)
+        mida = 0.5 * (self.positions[a] + self.positions[b] + R)
+        midb = 0.5 * (self.positions[a] + self.positions[b] - R)
+        if self.textures is not None:
+            texa = self.textures[a]
+            texb = self.textures[b]
+        else:
+            texa = texb = 'ase3'
+
+        if self.transmittances is not None:
+            transa = self.transmittances[a]
+            transb = self.transmittances[b]
+        else:
+            transa = transb = 0.
+
+        # draw bond, according to its bond_order.
+        # bond_order == 0: No bond is plotted
+        # bond_order == 1: use original code
+        # bond_order == 2: draw two bonds, one is shifted by bond_offset/2,
+        #                  and another is shifted by -bond_offset/2.
+        # bond_order == 3: draw two bonds, one is shifted by bond_offset,
+        #                  and one is shifted by -bond_offset, and the
+        #                  other has no shift.
+        # To shift the bond, add the shift to the first two coordinate in
+        # write statement.
+
+        posa = self.positions[a]
+        posb = self.positions[b]
+        cola = self.colors[a]
+        colb = self.colors[b]
+
+        if bond_order == 1:
+            draw_tuples = (posa, mida, cola, transa, texa),\
+                            (posb, midb, colb, transb, texb)
+
+        elif bond_order == 2:
+            bs = [x / 2 for x in bond_offset]
+            draw_tuples = (posa - bs, mida - bs, cola, transa, texa),\
+                            (posb - bs, midb - bs, colb, transb, texb),\
+                            (posa + bs, mida + bs, cola, transa, texa),\
+                            (posb + bs, midb + bs, colb, transb, texb)
+
+        elif bond_order == 3:
+            bs = bond_offset
+            draw_tuples = (posa, mida, cola, transa, texa),\
+                            (posb, midb, colb, transb, texb),\
+                            (posa + bs, mida + bs, cola, transa, texa),\
+                            (posb + bs, midb + bs, colb, transb, texb),\
+                            (posa - bs, mida - bs, cola, transa, texa),\
+                            (posb - bs, midb - bs, colb, transb, texb)
+
+        bondatoms += ''.join(f'cylinder {{{pa(p)}, '
+                                f'{pa(m)}, Rbond texture{{pigment '
+                                f'{{color {pc(c)} '
+                                f'transmit {tr}}} finish{{{tx}}}}}}}\n'
+                                for p, m, c, tr, tx in
+                                draw_tuples)
+
+    bondatoms = bondatoms.strip('\n')
+
+    # Draw constraints if requested
+    constraints = ''
+    if self.exportconstraints:
+        for a in self.constrainatoms:
+            dia = self.diameters[a]
+            loc = self.positions[a]
+            trans = 0.0
+            if self.transmittances is not None:
+                trans = self.transmittances[a]
+            constraints += f'constrain({pa(loc)}, {dia/2.:.2f}, Black, '\
+                f'{trans}, {tex}) // #{a:n} \n'
+    constraints = constraints.strip('\n')
+
+    pov = f"""#version 3.6;
+#include "colors.inc"
+#include "finish.inc"
+
+global_settings {{assumed_gamma 2.2 max_trace_level 6}}
+background {{{pc(self.background)}{' transmit 1.0' if self.transparent else ''}}}
+camera {{{self.camera_type}
+right -{self.image_width:.2f}*x up {self.image_height:.2f}*y
+direction {self.image_plane:.2f}*z
+location <0,0,{self.camera_dist:.2f}> look_at <0,0,0>}}
+{point_lights}
+{area_light if area_light != '' else '// no area light'}
+{fog if fog != '' else '// no fog'}
+{mat_style_keys}
+#declare Rcell = {self.celllinewidth:.3f};
+#declare Rbond = {self.bondlinewidth:.3f};
+
+#macro atom(LOC, R, COL, TRANS, FIN)
+sphere{{LOC, R texture{{pigment{{color COL transmit TRANS}} finish{{FIN}}}}}}
+#end
+#macro constrain(LOC, R, COL, TRANS FIN)
+union{{torus{{R, Rcell rotate 45*z texture{{pigment{{color COL transmit TRANS}} finish{{FIN}}}}}}
+    torus{{R, Rcell rotate -45*z texture{{pigment{{color COL transmit TRANS}} finish{{FIN}}}}}}
+    translate LOC}}
+#end
+
+{cell_vertices if cell_vertices != '' else '// no cell vertices'}
+{atoms}
+{bondatoms}
+{constraints if constraints != '' else '// no constraints'}
+"""  # noqa: E501
+
+    with open(path, 'w') as fd:
+        fd.write(pov)
+
+    return path
+
+
+def write_ini(self, path):
+    """Write ini file."""
+
+    ini_str = f"""\
+Input_File_Name={path.with_suffix('.pov').name}
+Output_to_File=True
+Output_File_Type=N
+Output_Alpha={'on' if self.transparent else 'off'}
+; if you adjust Height, and width, you must preserve the ratio
+; Width / Height = {self.canvas_width/self.canvas_height:f}
+Width={self.canvas_width}
+Height={self.canvas_height}
+Antialias=True
+Antialias_Threshold=0.1
+Display={self.display}
+Display_Gamma=2.2
+Pause_When_Done={self.pause}
+Verbose=False
+Max_Image_Buffer_Memory=1024
+"""
+    with open(path, 'w') as fd:
+        fd.write(ini_str)
+    return path
+
+
+
+
+
+material_styles_dict = dict(
+    simple='finish {phong 0.7 ambient 0.4 diffuse 0.55}',
+    # In general, 'pale' doesn't conserve energy and can look
+    # strange in many cases.
+    pale=('finish {ambient 0.9 diffuse 0.30 roughness 0.001 '
+        'specular 0.2 }'),
+    intermediate=('finish {ambient 0.4 diffuse 0.6 specular 0.1 '
+                'roughness 0.04}'),
+    vmd=(
+        'finish {ambient 0.2 diffuse 0.80 phong 0.25 phong_size 10.0 '
+        'specular 0.2 roughness 0.1}'),
+    jmol=('finish {ambient 0.4 diffuse 0.6 specular 1 roughness 0.001 '
+        'metallic}'),
+    ase2=('finish {ambient 0.2 brilliance 3 diffuse 0.6 metallic '
+        'specular 0.7 roughness 0.04 reflection 0.15}'),
+    ase3=('finish {ambient 0.4 brilliance 2 diffuse 0.6 metallic '
+        'specular 1.0 roughness 0.001 reflection 0.0}'),
+    glass=('finish {ambient 0.4 diffuse 0.35 specular 1.0 '
+        'roughness 0.001}'),
+    glass2=('finish {ambient 0.3 diffuse 0.3 specular 1.0 '
+            'reflection 0.25 roughness 0.001}'),
+)
+#################################################
+
+
 
 # Runtime patching
 import ase.io.espresso
 import ase.io.extxyz
+import ase.io.pov
 ase.io.espresso.write_espresso_in = write_espresso_in_custom
 ase.io.espresso.read_espresso_in = read_espresso_in_custom
 ase.io.espresso.read_espresso_out = read_espresso_out_custom
 ase.io.extxyz._read_xyz_frame = _read_xyz_frame_custom
 ase.io.extxyz.write_xyz = write_xyz_custom
+ase.io.pov.POVRAY.write_pov = write_pov
+ase.io.pov.POVRAY.write_ini = write_ini
+ase.io.pov.POVRAY.material_styles_dict = material_styles_dict
