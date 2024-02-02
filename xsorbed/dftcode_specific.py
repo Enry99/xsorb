@@ -19,7 +19,7 @@ from xsorbed.common_definitions import *
 SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO']
 
 HYBRID_SCREENING_THRESHOLDS = {
-    'VASP' : [-1], # ~ -4e-2 Ry/Bohr
+    'VASP' : [-0.5], # ~ -2e-2 Ry/Bohr
     'ESPRESSO' : [5e-3, 5e-2]
 }
 
@@ -177,7 +177,8 @@ def parse_vasp_settings(block_str_list : list):
         dftprogram_settings_dict["vasp_xc_functional"] = 'PBE'
     
     if "vasp_pseudo_setups" not in dftprogram_settings_dict:
-        dftprogram_settings_dict["vasp_pseudo_setups"] = {"base": "recommended"}             
+        dftprogram_settings_dict["vasp_pseudo_setups"] = {"base": "recommended"} 
+
 
     return dftprogram_settings_dict
     
@@ -270,7 +271,6 @@ def Calculator(settings, label : str, atoms, directory : str):
                             
     elif settings.program == 'VASP':
         
-        preset_incar_settings = {"xc": settings.dftprogram_settings_dict["vasp_xc_functional"]}
         if "pymatgen_set" in settings.dftprogram_settings_dict:
             from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
             from pymatgen.io.ase import AseAtomsAdaptor
@@ -286,10 +286,12 @@ def Calculator(settings, label : str, atoms, directory : str):
             del atomscopy.constraints #to suppress the warning about constraints not supported in pymatgen
             relax = RelaxSet(AseAtomsAdaptor.get_structure(atomscopy))
             preset_incar_settings = {k.lower(): v for k, v in relax.incar.as_dict().items()} 
+            if 'isif' in preset_incar_settings: preset_incar_settings['isif'] = 2 #OVERRIDE: we do not want a vc-relax, unless explicitly specified in &INCAR
             preset_incar_settings.pop('@module')
             preset_incar_settings.pop('@class')
             relax.kpoints.write_file('_temp_kpts_')
 
+        preset_incar_settings["xc"] = settings.dftprogram_settings_dict["vasp_xc_functional"]
 
         adjust_constraints(atoms, 'VASP')
         os.environ["VASP_PP_PATH"] = settings.dftprogram_settings_dict["vasp_pp_path"]
