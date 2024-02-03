@@ -11,70 +11,11 @@ Dissociation analysis
 """
 
 #Import statements#####################################################################
-import os, sys
-import argparse
+import sys
+from xsorbed.cli_parser import cli_parse_xfrag
 #
 from xsorbed.common_definitions import *
 ########################################################################################
-
-
-
-def cli_parse():
-
-    parser = argparse.ArgumentParser(
-        description='Select one of the commands below. The program will read further input informations from the files "fragments.in" and "settings.in"'
-        )
-
-    parser.add_argument('--v', '--version', action='version', version='%(prog)s '+VERSION)
-
-
-    calc_group = parser.add_argument_group(title='Calculation options')
-    #main flags
-    main_calc = calc_group.add_mutually_exclusive_group()
-    main_calc.add_argument('-generate-fragments', action='store_true', help='generate the input files of all framgents in fragments.json, wihtout launching calculations')
-    main_calc.add_argument('-relax-fragments', action='store_true', help='generate the input files of all framgents listed in fragments.json and launch calculations')
-    main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
-    main_calc.add_argument('-s', nargs='*', type=float, help='launch screening. Optional arguments: e_tot_conv_thr forc_conv_thr (default 5e-3 5e-2)')
-    main_calc.add_argument('-r', action='store_true', help='launch final relaxations')
-    main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) screening or relax calculations')
-    #optional flags
-    relax_options = calc_group.add_mutually_exclusive_group()
-    relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum) for the final relaxation')
-    relax_options.add_argument('--t', type=float, help='energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
-    calc_group.add_argument('--by-site', action='store_true', default=False, help='Select the most favorable configurations for full relax site-by-site site instead of overall')
-
-
-    energy_group = parser.add_argument_group(title='Energies collection options')  
-    #main flags
-    main_energy = energy_group.add_mutually_exclusive_group()
-    main_energy.add_argument('-deltae', action='store_true', help='collect dissociation energies dE for all the (fully optimized) combinations (adsorbed molecule -> adsorbed fragments)')
-
-    #parsing the command line
-    args = parser.parse_args()
-
-
-    #Check presence of incompatible commands belonging to different groups
-    args_dict = vars(args)
-    calc_command = [ key for key in args_dict if args_dict[key] and (key == 'generate-fragments' or key == 'relax-fragments' or key=='s' or key=='g' or key=='r' or key=='restart') ]
-    energy_command = [ key for key in args_dict if args_dict[key] and (key=='deltae') ]
-
-    if calc_command and energy_command:
-        parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], energy_command[0]))  
-
-    #Check for all incompatible OPTIONAL arguments
-    if args.n and not args.r:
-        parser.error("--n option can only be used with -r")
-    if args.t and not args.r:
-        parser.error("--t option can only be used with -r")
-    if args.by_site and not args.r:
-        parser.error("--by-site option can only be used with -r")
-
-    #Final check on values that are not already dealt with by argparse
-    if args.s is not None:
-        if len(args.s) != 0 and len(args.s) != 2:
-            parser.error('-s command requires either no argument (the default 5e-3 and 5e-2 will be used) or TWO arguments.')
-
-    return args
 
 
 def main():
@@ -86,7 +27,7 @@ def main():
         return 1
     
 
-    args = cli_parse()
+    args = cli_parse_xfrag()
 
 
     #import statements##########################################################################

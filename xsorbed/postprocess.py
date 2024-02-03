@@ -20,6 +20,8 @@ from xsorbed.io_utils import get_calculations_results, _get_configurations_numbe
 from xsorbed.dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
 from xsorbed.common_definitions import *
 
+#TODO: cut the empty part of the cell (same height for all images)
+
 #OK (code agnostic)
 def plot_adsorption_sites(ALL : bool = False):
     '''
