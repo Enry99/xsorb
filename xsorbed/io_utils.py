@@ -21,7 +21,7 @@ from xsorbed.common_definitions import *
 
 import ase_custom
 
-TEST = True #do not actually launch the jobs, simply prints the command
+TEST = False #do not actually launch the jobs, simply prints the command
 
 
 #OK (code agnostic) 
@@ -133,8 +133,12 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
     for index in indices:
         if not os.path.isfile(OUT_FILE_PATHS[calc_type][program].format(index)):
             continue #skip if file does not exist yet
+            
+        energy = get_energy(program, calc_type, index, full_evolution)
 
-        energy = (get_energy(program, calc_type, index, full_evolution) - (E_slab_mol[0]+E_slab_mol[1])) 
+
+        if energy is not None:
+            energy -= (E_slab_mol[0]+E_slab_mol[1])
         relax_completed = is_completed(program, calc_type, 'RELAX_COMPLETED', index)
         scf_nonconverged = is_completed(program, calc_type, 'SCF_NONCONVERGED', index)
 
@@ -143,8 +147,7 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
         results['scf_nonconverged'].update({index : scf_nonconverged})
 
         if(VERBOSE and scf_nonconverged): 
-            print(f'Warning! Config. {index} failed to reach SCF convergence after electron_maxstep.\
-                The last usable energy value will be used')
+            print(f'Warning! Config. {index} failed to reach SCF convergence after electron_maxstep. The last usable energy value will be used')
 
     
     return results
@@ -175,16 +178,18 @@ def write_results_to_file(TXT=False):
         column_data = []
         for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None
             if i in screening_results['energies']:
+                if screening_results['energies'][i] is None:
+                    print(f'Config. {i} has not reached the first scf convergence. It will be skipped.')
+                    column_data.append(None)
+                    continue
                 
                 column_data.append(screening_results['energies'][i] )
 
                 if screening_results['scf_nonconverged'][i]:
-                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep.\
-                           The energy will be marked with **')
+                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep. The energy will be marked with **')
                     column_data[-1] = f'{column_data[-1]:.3f}**'
                 if not screening_results['relax_completed'][i]:
-                    print(f'Warning! {i} relaxation has not reached final configuration. \
-                           The energy will be marked with a *')
+                    print(f'Warning! {i} relaxation has not reached final configuration. The energy will be marked with a *')
                     column_data[-1] = f'{column_data[-1]:.3f}*'
 
             else: #if the file does not exist
@@ -202,16 +207,18 @@ def write_results_to_file(TXT=False):
         column_data = []
         for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None
             if i in relax_results['energies']:
+                if relax_results['energies'][i] is None:
+                    print(f'Config. {i} has not reached the first scf convergence. It will be skipped.')
+                    column_data.append(None)
+                    continue
                 
                 column_data.append(relax_results['energies'][i] )
 
                 if relax_results['scf_nonconverged'][i]:
-                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep.\
-                           The energy will be marked with **')
+                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep. The energy will be marked with **')
                     column_data[-1] = f'{column_data[-1]:.3f}**'
                 if not relax_results['relax_completed'][i]:
-                    print(f'Warning! {i} relaxation has not reached final configuration. \
-                           The energy will be marked with a *')
+                    print(f'Warning! {i} relaxation has not reached final configuration. The energy will be marked with a *')
                     column_data[-1] = f'{column_data[-1]:.3f}*'
 
             else: #if the file does not exist
@@ -225,13 +232,13 @@ def write_results_to_file(TXT=False):
     mol_indices = np.arange(mol.natoms) if settings.mol_before_slab else np.arange(mol.natoms) + slab.natoms
     bonding_status = []
     for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None        
-        if os.path.isdir(relax_outdir) and i in relax_results['energies']: #prioritize status from relax over screening
+        if os.path.isdir(relax_outdir) and i in relax_results['energies'] and relax_results['energies'][i]: #prioritize status from relax over screening
             status = check_bond_status(settings.program, 
                                                     calc_type='RELAX', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
             bonding_status.append('Yes' if status else 'No')
-        elif i in screening_results['energies']:
+        elif i in screening_results['energies'] and screening_results['energies'][i]:
             status = check_bond_status(settings.program, 
                                                     calc_type='SCREENING', 
                                                     i_calc=i, 
@@ -262,12 +269,10 @@ def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices 
     - mol_indices: indices of the atoms belonging to the molecule
     '''
     filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
-    atoms = read(filename, results_required=False)
+    atoms = read(filename)
 
-    slab = atoms.copy()
-    del slab[[atom.index for atom in slab if atom.index in mol_indices]]
-    mol = atoms.copy()
-    del mol[[atom.index for atom in mol if atom.index not in mol_indices]]
+    slab = atoms[[atom.index for atom in atoms if atom.index not in mol_indices]]
+    mol = atoms[mol_indices]
 
     return mol_bonded_to_slab(slab, mol)
 
@@ -298,7 +303,7 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if "job-name" in line:
-                    lines[i] = f"{line.split('=')[0]} = {'scr' if calc_type == 'SCREENING' else 'RELAX'}_{index}\n"
+                    lines[i] = f"{line.split('=')[0]}={'scr' if calc_type == 'SCREENING' else 'relax'}_{index}\n"
                     break
         with open(jobscript_stdname, 'w') as f:       
             f.writelines(lines)

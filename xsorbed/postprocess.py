@@ -134,9 +134,11 @@ def get_decorated_structures(configs : list,
                              slab_atoms_indices : list,
                              ATOM_COLORS_SLAB : list,
                              ATOM_COLORS_MOL : list, 
-                             extend_slab : bool = True, 
+                             extend_slab : bool = False, 
                              depth_cueing : float = None):
     
+    from ase.build import make_supercell
+
     for config in configs:
 
         if isinstance(config, list): #for full evolution
@@ -150,7 +152,8 @@ def get_decorated_structures(configs : list,
 
                 #section to repeat the bulk if mol is partially outside###############
                 if(extend_slab):
-                    slab *= [3,3,1]
+                    x_rep, y_rep = (3,3)
+                    slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False)
                     mol.cell = slab.cell          
                     mol.translate(+(config_j.cell[:][0] + config_j.cell[:][1]) )
 
@@ -183,7 +186,8 @@ def get_decorated_structures(configs : list,
 
             #section to repeat the bulk if mol is partially outside###############
             if(extend_slab):
-                slab *= [3,3,1]
+                x_rep, y_rep = (3,3)
+                slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False)
                 mol.cell = slab.cell          
                 mol.translate(+(config.cell[:][0] + config.cell[:][1]) )
 
@@ -204,7 +208,6 @@ def get_decorated_structures(configs : list,
                 mol.cell = config.cell
             #######################################################################
             config = slab + mol
-
 
 
     config = configs[0][0] if isinstance(configs[0], list) else configs[0]  #just choose one to set the colors
@@ -284,6 +287,11 @@ def config_images(calc_type : str,
 
     configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
         CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images(calc_type, i_or_f)
+    
+
+    if not configs:
+        print("First step not completed for any configurations.")
+        return
     
 
     configs, colors, colors_depthcued, \
@@ -415,6 +423,10 @@ def relax_animations(calc_type : str,
         for conf_rel, i_rel in zip(configs_rel, calc_indices):
             configs.append(configs_scr[calc_indices_scr.index(i_rel)] + conf_rel )
 
+    if not configs:
+        print("First step not completed for any configurations.")
+        return
+
 
     configs, colors, colors_depthcued, \
           textures, textures_depthcued = get_decorated_structures(configs=configs,
@@ -501,9 +513,10 @@ def plot_energy_evolution(calc_type : str):
                                         full_evolution=True)
 
     
-    plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
+    if 0 not in settings.E_slab_mol:
+        plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
     for i_config, energy_array in results['energies'].items():
-        if energy_array[0]:
+        if energy_array is not None:
 
             #completion status of the calculations
             if results['relax_completed'][i_config]:

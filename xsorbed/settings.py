@@ -109,7 +109,7 @@ class Settings:
             if len(E_slab_mol_str) != 2:
                 raise ValueError("If you specify the tag E_slab_mol you must provide TWO values.")
             self.E_slab_mol = (np.array(E_slab_mol_str, dtype=float)*UNITS_TO_EV_FACTOR[program]).tolist()  
-        else: self.E_slab_mol = None
+        else: self.E_slab_mol = [0,0]
 
         #if E_slab_mol not in settings.in, try to read from file. If not possible, set it to [0,0]
         if(not self.E_slab_mol and read_energies):
