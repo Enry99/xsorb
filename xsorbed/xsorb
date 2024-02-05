@@ -19,6 +19,7 @@ import sys
 from xsorbed.cli_parser import cli_parse_xsorb
 from xsorbed.common_definitions import VERSION
 
+#NOTE: dire che xsorb supporta ibrav
 
 def main():
 

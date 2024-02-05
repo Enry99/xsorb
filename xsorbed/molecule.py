@@ -68,7 +68,7 @@ class Molecule:
             
         #select atoms subset
         if atoms_subset:            
-            del self.mol_ase[[index for index in range(0, len(self.mol_ase)) if index not in atoms_subset]]
+            self.mol_ase = self.mol_ase[atoms_subset]
 
         self.reference_atom_index = np.where([np.allclose(atom.position, [0,0,0]) for atom in self.mol_ase])[0]
 

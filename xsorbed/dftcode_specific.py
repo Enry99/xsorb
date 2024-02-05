@@ -79,6 +79,22 @@ SBATCH_POSTFIX = {
 }
 
 
+FRAGMENTS_IN_FILE_PATHS = {
+    'VASP': 'fragments/{0}/POSCAR',
+    'ESPRESSO': 'fragments/{0}/{0}.pwi'
+}
+
+FRAGMENTS_OUT_FILE_PATHS = {
+    'VASP': 'fragments/{0}/vasprun.xml',
+    'ESPRESSO': 'fragments/{0}/{0}.pwo'
+}
+
+SBATCH_POSTFIX_FRAGS = {
+    'VASP': '',
+    'ESPRESSO': '{0}.pwi {0}.pwo',
+}
+
+
 def parse_espresso_settings(block_str_list : list):
     
     #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, 
@@ -260,6 +276,41 @@ def override_settings(settings, calc_type : str):
                 if missing_ibrion: s.append('IBRION = 2')
 
                 settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)
+
+def override_settings_isolated_fragment(settings, natoms_mol : int):
+    '''
+    Overrides the DFT code settings with specific options for the isolated fragment calculation
+
+    Args:
+    - settings: Settings object, containing the dft code parameters
+    - fragment_index: index of the fragment
+    - natoms_mol: number of atoms in the molecule
+    '''
+    if settings.program == 'ESPRESSO':
+
+        settings.dftprogram_settings_dict['control'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
+        settings.dftprogram_settings_dict['system'].update({'nosym' : True})
+        settings.dftprogram_settings_dict['system'].update({'starting_magnetization(1)' : 1.0})        
+        settings.dftprogram_settings_dict['electrons'].update({'mixing_beta' : 0.1})
+
+
+    elif settings.program == 'VASP':
+        if 'incar_string' in settings.dftprogram_settings_dict:
+            s = settings.dftprogram_settings_dict['incar_string'].split('\n')
+        else: s = []
+
+        missing_isym = True
+        missing_magmom = True
+        for i, line in enumerate(s):
+            if 'ISYM' in line:
+                s[i] = 'ISYM = 0'
+                missing_isym = False
+            if 'MAGMOM in line':
+                s[i] = f'MAGMOM = {natoms_mol}*0.6'
+        if missing_isym: s.append('ISYM = 0')
+        if missing_magmom: s.append(f'MAGMOM = {natoms_mol}*0.6')
+
+        settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)     
 
 
 def Calculator(settings, label : str, atoms, directory : str):

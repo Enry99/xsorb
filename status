@@ -11,4 +11,4 @@ postprocess:      OK
 settings:         OK
 slab:             OK
 xfrag:            --
-xsorb:            --(fix after modifyng postprocess)
+xsorb:            OK
