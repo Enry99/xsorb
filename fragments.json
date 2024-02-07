@@ -16,7 +16,19 @@
          "screening_min_distance"  : 1.0,
 
          "fixed_indices_mol"       : 0,
-         "fix_mol_xyz"             : [0,0,1]
+         "fix_mol_xyz"             : [0,0,1],
+
+         "vasp_settings"           : {
+
+            "vacuum" :  {
+
+            },
+
+            "adsorption" : {
+               "MAGMOM" : "2*0.6"
+            }
+
+         }
       },
 
       "H" : 

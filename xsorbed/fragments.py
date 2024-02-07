@@ -20,6 +20,8 @@ from xsorbed.slab import Slab
 from xsorbed.dftcode_specific import FRAGMENTS_OUT_FILE_PATHS, FRAGMENTS_IN_FILE_PATHS, SBATCH_POSTFIX_FRAGS, override_settings_isolated_fragment, Calculator
 
 
+#TODO: sistemare la parte di override settings prendendo i dati da fragments_dict.json
+
 TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs
 
 #OK (code agnostic)
@@ -188,12 +190,30 @@ def isolated_fragments(RUN=False):
 
 
 def setup_fragments_screening(RUN = False, save_figs=False, saveas_format=None):
-    with open("fragments.json", "r") as f:
+    
+    with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
 
     settings = Settings()
-    slab = Slab(settings.slab_filename)  
- 
+
+    slab = Slab(slab_filename=settings.slab_filename, 
+                layers_threshold=settings.layers_height, 
+                surface_sites_height=settings.surface_height, 
+                fixed_layers_slab=settings.fixed_layers_slab, 
+                fixed_indices_slab=settings.fixed_indices_slab, 
+                fix_slab_xyz=settings.fix_slab_xyz,
+                sort_atoms_by_z=settings.sort_atoms_by_z,
+                translate_slab_from_below_cell_bottom=settings.translate_slab)
+
+    for fragment_name in fragments_dict["fragments"]:
+        if not os.path.exists(FRAGMENTS_IN_FILE_PATHS[settings.program].format(fragment_name)) \
+            and not os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name)):
+            print(f"ERROR! fragments/{fragment_name} input or output You need to generate/relax all the fragments first.".format())
+            sys.exit(1)
+
+
+
+
     settings_lines = settings.text
 
     for i, line in enumerate(settings_lines):
@@ -202,10 +222,7 @@ def setup_fragments_screening(RUN = False, save_figs=False, saveas_format=None):
             break
 
 
-    for fragment_name in fragments_dict["fragments"]:
-        if not os.path.exists('fragments/{0}/{0}.pwi'.format(fragment_name)) and not os.path.exists('fragments/{0}/{0}.pwo'.format(fragment_name)):
-            print("ERROR! fragments/{0}/{0} (.pwi or .pwo) not found. You need to generate/relax all the fragments first.".format(fragment_name))
-            sys.exit(1)
+
 
     main_dir = os.getcwd()
 
