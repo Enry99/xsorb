@@ -72,10 +72,10 @@ def main():
         plot_adsorption_sites(ALL = args.sites_all)
 
     elif(args.screening_images):
-        config_images(calc_type='SCREENING', i_or_f = args.screening_images[0], rotations=args.rotation, povray=args.povray, width_res=args.width_res, depth_cueing=args.depth_cueing)
+        config_images(calc_type='SCREENING', i_or_f = args.screening_images[0], rotations=args.rotation, povray=args.povray, width_res=args.width_res, depth_cueing=args.depth_cueing, extend_slab=False)
 
     elif(args.relax_images):
-        config_images(calc_type='RELAX', i_or_f = args.relax_images[0], rotations=args.rotation, povray=args.povray, width_res=args.width_res, depth_cueing=args.depth_cueing)
+        config_images(calc_type='RELAX', i_or_f = args.relax_images[0], rotations=args.rotation, povray=args.povray, width_res=args.width_res, depth_cueing=args.depth_cueing, extend_slab=False)
 
     #elif(args.render_image):
     #    config_images(which=args.render_image[0][0], index=args.render_image[0][1:], 

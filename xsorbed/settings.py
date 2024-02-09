@@ -112,7 +112,7 @@ class Settings:
         else: self.E_slab_mol = [0,0]
 
         #if E_slab_mol not in settings.in, try to read from file. If not possible, set it to [0,0]
-        if(not self.E_slab_mol and read_energies):
+        if(0 in self.E_slab_mol and read_energies):
             if 'mol_subset_atoms' in script_settings_dict['STRUCTURE']:
                 print('Using a subset of the molecule atoms. Molecule energy not extracted.')
             else:

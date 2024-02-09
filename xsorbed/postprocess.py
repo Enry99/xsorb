@@ -89,7 +89,7 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
                    fix_mol_xyz=settings.fix_mol_xyz)
     
 
-    #TODO: put here the reindexing for VASP
+    #TODO: put here the reindexing for VASP (POSCAR only, since for the outputs it already reads the reindexing file)
     mol_atoms_indices = np.arange(mol.natoms) if settings.mol_before_slab else np.arange(mol.natoms) + slab.natoms
     slab_atoms_indices = np.arange(slab.natoms) if not settings.mol_before_slab else np.arange(slab.natoms) + mol.natoms
 
@@ -139,6 +139,10 @@ def get_decorated_structures(configs : list,
     
     from ase.build import make_supercell
 
+    colors_list = []
+    colors_depthcued_list = []
+    textures_list = []
+    textures_depthcued_list = []
     for config in configs:
 
         if isinstance(config, list): #for full evolution
@@ -149,16 +153,19 @@ def get_decorated_structures(configs : list,
             
                 mol = config_j[mol_atoms_indices]
                 slab = config_j[slab_atoms_indices]
+                Nslab = len(slab)
 
                 #section to repeat the bulk if mol is partially outside###############
-                if(extend_slab):
+                #TODO: instead of extend slab, cut a window with the size of the cell but centered around the molecule
+                #trova il centro [x0,y0,z0] della molecola (traslata) e taglia una finestra [x0-a/2, x0+a/2]x[y0-b/2, y0+b/2]x[z0-c/2, z0+c/2]
+                if(extend_slab): #TODO: colors not working
                     x_rep, y_rep = (3,3)
                     slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False)
                     mol.cell = slab.cell          
                     mol.translate(+(config_j.cell[:][0] + config_j.cell[:][1]) )
 
                     
-                    if first_frame: #set borders only in first frame for each config
+                    if first_frame: #set borders and select atoms only in first frame for each config
                         max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
                         max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
                         dx_angstrom = 0.01 #distance in angstrom of surface extending beyond the molecule
@@ -168,9 +175,10 @@ def get_decorated_structures(configs : list,
                         max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
                         min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
 
+                        atom_indices = [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)]
                         first_frame = False
 
-                    del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
+                    del slab[ atom_indices ]
                     Nslab = len(slab)
                     slab.translate(-(config_j.cell[:][0] + config_j.cell[:][1]) )
                     mol.translate(-(config_j.cell[:][0] + config_j.cell[:][1]) )
@@ -183,9 +191,10 @@ def get_decorated_structures(configs : list,
 
             mol = config[mol_atoms_indices]
             slab = config[slab_atoms_indices]
+            Nslab = len(slab)
 
             #section to repeat the bulk if mol is partially outside###############
-            if(extend_slab):
+            if(extend_slab): #TODO: colors not working
                 x_rep, y_rep = (3,3)
                 slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False)
                 mol.cell = slab.cell          
@@ -209,32 +218,35 @@ def get_decorated_structures(configs : list,
             #######################################################################
             config = slab + mol
 
-
-    config = configs[0][0] if isinstance(configs[0], list) else configs[0]  #just choose one to set the colors
-    
-    colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nslab else ATOM_COLORS_MOL[atom.number] for atom in config]
-    colors_depthcued = colors.copy()
-    textures = ['ase3'] * (len(config))  
-    textures_depthcued = textures.copy() 
-  
-
-    #fading color for lower layers in top view
-    if (depth_cueing):
-        zmax = max([atom.z for atom in config if atom.index < Nslab])
-        zmin = min([atom.z for atom in config if atom.index < Nslab])
-        delta = zmax - zmin
-        if depth_cueing < 0:
-            raise ValueError("depth_cueing_intensity must be >=0.")
-        for atom in config[np.arange(Nslab)]:       
-            r,g,b = colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta * depth_cueing
-            if r>1: r=1
-            if g>1: g=1
-            if b>1: b=1
-            colors_depthcued[atom.index] = [r,g,b]
         
-        textures_depthcued = ['pale'] * Nslab + ['ase3'] * (len(config)-Nslab) 
+        colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nslab else ATOM_COLORS_MOL[atom.number] for atom in config]
+        colors_depthcued = colors.copy()
+        textures = ['ase3'] * (len(config))  
+        textures_depthcued = textures.copy() 
+    
 
-    return configs, colors, colors_depthcued, textures, textures_depthcued
+        #fading color for lower layers in top view
+        if (depth_cueing):
+            zmax = max([atom.z for atom in config if atom.index < Nslab])
+            zmin = min([atom.z for atom in config if atom.index < Nslab])
+            delta = zmax - zmin
+            if depth_cueing < 0:
+                raise ValueError("depth_cueing_intensity must be >=0.")
+            for atom in config[np.arange(Nslab)]:       
+                r,g,b = colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta * depth_cueing
+                if r>1: r=1
+                if g>1: g=1
+                if b>1: b=1
+                colors_depthcued[atom.index] = [r,g,b]
+            
+            textures_depthcued = ['pale'] * Nslab + ['ase3'] * (len(config)-Nslab)
+
+        colors_list.append(colors)
+        colors_depthcued_list.append(colors_depthcued)
+        textures_list.append(textures)
+        textures_depthcued_list.append(textures_depthcued) 
+
+    return configs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list
 
 #OK (code agnostic)
 def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, povray : bool, results : dict):
@@ -294,8 +306,8 @@ def config_images(calc_type : str,
         return
     
 
-    configs, colors, colors_depthcued, \
-          textures, textures_depthcued = get_decorated_structures(configs=configs,
+    configs, colors_list, colors_depthcued_list, \
+          textures_list, textures_depthcued_list = get_decorated_structures(configs=configs,
                                                            mol_atoms_indices=mol_atoms_indices,
                                                            slab_atoms_indices=slab_atoms_indices,
                                                            ATOM_COLORS_SLAB=ATOM_COLORS_SLAB,
@@ -303,18 +315,6 @@ def config_images(calc_type : str,
                                                            extend_slab=extend_slab,
                                                            depth_cueing=depth_cueing)
     
-
-    if not rotations: #lateral, top, 
-        rot_list = ['-5z,-85x', ''] 
-        rotations_labels = ['lateral', 'top', ]
-        color_list = [colors, colors_depthcued]
-        textures_list = [textures, textures_depthcued]
-    else: #use specified rotation
-        rot_list = [rotations]
-        rotations_labels = [rotations.replace(',','_')]
-        color_list = [colors_depthcued]
-        textures_list = [textures_depthcued]
-
 
     print('Saving images...')
 
@@ -327,7 +327,20 @@ def config_images(calc_type : str,
 
     import xsorbed.ase_custom #monkey patching
     
-    for i, config in zip(calc_indices, configs):
+    for i, config, colors, colors_depthcued, textures, textures_depthcued \
+         in zip(calc_indices, configs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list):
+
+
+        if not rotations: #lateral, top, 
+            rot_list = ['-5z,-85x', ''] 
+            rotations_labels = ['lateral', 'top', ]
+            color_list = [colors, colors_depthcued]
+            textures_list = [textures, textures_depthcued]
+        else: #use specified rotation
+            rot_list = [rotations]
+            rotations_labels = [rotations.replace(',','_')]
+            color_list = [colors_depthcued]
+            textures_list = [textures_depthcued]
         
         for rot, rot_label, color, texture in zip(rot_list, rotations_labels, color_list, textures_list):
 
@@ -428,8 +441,8 @@ def relax_animations(calc_type : str,
         return
 
 
-    configs, colors, colors_depthcued, \
-          textures, textures_depthcued = get_decorated_structures(configs=configs,
+    configs, colors_list, colors_depthcued_list, \
+        textures_list, textures_depthcued_list = get_decorated_structures(configs=configs,
                                                            mol_atoms_indices=mol_atoms_indices,
                                                            slab_atoms_indices=slab_atoms_indices,
                                                            ATOM_COLORS_SLAB=ATOM_COLORS_SLAB,
@@ -452,7 +465,9 @@ def relax_animations(calc_type : str,
 
     import xsorbed.ase_custom #monkey patching
     
-    for i, config in zip(calc_indices, configs):
+    for i, config, colors, colors_depthcued, textures, textures_depthcued \
+        in zip(calc_indices, configs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list):
+
 
         if(povray):
 

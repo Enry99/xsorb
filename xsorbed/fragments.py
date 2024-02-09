@@ -188,7 +188,7 @@ def isolated_fragments(RUN=False):
 
 
 def setup_fragments_screening(RUN = False, save_figs=False, saveas_format=None):
-    with open("fragments.json", "r") as f:
+    with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
 
     settings = Settings()
@@ -286,7 +286,7 @@ def setup_fragments_screening(RUN = False, save_figs=False, saveas_format=None):
 
 def final_relax_fragments(n_configs, threshold, BY_SITE):
 
-    with open("fragments.json", "r") as f:
+    with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
 
     main_dir = os.getcwd()
@@ -304,7 +304,7 @@ def final_relax_fragments(n_configs, threshold, BY_SITE):
 
 def restart_jobs_fragments(which):
 
-    with open("fragments.json", "r") as f:
+    with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
 
     main_dir = os.getcwd()
@@ -325,7 +325,7 @@ def get_diss_energies():
     from natsort import natsorted
     import glob
 
-    with open("fragments.json", "r") as f:
+    with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
     
     
