@@ -59,7 +59,9 @@ def build_xsorb_parser():
     #optional flags
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
     visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
-    visualization_group.add_argument('--depth-cueing', nargs='?', type=float, const=1, help='Enable depth cueing. Optional parameter: intensity (>=0, default=1).') 
+    visualization_group.add_argument('--depth-cueing', nargs='?', type=float, const=1, help='Enable depth cueing. Optional parameter: intensity (>=0, default=1).')
+    visualization_group.add_argument('--center-mol', action='store_true', help='translate the structure so that the molecule is centered in the image')
+    visualization_group.add_argument('--cut-vacuum', action='store_true', help='cut most of the vacuum above molecule in the images')  
     visualization_group.add_argument('--rotation', type=str, help='Rotation for saving images, in ASE format, e.g. 10z,5x') 
 
     return parser
@@ -107,10 +109,19 @@ def validate_xsorb_args(args : argparse.Namespace, parser : argparse.ArgumentPar
         parser.error("--exclude option can only be used with -r")
     if args.regenerate and not args.r:
         parser.error("--regenerate option can only be used with -r")
-    if args.povray and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations: # and not args.render_image:
+    if args.povray and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations:
         parser.error("--povray option can only be used with -screening-images or -relax-images or -screening-animations or -relax-animations")
     if args.width_res is not None and not args.povray:
         parser.error("--width-res can be specified only for povray rendering")
+    if args.depth_cueing and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations:
+        parser.error("--depth-cueing option can only be used with -screening-images or -relax-images or -screening-animations or -relax-animations")
+    if args.center_mol and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations: # and not args.render_image:
+        parser.error("--center-mol option can only be used with -screening-images or -relax-images or -screening-animations or -relax-animations")
+    if args.rotation and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations:
+        parser.error("--rotation option can only be used with -screening-images or -relax-images or -screening-animations or -relax-animations")
+    if args.cut_vacuum and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations:
+        parser.error("--cut-vacuum option can only be used with -screening-images or -relax-images or -screening-animations or -relax-animations")
+
 
     # Final check on values that are not already dealt with by argparse
     if(args.view):

@@ -20,8 +20,6 @@ from xsorbed.io_utils import get_calculations_results, _get_configurations_numbe
 from xsorbed.dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
 from xsorbed.common_definitions import *
 
-#TODO: cut the empty part of the cell (same height for all images)
-
 #OK (code agnostic)
 def plot_adsorption_sites(ALL : bool = False):
     '''
@@ -134,89 +132,64 @@ def get_decorated_structures(configs : list,
                              slab_atoms_indices : list,
                              ATOM_COLORS_SLAB : list,
                              ATOM_COLORS_MOL : list, 
-                             extend_slab : bool = False, 
-                             depth_cueing : float = None):
-    
-    from ase.build import make_supercell
+                             center_molecule : bool = False, 
+                             depth_cueing : float = None,
+                             cut_vacuum : bool = False):
 
+    cut_height = 3 #cut empty cell to this height above the highest atom
+    
+    newconfigs = []
     colors_list = []
     colors_depthcued_list = []
     textures_list = []
     textures_depthcued_list = []
+
     for config in configs:
 
         if isinstance(config, list): #for full evolution
         
+            newconfigs.append([])
             first_frame = True
-            
+
             for config_j in config:
             
                 mol = config_j[mol_atoms_indices]
                 slab = config_j[slab_atoms_indices]
+                if cut_vacuum: 
+                    slab.cell[2][2] = np.max([atom.z for atom in config]) + cut_height
+                    if not center_molecule: first_frame = False
                 Nslab = len(slab)
 
-                #section to repeat the bulk if mol is partially outside###############
-                #TODO: instead of extend slab, cut a window with the size of the cell but centered around the molecule
-                #trova il centro [x0,y0,z0] della molecola (traslata) e taglia una finestra [x0-a/2, x0+a/2]x[y0-b/2, y0+b/2]x[z0-c/2, z0+c/2]
-                if(extend_slab): #TODO: colors not working
-                    x_rep, y_rep = (3,3)
-                    slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False)
-                    mol.cell = slab.cell          
-                    mol.translate(+(config_j.cell[:][0] + config_j.cell[:][1]) )
-
-                    
-                    if first_frame: #set borders and select atoms only in first frame for each config
-                        max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
-                        max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
-                        dx_angstrom = 0.01 #distance in angstrom of surface extending beyond the molecule
-                        a, b = config_j.cell.lengths()[:2]
-                        max_a = max(2/3-0.05/a, max_a + dx_angstrom/a)
-                        min_a = min(1/3-0.05/a, min_a - dx_angstrom/a)
-                        max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
-                        min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
-
-                        atom_indices = [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)]
+                if(center_molecule): 
+                    if first_frame:
+                        mol_center = np.array([np.mean(mol.get_positions()[:,0]), np.mean(mol.get_positions()[:,1]), 0])
+                        cell_center = config.cell[:][0]/2 + config.cell[:][1]/2  #a1/2 + a2/2
                         first_frame = False
 
-                    del slab[ atom_indices ]
-                    Nslab = len(slab)
-                    slab.translate(-(config_j.cell[:][0] + config_j.cell[:][1]) )
-                    mol.translate(-(config_j.cell[:][0] + config_j.cell[:][1]) )
-                    slab.cell = config_j.cell
-                    mol.cell = config_j.cell
-                #######################################################################
-                config_j = slab + mol
+                    mol.translate(cell_center - mol_center)
+                    slab.translate(cell_center - mol_center)
+                    slab.wrap()
+
+                newconfigs[-1].append(slab + mol) 
     
         else: #for just single configurations
 
             mol = config[mol_atoms_indices]
             slab = config[slab_atoms_indices]
+            if cut_vacuum: 
+                slab.cell[2][2] = np.max([atom.z for atom in config]) + cut_height
             Nslab = len(slab)
 
-            #section to repeat the bulk if mol is partially outside###############
-            if(extend_slab): #TODO: colors not working
-                x_rep, y_rep = (3,3)
-                slab = make_supercell(slab, [[x_rep,0,0], [0,y_rep,0], [0,0,1]], wrap=False)
-                mol.cell = slab.cell          
-                mol.translate(+(config.cell[:][0] + config.cell[:][1]) )
+            if(center_molecule): 
+                
+                mol_center = np.array([np.mean(mol.get_positions()[:,0]), np.mean(mol.get_positions()[:,1]), 0])
+                cell_center = config.cell[:][0]/2 + config.cell[:][1]/2  #a1/2 + a2/2
 
-                max_a, min_a = ( max(mol.get_scaled_positions()[:,0]), min(mol.get_scaled_positions()[:,0]) )
-                max_b, min_b = ( max(mol.get_scaled_positions()[:,1]), min(mol.get_scaled_positions()[:,1]) )
-                dx_angstrom = 0.01 #distance in angstrom of surface extending beyond the molecule
-                a, b = config.cell.lengths()[:2]
-                max_a = max(2/3-0.05/a, max_a + dx_angstrom/a)
-                min_a = min(1/3-0.05/a, min_a - dx_angstrom/a)
-                max_b = max(2/3-0.05/b, max_b + dx_angstrom/b)
-                min_b = min(1/3-0.05/b, min_b - dx_angstrom/b)
-
-                del slab[ [atom.index for atom in slab if (atom.a < min_a or atom.a > max_a or atom.b < min_b or atom.b > max_b)] ]
-                Nslab = len(slab)
-                slab.translate(-(config.cell[:][0] + config.cell[:][1]) )
-                mol.translate(-(config.cell[:][0] + config.cell[:][1]) )
-                slab.cell = config.cell
-                mol.cell = config.cell
-            #######################################################################
-            config = slab + mol
+                mol.translate(cell_center - mol_center)
+                slab.translate(cell_center - mol_center)
+                slab.wrap()
+                
+            newconfigs.append(slab + mol)
 
         
         colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nslab else ATOM_COLORS_MOL[atom.number] for atom in config]
@@ -246,7 +219,7 @@ def get_decorated_structures(configs : list,
         textures_list.append(textures)
         textures_depthcued_list.append(textures_depthcued) 
 
-    return configs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list
+    return newconfigs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list
 
 #OK (code agnostic)
 def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, povray : bool, results : dict):
@@ -291,8 +264,9 @@ def config_images(calc_type : str,
                   povray : bool = False, 
                   width_res : int = None, 
                   rotations : str = None, 
-                  extend_slab: bool = True, 
-                  depth_cueing : float = None):
+                  center_molecule: bool = True, 
+                  depth_cueing : float = None,
+                  cut_vacuum : bool = False):
 
 
     if width_res is None and povray: width_res = 500  # I used 3000. From 1500 is still quite good. 2000 maybe best compromise (still very high res)
@@ -312,8 +286,9 @@ def config_images(calc_type : str,
                                                            slab_atoms_indices=slab_atoms_indices,
                                                            ATOM_COLORS_SLAB=ATOM_COLORS_SLAB,
                                                            ATOM_COLORS_MOL=ATOM_COLORS_MOL,
-                                                           extend_slab=extend_slab,
-                                                           depth_cueing=depth_cueing)
+                                                           center_molecule=center_molecule,
+                                                           depth_cueing=depth_cueing,
+                                                           cut_vacuum=cut_vacuum)
     
 
     print('Saving images...')
@@ -415,8 +390,9 @@ def view_config(calc_type : str, in_or_out : str, index : int):
 def relax_animations(calc_type : str,
                      povray : bool = False, 
                      width_res : int = None, 
-                     extend_slab: bool = True, 
-                     depth_cueing : float = None):
+                     center_molecule: bool = True, 
+                     depth_cueing : float = None,
+                     cut_vacuum : bool = False):
 
 
     if width_res is None and povray: width_res = 500
@@ -447,8 +423,9 @@ def relax_animations(calc_type : str,
                                                            slab_atoms_indices=slab_atoms_indices,
                                                            ATOM_COLORS_SLAB=ATOM_COLORS_SLAB,
                                                            ATOM_COLORS_MOL=ATOM_COLORS_MOL,
-                                                           extend_slab=extend_slab,
-                                                           depth_cueing=depth_cueing)
+                                                           center_molecule=center_molecule,
+                                                           depth_cueing=depth_cueing,
+                                                           cut_vacuum=cut_vacuum)
     
 
 
