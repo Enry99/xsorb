@@ -10,8 +10,10 @@ Small helper class to manage the molecule
 """
 
 import numpy as np
-from ase.io import read
 from matplotlib import pyplot as plt
+from ase.io import read
+from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.core.bonds import CovalentBond
 from ase.visualize.plot import plot_atoms
 from ase.constraints import FixCartesian
 
@@ -31,6 +33,7 @@ class Molecule:
         - axis_vector: [ax, ay, az] of the vector that is considered as the x-axis of the molecule
         - atoms_subset: indices of the atoms to include. Only removes atom NOT in this list, does not check
         if the atoms in the list actually exist in the molecule
+        - break_bond_indices: indices of the two atoms of the bond to be broken. The fragment containing the first atom will be kept.
         - fixed_indices_mol: list of specific atoms to be fixed 
         (indices start from 0, with the ordering of the atoms in the input file)
         - fix_mol_xyz: which coordinates to fix for the fixed atoms, e.g. [True, True, False] = fix motion in x,y, free to move along z.
@@ -41,7 +44,8 @@ class Molecule:
                  atom_index: int,
                  molecule_axis_atoms : list = None, 
                  axis_vector: list = None, 
-                 atoms_subset : list = None, 
+                 atoms_subset : list = None,
+                 break_bond_indices : list = None,
                  fixed_indices_mol : list = None, 
                  fix_mol_xyz : list = None):
 
@@ -70,8 +74,25 @@ class Molecule:
         if atoms_subset:            
             self.mol_ase = self.mol_ase[atoms_subset]
 
-        self.reference_atom_index = np.where([np.allclose(atom.position, [0,0,0]) for atom in self.mol_ase])[0]
+        elif break_bond_indices:
+            mol_pymat = AseAtomsAdaptor.get_molecule(self.mol_ase)
+            
+            if not CovalentBond.is_bonded(mol_pymat[break_bond_indices[0]], mol_pymat[break_bond_indices[1]]):
+                raise ValueError('The two selected atoms to split the molecule are not bonded.')
+            
+            mol_pymat = mol_pymat.break_bond(break_bond_indices[0], break_bond_indices[1])[0]
 
+            included_indices = []
+            for mol_atom in self.mol_ase:
+                for frag_atom in mol_pymat:
+                    if np.allclose(mol_atom.position, frag_atom.coords):
+                        included_indices.append(mol_atom.index)
+                        break
+
+            self.mol_ase = self.mol_ase[included_indices]
+
+        self.reference_atom_index = np.where([np.allclose(atom.position, [0,0,0]) for atom in self.mol_ase])[0]
+        self.constrained_indices = [constr.a for constr in self.mol_ase.constraints]
         self.natoms = len(self.mol_ase)
 
 

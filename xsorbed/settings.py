@@ -9,7 +9,6 @@ Small helper class to collect the settings read from settings.in
 """
 
 
-import sys
 import numpy as np
 from xsorbed import input
 from xsorbed.dftcode_specific import UNITS_TO_EV_FACTOR, HYBRID_SCREENING_THRESHOLDS
@@ -62,8 +61,7 @@ class Settings:
 
         if script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'atoms':
             if len(script_settings_dict['STRUCTURE']['molecule_axis'][1:]) != 2:
-                print("Error: you must specify two integers as indices of the two atoms for the molecule axis.")
-                sys.exit(1)
+                raise ValueError("Error: you must specify two integers as indices of the two atoms for the molecule axis.")
         elif script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'vector':
             if len(script_settings_dict['STRUCTURE']['molecule_axis'][1:]) != 3:
                 raise ValueError("Error: you must specify three numbers for the vector representing the molecule axis.")         

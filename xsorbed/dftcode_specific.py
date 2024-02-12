@@ -12,8 +12,8 @@ from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
 from xsorbed.common_definitions import *
 
-#TODO: try to launch, check the xsorb -e, try to fullrelax. 
-#Check that ase-sort.dat is used to sort the files back in the initial order when reading the outputs.
+#TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
+#TODO: Check that ase-sort.dat is used to sort the files back in the initial order when reading the outputs.
 #It does not work when reading poscar, it should work with outcar/vasprun.xml
 
 SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO']
@@ -277,14 +277,14 @@ def override_settings(settings, calc_type : str):
 
                 settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)
 
-def override_settings_isolated_fragment(settings, natoms_mol : int):
+def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_override : dict = None):
     '''
     Overrides the DFT code settings with specific options for the isolated fragment calculation
 
     Args:
     - settings: Settings object, containing the dft code parameters
-    - fragment_index: index of the fragment
     - natoms_mol: number of atoms in the molecule
+    - manual_dft_override: additional settings fragment-specific, read from fragments.json
     '''
     if settings.program == 'ESPRESSO':
 
@@ -292,6 +292,14 @@ def override_settings_isolated_fragment(settings, natoms_mol : int):
         settings.dftprogram_settings_dict['system'].update({'nosym' : True})
         settings.dftprogram_settings_dict['system'].update({'starting_magnetization(1)' : 1.0})        
         settings.dftprogram_settings_dict['electrons'].update({'mixing_beta' : 0.1})
+
+        if manual_dft_override is not None:
+            if 'SYSTEM' in manual_dft_override:
+                for k, v in manual_dft_override['SYSTEM'].items():
+                    settings.dftprogram_settings_dict['system'][k] = v
+            if 'ELECTRONS' in manual_dft_override:
+                for k, v in manual_dft_override['ELECTRONS'].items():
+                    settings.dftprogram_settings_dict['electrons'][k] = v
 
 
     elif settings.program == 'VASP':
@@ -302,15 +310,77 @@ def override_settings_isolated_fragment(settings, natoms_mol : int):
         missing_isym = True
         missing_magmom = True
         for i, line in enumerate(s):
+            
             if 'ISYM' in line:
-                s[i] = 'ISYM = 0'
+                if manual_dft_override and 'ISYM' in manual_dft_override:
+                    s[i] = f'ISYM = {manual_dft_override["ISYM"].strip()}'
+                    manual_dft_override.pop('ISYM')
+                else:
+                    s[i] = 'ISYM = 0'          
                 missing_isym = False
-            if 'MAGMOM in line':
-                s[i] = f'MAGMOM = {natoms_mol}*0.6'
+
+            if 'MAGMOM' in line:
+                if manual_dft_override and 'MAGMOM' in manual_dft_override:
+                    s[i] = f'MAGMOM = {manual_dft_override["MAGMOM"].strip()}'
+                    manual_dft_override.pop('MAGMOM')
+                else:
+                    s[i] = f'MAGMOM = {natoms_mol}*0.6'
+                missing_magmom = False
+            
+            key = line.split()[0].strip()
+            if key in manual_dft_override:
+                s[i] = f'{key} = {manual_dft_override[key].strip()}'
+                manual_dft_override.pop(key)
+                
         if missing_isym: s.append('ISYM = 0')
         if missing_magmom: s.append(f'MAGMOM = {natoms_mol}*0.6')
 
+        if manual_dft_override is not None:
+            for key in manual_dft_override:
+                s.append(f'{key} = {manual_dft_override[key].strip()}')
+
+
         settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)     
+
+def override_settings_adsorbed_fragment(settings, natoms_mol : int, manual_dft_override : dict = None):
+    '''
+    Overrides the DFT code settings with specific options for the adsorbed fragments calculations
+
+    Args:
+    - settings: Settings object, containing the dft code parameters
+    - fragment_index: index of the fragment
+    - natoms_mol: number of atoms in the molecule
+    - manual_dft_override: additional settings fragment-specific, read from fragments.json
+    '''
+    if settings.program == 'ESPRESSO':
+    
+        if manual_dft_override is not None:
+            if 'SYSTEM' in manual_dft_override:
+                for k, v in manual_dft_override['SYSTEM'].items():
+                    settings.dftprogram_settings_dict['system'][k] = v
+            if 'ELECTRONS' in manual_dft_override:
+                for k, v in manual_dft_override['ELECTRONS'].items():
+                    settings.dftprogram_settings_dict['electrons'][k] = v
+
+
+    elif settings.program == 'VASP':
+        
+        if 'incar_string' in settings.dftprogram_settings_dict:
+            s = settings.dftprogram_settings_dict['incar_string'].split('\n')
+        else: s = []
+
+        for i, line in enumerate(s):           
+            key = line.split()[0].strip()
+            if key in manual_dft_override:
+                s[i] = f'{key} = {manual_dft_override[key].strip()}'
+                manual_dft_override.pop(key)
+
+        if manual_dft_override is not None:
+            for key in manual_dft_override:
+                s.append(f'{key} = {manual_dft_override[key].strip()}')
+
+        settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)     
+
 
 
 def Calculator(settings, label : str, atoms, directory : str):

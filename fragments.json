@@ -18,14 +18,15 @@
          "fixed_indices_mol"       : 0,
          "fix_mol_xyz"             : [0,0,1],
 
-         "vasp_settings"           : {
+         "dft_settings_override"   : {
 
             "vacuum" :  {
+               "MAGMOM" : "2*0.6"
 
             },
 
             "adsorption" : {
-               "MAGMOM" : "2*0.6"
+               
             }
 
          }
@@ -34,7 +35,7 @@
       "H" : 
       {
          "mol_subset_atoms"        : [2],
-         "selected_atom_index"     : 0,
+         "selected_atom_index"     : 2,
          "molecule_axis"           : "vector 1 0 0",
          "x_rot_angles"            : [0],
          "y_rot_angles"            : [0],   
