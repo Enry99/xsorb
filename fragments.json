@@ -15,7 +15,7 @@
          "screening_atom_distance" : 1.5,
          "screening_min_distance"  : 1.0,
 
-         "fixed_indices_mol"       : 0,
+         "fixed_indices_mol"       : [0],
          "fix_mol_xyz"             : [0,0,1],
 
          "dft_settings_override"   : {
@@ -45,7 +45,7 @@
          "screening_atom_distance" : 1.5,
          "screening_min_distance"  : 1.0,
 
-         "fixed_indices_mol"       : 0,
+         "fixed_indices_mol"       : [0],
          "fix_mol_xyz"             : [0,0,1]
       },
 
@@ -62,7 +62,7 @@
          "screening_atom_distance" : 1.5,
          "screening_min_distance"  : 1.0,
 
-         "fixed_indices_mol"       : 0,
+         "fixed_indices_mol"       : [0],
          "fix_mol_xyz"             : [0,0,1]
       }
 

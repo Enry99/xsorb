@@ -20,6 +20,7 @@ from xsorbed.cli_parser import cli_parse_xsorb
 from xsorbed.common_definitions import VERSION
 
 #NOTE: dire che xsorb supporta ibrav
+#TODO: dictionary.get(keyname, value) #se non c'è la chiave ritorna value. Sostituire i vari if con questo
 
 def main():
 

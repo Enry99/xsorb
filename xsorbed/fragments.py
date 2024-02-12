@@ -14,10 +14,9 @@ import json, os, shutil, copy
 import numpy as np
 from xsorbed.settings import Settings
 from xsorbed.molecule import Molecule
-from xsorbed.calculations import generate, final_relax
-from xsorbed.io_utils import get_energies, restart_jobs
+from xsorbed.calculations import launch_screening, final_relax
+from xsorbed.io_utils import get_calculations_results, restart_jobs
 from xsorbed.common_definitions import *
-from xsorbed.slab import Slab
 from xsorbed.dftcode_specific import FRAGMENTS_OUT_FILE_PATHS, FRAGMENTS_IN_FILE_PATHS, SBATCH_POSTFIX_FRAGS, \
     override_settings_isolated_fragment, override_settings_adsorbed_fragment, Calculator
 from xsorbed import ase_custom
@@ -35,12 +34,14 @@ def generate_isolated_fragment(settings : Settings, fragment_dict : dict):
        - fragment_dict (dict): A dictionary containing information about the fragment to be generated.
 
     Returns:
-        list: A Molecule object representing the isolated fragment.
+        Molecule object representing the isolated fragment.
     """
 
         
     if "mol_subset_atoms" in fragment_dict and "break_bond_indices" in fragment_dict:
         raise ValueError("You can specify a fragment either by its atoms or by the broken bonds, not both.")
+    if "mol_subset_atoms" not in fragment_dict and "break_bond_indices" not in fragment_dict:
+        raise RuntimeError("You must specify the fragment either through mol_subset_atoms or break_bond_indices.")
     
             
     axis = [x.strip("'") for x in fragment_dict['molecule_axis'].split()]
@@ -50,24 +51,15 @@ def generate_isolated_fragment(settings : Settings, fragment_dict : dict):
     elif axis[0] == 'vector':
         if len(axis[1:]) != 3:
             raise ValueError("Error: you must specify three numbers for the vector representing the molecule axis.")
-    molecule_axis_atoms    = np.array(axis[1:], dtype=int).tolist() if axis[0] == 'atoms' else None
-    axis_vector            = np.array(axis[1:], dtype=float).tolist() if axis[0] == 'vector' else None   
-    
-    if "mol_subset_atoms" in fragment_dict:
-        mol = Molecule(molecule_filename=settings.molecule_filename,
-                                atom_index=fragment_dict["selected_atom_index"],
-                                molecule_axis_atoms=molecule_axis_atoms, 
-                                axis_vector=axis_vector,
-                                atoms_subset=fragment_dict["mol_subset_atoms"])
-    elif "break_bond_indices" in fragment_dict:
-        mol = Molecule(molecule_filename=settings.molecule_filename,
-                                atom_index=fragment_dict["selected_atom_index"],
-                                molecule_axis_atoms=molecule_axis_atoms, 
-                                axis_vector=axis_vector,
-                                break_bond_indices=fragment_dict["break_bond_indices"])
-    else:
-        raise RuntimeError("Error: fragment definition not recognized. You must specify either mol_subset_atoms or break_bond_indices.")
-    
+
+    mol = Molecule(molecule_filename=settings.molecule_filename,
+                            atom_index=fragment_dict["selected_atom_index"],
+                            molecule_axis_atoms=np.array(axis[1:], dtype=int).tolist() if axis[0] == 'atoms' else None,
+                            axis_vector=np.array(axis[1:], dtype=float).tolist() if axis[0] == 'vector' else None, 
+                            atoms_subset=fragment_dict["mol_subset_atoms"] if "mol_subset_atoms" in fragment_dict else None,
+                            break_bond_indices=fragment_dict["break_bond_indices"] if "break_bond_indices" in fragment_dict else None,
+                            fixed_indices_mol=fragment_dict["fixed_indices_mol"] if "fixed_indices_mol" in fragment_dict else None,
+                            fix_mol_xyz=fragment_dict["fix_mol_xyz"] if "fix_mol_xyz" in fragment_dict else None)
 
     return mol
     
@@ -105,6 +97,7 @@ def write_fragments_inputs(settings : Settings,
     """    
 
     os.makedirs('fragments', exist_ok=True)
+    main_dir = os.getcwd()
     
     frag_list = []
     for fragment_name, molecule in zip(fragments_dict["fragments"], molecules):
@@ -141,10 +134,12 @@ def write_fragments_inputs(settings : Settings,
         
         newsettings = copy.deepcopy(settings)
         if OVERRIDE_SETTINGS: 
-            override_settings_isolated_fragment(newsettings, molecules[0].Natoms, manual_dft_override)
+            override_settings_isolated_fragment(newsettings, molecules[0].natoms, manual_dft_override)
         
-        calc = Calculator(newsettings, fragment_name, molecule.mol_ase, outdir) 
+        os.chdir(outdir)
+        calc = Calculator(newsettings, fragment_name, molecule.mol_ase, '.') 
         calc.write_input(molecule.mol_ase)
+        os.chdir(main_dir)
 
         frag_list.append(fragment_name)
 
@@ -212,9 +207,47 @@ def isolated_fragments(RUN=False):
 
 
 
+def edit_fragment_settings(lines : list, 
+                           settings_dict : dict):
+    
+    print(settings_dict)
+    
+    settings_lines_frag = []
+    in_structure = False
+    for line in lines:
+        if '&STRUCTURE' in line.upper(): in_structure = True
+
+        if 'mol_subset_atoms' in line:
+            continue #do not write this line
+        elif 'molecule_axis' in line:
+            settings_lines_frag.append(f'   molecule_axis = vector 1 0 0\n')
+            continue
+        else:
+            found = False
+            for key, val in settings_dict.items():
+                if key == 'dft_settings_override' or val is None: continue
+                if isinstance(val, list): val = ' '.join([str(x) for x in val])
+                if key in line: 
+                    settings_lines_frag.append(f'   {key} = {val}\n')
+                    settings_dict.pop(key)
+                    found = True
+                    break
+            if found: continue
+            
+        if in_structure and line.strip()=='/': 
+            in_structure = False
+            for key, val in settings_dict.items():
+                if key == 'dft_settings_override' or not val: continue
+                if isinstance(val, list): val = ' '.join([str(x) for x in val])
+                settings_lines_frag.append(f'   {key} = {val}\n')
+
+        settings_lines_frag.append(line)
+        #TODO: add dft_settings_override
+
+    return settings_lines_frag
 
 
-def setup_fragments_screening(RUN = False, save_figs=False, saveas_format=None):
+def setup_fragments_screening(RUN = False):
     
     with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
@@ -222,97 +255,64 @@ def setup_fragments_screening(RUN = False, save_figs=False, saveas_format=None):
     settings = Settings()
     
     main_dir = os.getcwd()
-    
     for fragment_name, fragment_dict in fragments_dict["fragments"].items():
         
         os.chdir(main_dir)
         print(f'\n--------------------\nFragment {fragment_name}:')
 
-        shutil.copyfile(settings.jobscript, f'fragments/{fragment_name}/{jobscript_stdname}')
+        outdir = f'fragments/{fragment_name}'
+        os.makedirs(outdir, exist_ok=True)
+
+        shutil.copyfile(settings.jobscript, f'{outdir}/{jobscript_stdname}')
 
         frag_initial = generate_isolated_fragment(settings, fragment_dict)
         
         if not os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name)):
             print(f"Isolated {fragment_name} was not relaxed. Its initial structure will be used.")
-            mol = frag_initial
-            #write to be able to use xsorb from within the fragment folder   
-            ase_custom.write_xyz_custom(f'fragments/{fragment_name}/{fragment_name}.xyz', frag_initial.mol_ase) 
-
+            ase_custom.write_xyz_custom(f'{outdir}/{fragment_name}.xyz', frag_initial.mol_ase)
+            fragment_filename = f'{outdir}/{fragment_name}.xyz'
         else:
-            mol = Molecule(molecule_filename=FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name),
-                        atom_index=frag_initial.reference_atom_index,
-                        axis_vector=[1,0,0],  
-                        fixed_indices_mol=frag_initial.constrained_indices, 
-                        fix_mol_xyz=settings.fix_mol_xyz)
-            
-
-            #TODO:
-            #mol_subset_atoms -> delete, since we are already providing the fragment as a input mol
-            #molecule_axis -> set to vector 1 0 0, since the rotation is performed when generating the fragment
-            #selected_atom_index -> reindex (just for completeness)
-            #fixed_indices_mol -> reindex  (just for completeness)
-
-            #TODO: check how to handle the dft parameters ordering.
+            fragment_filename = FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name)
     
 
 
         #only edit settings.in if not already present. This allows to fine-tune some parameters for specific fragments after -g, before -s
         answer = 'yes'
-        if os.path.exists(f'fragments/{fragment_name}/settings.in'):
-            print(f'fragments/{fragment_name}/settings.in already present.')
+        if os.path.exists(f'{outdir}/settings.in'):
+            print(f'{outdir}/settings.in already present.')
             while True:
                 answer = input('Overwrite? ("y" = yes, "n" = no): ')
                 if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
                     break
                 else: print('Value not recognized. Try again.')
 
-        if answer == 'yes' or answer == 'y': 
-            #edit and put slab and molecule paths, and edit the jobscript changing the name to {jobscript_stdname}
-    
-            settings_lines_frag = copy.deepcopy(settings_lines)
+        with open('settings.in', 'r') as f:
+            settings_lines = f.readlines()    
+        if 'y' in answer: 
+            settings_dict = dict(jobscript=f'{jobscript_stdname} {settings.sbatch_command}',
+                                slab_filename=os.path.abspath(settings.slab_filename),
+                                molecule_filename=os.path.abspath(fragment_filename),
+                                selected_atom_index=frag_initial.reference_atom_index,
+                                x_rot_angles=fragment_dict.get("x_rot_angles", None),
+                                y_rot_angles=fragment_dict.get("y_rot_angles", None),
+                                z_rot_angles=fragment_dict.get("z_rot_angles", None),
+                                vertical_angles=fragment_dict.get("vertical_angles", None),
+                                screening_atom_distance=fragment_dict.get("screening_atom_distance", None),
+                                screening_min_distance=fragment_dict.get("screening_min_distance", None),
+                                relax_atom_distance=fragment_dict.get("relax_atom_distance", None),
+                                relax_min_distance=fragment_dict.get("relax_min_distance", None),
+                                fixed_indices_mol=frag_initial.constrained_indices,
+                                fix_mol_xyz=fragment_dict.get("fix_mol_xyz", None),
 
-            for i, line in enumerate(settings_lines_frag):
-                if "molecule_filename" in line:
-                    l = line.split('=')[:2]
-                    l[1] = mol_frag_name.split('/')[-1]
-                    line = '= '.join(l)+'\n'
-                    settings_lines_frag[i] = line
-    
-
-            for flag in fragments_dict["fragments"][fragment_name]: 
-                if flag ==  "mol_subset_atoms": continue
-                found = False              
-                for i, line in enumerate(settings_lines_frag):
-                    
-                    if flag in line:
-                        l = line.split('=')[:2]
-                        l[0] = '   '+flag.ljust(30)
-                        if isinstance(fragments_dict["fragments"][fragment_name][flag], list):
-                            l[1] = ' '.join(str(x) for x in fragments_dict["fragments"][fragment_name][flag])                        
-                        else:
-                            l[1] = str(fragments_dict["fragments"][fragment_name][flag])
-                        line = '= '.join(l)+'\n'
-                        settings_lines_frag[i] = line
-                        found = True
-                        break
-                if not found:
-                    if isinstance(fragments_dict["fragments"][fragment_name][flag], list):
-                        l = ' '.join(str(x) for x in fragments_dict["fragments"][fragment_name][flag])                        
-                    else:
-                        l = str(fragments_dict["fragments"][fragment_name][flag])
-                    settings_lines_frag.insert(STRUCTURE_line_i, '   '+flag.ljust(30)+' = '+l+'\n')
+                                dft_settings_override=fragment_dict.get("dft_settings_override", None)
+                                )
+            settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict)  
+        with open(f'{outdir}/settings.in', 'w') as f:
+            f.writelines(settings_lines)
 
 
-            with open('fragments/{0}'.format(fragment_name)+'/settings.in', 'w') as f:
-                f.writelines(settings_lines_frag)
-
-
-        
-        j_dir = 'fragments/'+fragment_name
-        if not os.path.exists(j_dir + '/'+jobscript_filename) : shutil.copyfile(settings.jobscript, j_dir + '/'+jobscript_filename)
-
-        os.chdir(j_dir)
-        generate(RUN = RUN, etot_forc_conv = etot_forc_conv, SAVEFIG=save_figs, saveas_format=saveas_format)
+        os.chdir(outdir)
+        if RUN: launch_screening()
         os.chdir(main_dir)
 
     #print(json.dumps(fragments_dict, indent=3))
@@ -328,15 +328,15 @@ def final_relax_fragments(n_configs, threshold, BY_SITE):
 
         os.chdir(main_dir)
 
-        print('\n--------------------\nFragment {}:'.format(fragment_name))
+        print(f'\n--------------------\nFragment {fragment_name}:')
 
-        j_dir = 'fragments/'+fragment_name
-        os.chdir(j_dir)
+        outdir = f'fragments/{fragment_name}'
+        os.chdir(outdir)
         final_relax(n_configs=n_configs, threshold=threshold, BY_SITE=BY_SITE)
         os.chdir(main_dir)
         
 
-def restart_jobs_fragments(which):
+def restart_jobs_fragments(calc_type : str):
 
     with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
@@ -346,18 +346,17 @@ def restart_jobs_fragments(which):
 
         os.chdir(main_dir)
 
-        print('\n--------------------\nFragment {}:'.format(fragment_name))
+        print(f'\n--------------------\nFragment {fragment_name}:')
 
-        j_dir = 'fragments/'+fragment_name
-        os.chdir(j_dir)
-        restart_jobs(which='screening' if which == 's' else 'relax')
+        outdir = f'fragments/{fragment_name}'
+        os.chdir(outdir)
+        restart_jobs(calc_type)
         os.chdir(main_dir)
 
 
 def get_diss_energies():
 
-    from natsort import natsorted
-    import glob
+    pass
 
     with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)

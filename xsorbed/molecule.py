@@ -50,7 +50,7 @@ class Molecule:
                  fix_mol_xyz : list = None):
 
 
-        self.mol_ase = ase_custom.Atoms_custom(read(molecule_filename, results_required=False))
+        self.mol_ase = ase_custom.Atoms_custom(read(molecule_filename))
 
         #align axis to x axis
         if molecule_axis_atoms and axis_vector: raise RuntimeError("molecule axis cannot be given simultaneously as vector and by two atoms.")
@@ -75,7 +75,9 @@ class Molecule:
             self.mol_ase = self.mol_ase[atoms_subset]
 
         elif break_bond_indices:
-            mol_pymat = AseAtomsAdaptor.get_molecule(self.mol_ase)
+            molcopy = self.mol_ase.copy() 
+            del molcopy.constraints #to suppress the warning about constraints not supported in pymatgen
+            mol_pymat = AseAtomsAdaptor.get_molecule(molcopy)
             
             if not CovalentBond.is_bonded(mol_pymat[break_bond_indices[0]], mol_pymat[break_bond_indices[1]]):
                 raise ValueError('The two selected atoms to split the molecule are not bonded.')
@@ -91,7 +93,9 @@ class Molecule:
 
             self.mol_ase = self.mol_ase[included_indices]
 
-        self.reference_atom_index = np.where([np.allclose(atom.position, [0,0,0]) for atom in self.mol_ase])[0]
+        ref_idx = [atom.index for atom in self.mol_ase if np.allclose(atom.position, [0,0,0])]
+        if len(ref_idx) != 1: raise ValueError('Reference atom index not found.')
+        self.reference_atom_index = ref_idx[0]
         self.constrained_indices = [constr.a for constr in self.mol_ase.constraints]
         self.natoms = len(self.mol_ase)
 

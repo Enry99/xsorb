@@ -384,7 +384,7 @@ def read_espresso_in_custom(fileobj):
     symbols = [label_to_symbol(position[0]) for position in positions_card]
     custom_labels = ['{:3}'.format(position[0]) for position in positions_card]
     positions = [position[1] for position in positions_card]
-    magmoms = [species_info[label]["magmom"] for label in custom_labels]
+    magmoms = [species_info[position[0]]["magmom"] for position in positions_card]
     
 
     # TODO: put more info into the atoms object

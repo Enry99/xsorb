@@ -55,7 +55,7 @@ class Slab:
                  sort_atoms_by_z : bool = False,
                  translate_slab_from_below_cell_bottom : bool = True):
         
-        self.slab_ase = ase_custom.Atoms_custom(read(filename=slab_filename, results_required=False))
+        self.slab_ase = ase_custom.Atoms_custom(read(filename=slab_filename))
         self.natoms   = len(self.slab_ase)
 
 
@@ -290,7 +290,7 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
 def mol_bonded_to_slab(slab : Atoms, mol: Atoms):
     '''
     Returns true if the molecule is bonded to the slab, i.e. if a
-    (slab, molecule) atom pair is closer than 1.2 x sum of covalent radii
+    (slab, molecule) atom pair is closer than 1.1 x sum of covalent radii
 
     Args:
     - slab: Atoms object for the slab
@@ -299,7 +299,7 @@ def mol_bonded_to_slab(slab : Atoms, mol: Atoms):
 
     i_mol, j_slab, distance = closest_pair(slab, mol)
 
-    max_bond_distance = 1.2 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
+    max_bond_distance = 1.1 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
                                 + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
     
     return distance <= max_bond_distance

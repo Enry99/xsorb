@@ -46,14 +46,13 @@ def main():
         setup_fragments_screening(RUN=False)
 
     elif(args.s is not None):
-        if not args.s: args.s = hybrid_screening_thresholds
-        setup_fragments_screening(RUN=True, etot_forc_conv = args.s)
+        setup_fragments_screening(RUN=True)
 
     elif(args.r):
         final_relax_fragments(n_configs=args.n, threshold=args.t, BY_SITE=args.by_site)
 
     elif(args.restart):
-        restart_jobs_fragments(which='screening' if args.restart == 's' else 'relax')
+        restart_jobs_fragments(calc_type = 'SCREENING' if args.restart == 's' else 'RELAX')
 
 
     #energies
