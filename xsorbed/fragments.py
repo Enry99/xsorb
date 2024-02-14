@@ -12,6 +12,7 @@ Generation of molecular fragments and dissociation energies calculation
 
 import json, os, shutil, copy
 import numpy as np
+import pandas as pd
 from xsorbed.settings import Settings
 from xsorbed.molecule import Molecule
 from xsorbed.calculations import launch_screening, final_relax
@@ -22,7 +23,7 @@ from xsorbed.dftcode_specific import FRAGMENTS_OUT_FILE_PATHS, FRAGMENTS_IN_FILE
 from xsorbed import ase_custom
 
 
-TEST = True   #set to true for testing: prints sbatch command instead of actually launching jobs
+TEST = True   #set to true for testing: prints sbatch command instead of actually launching jobs for the isolated fragments
 
 #OK (code agnostic)
 def generate_isolated_fragment(settings : Settings, fragment_dict : dict):
@@ -60,6 +61,10 @@ def generate_isolated_fragment(settings : Settings, fragment_dict : dict):
                             break_bond_indices=fragment_dict["break_bond_indices"] if "break_bond_indices" in fragment_dict else None,
                             fixed_indices_mol=fragment_dict["fixed_indices_mol"] if "fixed_indices_mol" in fragment_dict else None,
                             fix_mol_xyz=fragment_dict["fix_mol_xyz"] if "fix_mol_xyz" in fragment_dict else None)
+    
+    if not mol.mol_ase.cell: #when reading from xyz, cell might not be set
+        mol.mol_ase.set_cell([30,30,30])
+        mol.mol_ase.set_pbc([True,True,True])
 
     return mol
     
@@ -208,13 +213,33 @@ def isolated_fragments(RUN=False):
 
 
 def edit_fragment_settings(lines : list, 
-                           settings_dict : dict):
+                           settings_dict : dict,
+                           program : str):
     
-    print(settings_dict)
+    settings_lines_frag = [] #where to put all the lines
+
+
+    script_section = ['@SETTINGS', '/@SETTINGS']
+    dft_section = [f'@{program}', f'/@{program}']
+
+    for i,line in enumerate(lines):
+        if script_section[0] in line: 
+            i_script_beg = i
+        if script_section[1] in line:
+            i_script_end = i
+            break
+    script_lines = lines[i_script_beg:i_script_end+1]
+
+    for i,line in enumerate(lines):
+        if dft_section[0] in line: 
+            i_dft_beg = i
+        if dft_section[1] in line:
+            i_dft_end = i
+            break
+    dft_lines = lines[i_dft_beg:i_dft_end+1]
     
-    settings_lines_frag = []
     in_structure = False
-    for line in lines:
+    for line in script_lines:
         if '&STRUCTURE' in line.upper(): in_structure = True
 
         if 'mol_subset_atoms' in line:
@@ -242,7 +267,9 @@ def edit_fragment_settings(lines : list,
                 settings_lines_frag.append(f'   {key} = {val}\n')
 
         settings_lines_frag.append(line)
-        #TODO: add dft_settings_override
+    
+    #add dft_settings_override
+    settings_lines_frag += override_settings_adsorbed_fragment(program, dft_section, settings_dict['dft_settings_override'] if 'dft_settings_override' in settings_dict else None)
 
     return settings_lines_frag
 
@@ -306,7 +333,7 @@ def setup_fragments_screening(RUN = False):
 
                                 dft_settings_override=fragment_dict.get("dft_settings_override", None)
                                 )
-            settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict)  
+            settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict, program=settings.program)  
         with open(f'{outdir}/settings.in', 'w') as f:
             f.writelines(settings_lines)
 
@@ -356,73 +383,56 @@ def restart_jobs_fragments(calc_type : str):
 
 def get_diss_energies():
 
-    pass
-
     with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
     
-    
-    slab_energy = Settings().E_slab_mol[0] #* rydbergtoev  CHANGE!!!
-
-
+    #get energy of most stable configuration for the whole molecule
     fragments_data = {"mol" : {}}
-    #get total energy of molecule, each with the label and position
-    sites = [] 
-    config_labels = []
-    with open('site_labels.csv', 'r') as f:
-        file = f.readlines()
-        for line in file:
-            if 'site' in line: continue
-            sites.append(int(line.split(',')[0]))
-            config_labels.append(line.split(',')[4])
-    energies = get_energies(pwo_prefix='relax')
-    i_min = energies.index(min(energies))
-    files = natsorted(glob.glob( 'relax_*.pwo' ))
-    name_min = files[i_min]
-    label_min = int(name_min.split('_')[-1].split('.')[0])
-    fragments_data["mol"]["energy"] = min(energies)
-    fragments_data["mol"]["site"] = config_labels[label_min]
+
+    datafile = pd.read_csv(labels_filename, index_col=0)
+    settings_mol = Settings()
+    results_mol = get_calculations_results(settings_mol.program, 'RELAX', settings_mol.E_slab_mol)
+    energies_mol = []
+    indices_mol = []
+    for key, val in results_mol['energy'].items():
+        energies_mol.append(val)
+        indices_mol.append(key)
+    i_min = indices_mol[energies_mol.index(min(energies_mol))]
+    fragments_data["mol"]["energy"] = min(energies_mol)
+    fragments_data["mol"]["site"] = datafile['Sites'][i_min]
+
 
     #repeat for each fragment
+    main_dir = os.getcwd()
     for fragment_name in fragments_dict["fragments"]:
         
         fragments_data.update({fragment_name : {} })
 
-        #get total energy of each fragment, each with the label and position
-        sites = [] 
-        config_labels = []
-        with open('fragments/{}/site_labels.csv'.format(fragment_name), 'r') as f:
-            file = f.readlines()
-
-            for line in file:
-                if 'site' in line: continue
-                sites.append(int(line.split(',')[0]))
-                config_labels.append(line.split(',')[4])
-
-        energies = get_energies(pwo_prefix='fragments/{}/relax'.format(fragment_name))
-
-        i_min = energies.index(min(energies))
         
-        files = natsorted(glob.glob( 'fragments/{}/relax_*.pwo'.format(fragment_name) ))
-
-        name_min = files[i_min]
-        label_min = int(name_min.split('_')[-1].split('.')[0])
-
-        fragments_data[fragment_name]["energy"] = min(energies)
-        fragments_data[fragment_name]["site"] = config_labels[label_min]
-        
-
+        outdir = f'fragments/{fragment_name}'
+        os.chdir(outdir)
+        datafile = pd.read_csv(labels_filename, index_col=0)
+        settings_mol = Settings()
+        results_mol = get_calculations_results(settings_mol.program, 'RELAX', settings_mol.E_slab_mol)
+        energies_mol = []
+        indices_mol = []
+        for key, val in results_mol['energy'].items():
+            energies_mol.append(val)
+            indices_mol.append(key)
+        i_min = indices_mol[energies_mol.index(min(energies_mol))]
+        fragments_data[fragment_name]["energy"] = min(energies_mol)
+        fragments_data[fragment_name]["site"] = datafile['Sites'][i_min]
+        os.chdir(main_dir)
     
     text = []
-
 
     for combination in fragments_dict["combinations"]:        
         
         products_names = combination[1]
         initial_fragment_name = combination[0]
-        dissoc_products_toten = sum([ fragments_data[frag]["energy"] for frag in products_names])
+        dissoc_products_total_ads_en = sum([ fragments_data[frag]["energy"] for frag in products_names])
         initial_fragment_energy = fragments_data[ initial_fragment_name ]["energy"]
-        diss_en = dissoc_products_toten - initial_fragment_energy - slab_energy * (len(products_names) - 1)
+        diss_en = dissoc_products_total_ads_en - initial_fragment_energy
 
         fragments_names = '{0}({1}) -> '.format(initial_fragment_name, fragments_data[initial_fragment_name]["site"]).format()    \
             +' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in products_names])

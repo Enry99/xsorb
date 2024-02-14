@@ -342,44 +342,43 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
 
         settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)     
 
-def override_settings_adsorbed_fragment(settings, natoms_mol : int, manual_dft_override : dict = None):
+def override_settings_adsorbed_fragment(program : str, dft_section : list, dft_settings_dict : dict = None):
     '''
     Overrides the DFT code settings with specific options for the adsorbed fragments calculations
-
-    Args:
-    - settings: Settings object, containing the dft code parameters
-    - fragment_index: index of the fragment
-    - natoms_mol: number of atoms in the molecule
-    - manual_dft_override: additional settings fragment-specific, read from fragments.json
     '''
-    if settings.program == 'ESPRESSO':
+
+    dft_newlines = []
     
-        if manual_dft_override is not None:
-            if 'SYSTEM' in manual_dft_override:
-                for k, v in manual_dft_override['SYSTEM'].items():
-                    settings.dftprogram_settings_dict['system'][k] = v
-            if 'ELECTRONS' in manual_dft_override:
-                for k, v in manual_dft_override['ELECTRONS'].items():
-                    settings.dftprogram_settings_dict['electrons'][k] = v
+    if program == 'ESPRESSO':
+    
+        for line in dft_section:
+            if '&STRUCTURE' in line.upper(): in_structure = True
+
+            else:
+                found = False
+                for key, val in settings_dict.items():
+                    if key == 'dft_settings_override' or val is None: continue
+                    if isinstance(val, list): val = ' '.join([str(x) for x in val])
+                    if key in line: 
+                        settings_lines_frag.append(f'   {key} = {val}\n')
+                        settings_dict.pop(key)
+                        found = True
+                        break
+                if found: continue
+                
+            if in_structure and line.strip()=='/': 
+                in_structure = False
+                for key, val in settings_dict.items():
+                    if key == 'dft_settings_override' or not val: continue
+                    if isinstance(val, list): val = ' '.join([str(x) for x in val])
+                    settings_lines_frag.append(f'   {key} = {val}\n')
 
 
-    elif settings.program == 'VASP':
+    elif program == 'VASP':
+        pass
         
-        if 'incar_string' in settings.dftprogram_settings_dict:
-            s = settings.dftprogram_settings_dict['incar_string'].split('\n')
-        else: s = []
 
-        for i, line in enumerate(s):           
-            key = line.split()[0].strip()
-            if key in manual_dft_override:
-                s[i] = f'{key} = {manual_dft_override[key].strip()}'
-                manual_dft_override.pop(key)
-
-        if manual_dft_override is not None:
-            for key in manual_dft_override:
-                s.append(f'{key} = {manual_dft_override[key].strip()}')
-
-        settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)     
+    return dft_newlines    
 
 
 

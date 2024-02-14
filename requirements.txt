@@ -2,4 +2,4 @@ ase==3.22.1
 pymatgen==2023.3.23
 matplotlib>=3.7.1
 numpy>=1.24.2
-pandas==2.1.1
+pandas>=2.0.0
