@@ -21,6 +21,9 @@ from xsorbed.common_definitions import VERSION
 
 #NOTE: dire che xsorb supporta ibrav
 #TODO: dictionary.get(keyname, value) #se non c'è la chiave ritorna value. Sostituire i vari if con questo
+#TODO (future): substitute settings.in and manual parsing with configparser, make the Settings class a dict. 
+#TODO (future): substitute the results dict with a pandas dataframe
+
 
 def main():
 

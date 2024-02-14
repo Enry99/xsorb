@@ -351,31 +351,56 @@ def override_settings_adsorbed_fragment(program : str, dft_section : list, dft_s
     
     if program == 'ESPRESSO':
     
+        card = None
         for line in dft_section:
-            if '&STRUCTURE' in line.upper(): in_structure = True
-
-            else:
+            
+            if '&' in line: 
+                card = line.split('&')[1].strip()
+                dft_newlines.append(line)
+                continue
+            
+            if card and card in dft_settings_dict:
                 found = False
-                for key, val in settings_dict.items():
-                    if key == 'dft_settings_override' or val is None: continue
-                    if isinstance(val, list): val = ' '.join([str(x) for x in val])
+                for key, val in dft_settings_dict[card].items():
                     if key in line: 
-                        settings_lines_frag.append(f'   {key} = {val}\n')
-                        settings_dict.pop(key)
+                        dft_newlines.append(f'   {key} = {val}\n')
+                        dft_settings_dict[card].pop(key)
                         found = True
                         break
                 if found: continue
                 
-            if in_structure and line.strip()=='/': 
-                in_structure = False
-                for key, val in settings_dict.items():
-                    if key == 'dft_settings_override' or not val: continue
-                    if isinstance(val, list): val = ' '.join([str(x) for x in val])
-                    settings_lines_frag.append(f'   {key} = {val}\n')
+            if card and line.strip()=='/': 
+                for key, val in dft_settings_dict[card].items():
+                    dft_newlines.append(f'   {key} = {val}\n')
+                dft_newlines.append(line)
+                card = None
 
 
     elif program == 'VASP':
-        pass
+        
+        in_incar = False
+        for line in dft_section:
+            
+            if '&INCAR' in line: 
+                in_incar = True
+                dft_newlines.append(line)
+                continue
+            
+            if in_incar:
+                found = False
+                for key, val in dft_settings_dict.items():
+                    if key in line: 
+                        dft_newlines.append(f'   {key} = {val}\n')
+                        dft_settings_dict.pop(key)
+                        found = True
+                        break
+                if found: continue
+                
+            if in_incar and line.strip()=='/': 
+                for key, val in dft_settings_dict.items():
+                    dft_newlines.append(f'   {key} = {val}\n')
+                dft_newlines.append(line)
+                card = None
         
 
     return dft_newlines    

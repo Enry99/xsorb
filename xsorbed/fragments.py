@@ -269,7 +269,7 @@ def edit_fragment_settings(lines : list,
         settings_lines_frag.append(line)
     
     #add dft_settings_override
-    settings_lines_frag += override_settings_adsorbed_fragment(program, dft_section, settings_dict['dft_settings_override'] if 'dft_settings_override' in settings_dict else None)
+    settings_lines_frag += override_settings_adsorbed_fragment(program, dft_lines, settings_dict['dft_settings_override'].get('adsorption') if 'dft_settings_override' in settings_dict else None)
 
     return settings_lines_frag
 
@@ -312,10 +312,10 @@ def setup_fragments_screening(RUN = False):
                 if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
                     break
                 else: print('Value not recognized. Try again.')
-
-        with open('settings.in', 'r') as f:
-            settings_lines = f.readlines()    
-        if 'y' in answer: 
+   
+        if 'y' in answer:
+            with open('settings.in', 'r') as f:
+                settings_lines = f.readlines() 
             settings_dict = dict(jobscript=f'{jobscript_stdname} {settings.sbatch_command}',
                                 slab_filename=os.path.abspath(settings.slab_filename),
                                 molecule_filename=os.path.abspath(fragment_filename),
@@ -334,8 +334,8 @@ def setup_fragments_screening(RUN = False):
                                 dft_settings_override=fragment_dict.get("dft_settings_override", None)
                                 )
             settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict, program=settings.program)  
-        with open(f'{outdir}/settings.in', 'w') as f:
-            f.writelines(settings_lines)
+            with open(f'{outdir}/settings.in', 'w') as f:
+                f.writelines(settings_lines)
 
 
         os.chdir(outdir)
