@@ -508,7 +508,7 @@ def plot_energy_evolution(calc_type : str):
     if 0 not in settings.E_slab_mol:
         plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
     for i_config, energy_array in results['energies'].items():
-        if energy_array is not None:
+        if energy_array is not None and len(energy_array) > 0:
 
             #completion status of the calculations
             if results['relax_completed'][i_config]:
