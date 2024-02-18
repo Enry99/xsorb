@@ -74,7 +74,7 @@ SBATCH_POSTFIX = {
 
     'RELAX': {
         'VASP': '',
-        'ESPRESSO': '{0}/screening_{1}.pwi {0}/screening_{1}.pwo',
+        'ESPRESSO': '{0}/relax_{1}.pwi {0}/relax_{1}.pwo',
     }
 }
 
@@ -142,8 +142,8 @@ def parse_espresso_settings(block_str_list : list):
         dftprogram_settings_dict['koffset'] = None
     else:
         line = card_lines[k_points_index+1]
-        dftprogram_settings_dict['kpts'] = line.split()[:3]
-        dftprogram_settings_dict['koffset'] = line.split()[3:]
+        dftprogram_settings_dict['kpts'] = list(map(int, line.split()[:3]))
+        dftprogram_settings_dict['koffset'] = list(map(int, line.split()[3:]))
 
     return dftprogram_settings_dict
 
@@ -182,8 +182,9 @@ def parse_vasp_settings(block_str_list : list):
             val = json.loads(val)
         dftprogram_settings_dict[key] = val
         
-    if cards['INCAR']: dftprogram_settings_dict["incar_string"] = '\n'.join(cards['INCAR']) #use as an untouched single string
-    if cards['KPOINTS']: dftprogram_settings_dict["kpoints_string"] = '\n'.join(cards['KPOINTS']) #use as an untouched single string
+    if cards['INCAR']: dftprogram_settings_dict["incar_string"] = ''.join(cards['INCAR']) #use as an untouched single string
+    if cards['KPOINTS']: dftprogram_settings_dict["kpoints_string"] = ''.join(cards['KPOINTS']) #use as an untouched single string
+
 
     if 'pymatgen_set' not in dftprogram_settings_dict and 'incar_string' not in dftprogram_settings_dict:
         pass
@@ -292,6 +293,8 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
         settings.dftprogram_settings_dict['system'].update({'nosym' : True})
         settings.dftprogram_settings_dict['system'].update({'starting_magnetization(1)' : 1.0})        
         settings.dftprogram_settings_dict['electrons'].update({'mixing_beta' : 0.1})
+        settings.dftprogram_settings_dict['kpts'] = None
+        settings.dftprogram_settings_dict['koffset'] = None
 
         if manual_dft_override is not None:
             if 'SYSTEM' in manual_dft_override:
@@ -300,6 +303,10 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
             if 'ELECTRONS' in manual_dft_override:
                 for k, v in manual_dft_override['ELECTRONS'].items():
                     settings.dftprogram_settings_dict['electrons'][k] = v
+
+        #TODO: delete atomic species that are not present (check custom_labels)
+
+    
 
 
     elif settings.program == 'VASP':
@@ -327,7 +334,7 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
                     s[i] = f'MAGMOM = {natoms_mol}*0.6'
                 missing_magmom = False
             
-            key = line.split()[0].strip()
+            key = line.split('=')[0].strip()
             if key in manual_dft_override:
                 s[i] = f'{key} = {manual_dft_override[key].strip()}'
                 manual_dft_override.pop(key)
@@ -335,12 +342,15 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
         if missing_isym: s.append('ISYM = 0')
         if missing_magmom: s.append(f'MAGMOM = {natoms_mol}*0.6')
 
+
         if manual_dft_override is not None:
             for key in manual_dft_override:
                 s.append(f'{key} = {manual_dft_override[key].strip()}')
 
 
         settings.dftprogram_settings_dict['incar_string'] = '\n'.join(s)     
+
+        settings.dftprogram_settings_dict['kpoints_string'] = 'Isolated fragment\n0\nGamma\n1 1 1\n'
 
 def override_settings_adsorbed_fragment(program : str, dft_section : list, dft_settings_dict : dict = None):
     '''
@@ -351,31 +361,61 @@ def override_settings_adsorbed_fragment(program : str, dft_section : list, dft_s
     
     if program == 'ESPRESSO':
     
+        card = None
         for line in dft_section:
-            if '&STRUCTURE' in line.upper(): in_structure = True
-
-            else:
+            
+            if '&' in line: 
+                card = line.split('&')[1].strip()
+                dft_newlines.append(line)
+                continue
+            
+            if card and dft_settings_dict and card in dft_settings_dict:
                 found = False
-                for key, val in settings_dict.items():
-                    if key == 'dft_settings_override' or val is None: continue
-                    if isinstance(val, list): val = ' '.join([str(x) for x in val])
+                for key, val in dft_settings_dict[card].items():
                     if key in line: 
-                        settings_lines_frag.append(f'   {key} = {val}\n')
-                        settings_dict.pop(key)
+                        dft_newlines.append(f'   {key} = {val}\n')
+                        dft_settings_dict[card].pop(key)
                         found = True
                         break
                 if found: continue
                 
-            if in_structure and line.strip()=='/': 
-                in_structure = False
-                for key, val in settings_dict.items():
-                    if key == 'dft_settings_override' or not val: continue
-                    if isinstance(val, list): val = ' '.join([str(x) for x in val])
-                    settings_lines_frag.append(f'   {key} = {val}\n')
+            if card and dft_settings_dict and line.strip()=='/': 
+                for key, val in dft_settings_dict[card].items():
+                    dft_newlines.append(f'   {key} = {val}\n')
+                dft_newlines.append(line)
+                card = None
+
+            dft_newlines.append(line)
+            
 
 
     elif program == 'VASP':
-        pass
+        
+        in_incar = False
+        for line in dft_section:
+            
+            if '&INCAR' in line: 
+                in_incar = True
+                dft_newlines.append(line)
+                continue
+            
+            if in_incar and dft_settings_dict :
+                found = False
+                for key, val in dft_settings_dict.items():
+                    if key in line: 
+                        dft_newlines.append(f'   {key} = {val}\n')
+                        dft_settings_dict.pop(key)
+                        found = True
+                        break
+                if found: continue
+                
+            if in_incar and dft_settings_dict  and line.strip()=='/': 
+                for key, val in dft_settings_dict.items():
+                    dft_newlines.append(f'   {key} = {val}\n')
+                dft_newlines.append(line)
+                card = None
+
+            dft_newlines.append(line)
         
 
     return dft_newlines    
@@ -386,10 +426,14 @@ def Calculator(settings, label : str, atoms, directory : str):
     
     if settings.program == 'ESPRESSO':
         return Espresso(label = label,
-                        pseudopotentials=settings.dftprogram_settings_dict['pseudopotentials'], 
+                        pseudopotentials=settings.dftprogram_settings_dict['pseudopotentials'],
+                        kpts=settings.dftprogram_settings_dict["kpts"],
+                        koffset=settings.dftprogram_settings_dict["koffset"],
                         input_data=settings.dftprogram_settings_dict)
                             
     elif settings.program == 'VASP':
+        
+        preset_incar_settings = {}
         
         if "pymatgen_set" in settings.dftprogram_settings_dict:
             from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet

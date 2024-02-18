@@ -1816,11 +1816,102 @@ material_styles_dict = dict(
 #################################################
 
 
+#fix for VASP >= 6.0.0 OUTCAR (already fixed on ASE repository, but not yet in 3.22.1)
+from typing import Sequence, Dict, Any
+_CURSOR = int
+_CHUNK = Sequence[str]
+_RESULT = Dict[str, Any]
+
+class NoNonEmptyLines(Exception):
+    """No more non-empty lines were left in the provided chunck"""
+
+
+class UnableToLocateDelimiter(Exception):
+    """Did not find the provided delimiter"""
+    def __init__(self, delimiter, msg):
+        self.delimiter = delimiter
+        super().__init__(msg)
+
+def find_next_non_empty_line(cursor: _CURSOR, lines: _CHUNK) -> _CURSOR:
+    """Fast-forward the cursor from the current position to the next
+    line which is non-empty.
+    Returns the new cursor position on the next non-empty line.
+    """
+    for line in lines[cursor:]:
+        if line.strip():
+            # Line was non-empty
+            return cursor
+        # Empty line, increment the cursor position
+        cursor += 1
+    # There was no non-empty line
+    raise NoNonEmptyLines("Did not find a next line which was not empty")
+
+
+def search_lines(delim: str, cursor: _CURSOR, lines: _CHUNK) -> _CURSOR:
+    """Search through a chunk of lines starting at the cursor position for
+    a given delimiter. The new position of the cursor is returned."""
+    for line in lines[cursor:]:
+        if delim in line:
+            # The cursor should be on the line with the delimiter now
+            assert delim in lines[cursor]
+            return cursor
+        # We didn't find the delimiter
+        cursor += 1
+    raise UnableToLocateDelimiter(
+        delim, f'Did not find starting point for delimiter {delim}')
+
+
+def parse_custom(self, cursor: _CURSOR, lines: _CHUNK) -> _RESULT:
+    nkpts = self.get_from_header('nkpts')
+    nbands = self.get_from_header('nbands')
+    weights = self.get_from_header('kpt_weights')
+    spinpol = self.get_from_header('spinpol')
+    nspins = 2 if spinpol else 1
+
+    kpts = []
+    for spin in range(nspins):
+        # for Vasp 6, they added some extra information after the spin components.
+        # so we might need to seek the spin component line
+        cursor = search_lines(f'spin component {spin + 1}', cursor, lines)
+
+        cursor += 2  # Skip two lines
+        for _ in range(nkpts):
+            # Skip empty lines
+            cursor = find_next_non_empty_line(cursor, lines)
+
+            line = self.get_line(cursor, lines)
+            # Example line:
+            # "k-point     1 :       0.0000    0.0000    0.0000"
+            parts = line.strip().split()
+            ikpt = int(parts[1]) - 1  # Make kpt idx start from 0
+            weight = weights[ikpt]
+
+            cursor += 2  # Move down two
+            eigenvalues = np.zeros(nbands)
+            occupations = np.zeros(nbands)
+            for n in range(nbands):
+                # Example line:
+                # "      1      -9.9948      1.00000"
+                parts = lines[cursor].strip().split()
+                eps_n, f_n = map(float, parts[1:])
+                occupations[n] = f_n
+                eigenvalues[n] = eps_n
+                cursor += 1
+            kpt = SinglePointKPoint(weight,
+                                    spin,
+                                    ikpt,
+                                    eps_n=eigenvalues,
+                                    f_n=occupations)
+            kpts.append(kpt)
+
+    return {'kpts': kpts}
+
 
 # Runtime patching
 import ase.io.espresso
 import ase.io.extxyz
 import ase.io.pov
+import ase.io.vasp_parsers.vasp_outcar_parsers
 ase.io.espresso.write_espresso_in = write_espresso_in_custom
 ase.io.espresso.read_espresso_in = read_espresso_in_custom
 ase.io.espresso.read_espresso_out = read_espresso_out_custom
@@ -1829,3 +1920,4 @@ ase.io.extxyz.write_xyz = write_xyz_custom
 ase.io.pov.POVRAY.write_pov = write_pov
 ase.io.pov.POVRAY.write_ini = write_ini
 ase.io.pov.POVRAY.material_styles_dict = material_styles_dict
+ase.io.vasp_parsers.vasp_outcar_parsers.Kpoints.parse = parse_custom

@@ -23,7 +23,7 @@ from xsorbed.dftcode_specific import FRAGMENTS_OUT_FILE_PATHS, FRAGMENTS_IN_FILE
 from xsorbed import ase_custom
 
 
-TEST = True   #set to true for testing: prints sbatch command instead of actually launching jobs for the isolated fragments
+TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs for the isolated fragments
 
 #OK (code agnostic)
 def generate_isolated_fragment(settings : Settings, fragment_dict : dict):
@@ -139,7 +139,7 @@ def write_fragments_inputs(settings : Settings,
         
         newsettings = copy.deepcopy(settings)
         if OVERRIDE_SETTINGS: 
-            override_settings_isolated_fragment(newsettings, molecules[0].natoms, manual_dft_override)
+            override_settings_isolated_fragment(newsettings, molecule.natoms, manual_dft_override)
         
         os.chdir(outdir)
         calc = Calculator(newsettings, fragment_name, molecule.mol_ase, '.') 
@@ -218,9 +218,8 @@ def edit_fragment_settings(lines : list,
     
     settings_lines_frag = [] #where to put all the lines
 
-
-    script_section = ['@SETTINGS', '/@SETTINGS']
-    dft_section = [f'@{program}', f'/@{program}']
+    script_section = ['@SETTINGS', '@/SETTINGS']
+    dft_section = [f'@{program}', f'@/{program}']
 
     for i,line in enumerate(lines):
         if script_section[0] in line: 
@@ -269,7 +268,7 @@ def edit_fragment_settings(lines : list,
         settings_lines_frag.append(line)
     
     #add dft_settings_override
-    settings_lines_frag += override_settings_adsorbed_fragment(program, dft_section, settings_dict['dft_settings_override'] if 'dft_settings_override' in settings_dict else None)
+    settings_lines_frag += override_settings_adsorbed_fragment(program, dft_lines, settings_dict['dft_settings_override'].get('adsorption') if settings_dict['dft_settings_override'] else None)
 
     return settings_lines_frag
 
@@ -312,10 +311,10 @@ def setup_fragments_screening(RUN = False):
                 if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
                     break
                 else: print('Value not recognized. Try again.')
-
-        with open('settings.in', 'r') as f:
-            settings_lines = f.readlines()    
-        if 'y' in answer: 
+   
+        if 'y' in answer:
+            with open('settings.in', 'r') as f:
+                settings_lines = f.readlines() 
             settings_dict = dict(jobscript=f'{jobscript_stdname} {settings.sbatch_command}',
                                 slab_filename=os.path.abspath(settings.slab_filename),
                                 molecule_filename=os.path.abspath(fragment_filename),
@@ -334,8 +333,8 @@ def setup_fragments_screening(RUN = False):
                                 dft_settings_override=fragment_dict.get("dft_settings_override", None)
                                 )
             settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict, program=settings.program)  
-        with open(f'{outdir}/settings.in', 'w') as f:
-            f.writelines(settings_lines)
+            with open(f'{outdir}/settings.in', 'w') as f:
+                f.writelines(settings_lines)
 
 
         os.chdir(outdir)
