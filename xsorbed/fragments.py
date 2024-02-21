@@ -389,16 +389,17 @@ def get_diss_energies():
     fragments_data = {"mol" : {}}
 
     datafile = pd.read_csv(labels_filename, index_col=0)
-    settings_mol = Settings()
-    results_mol = get_calculations_results(settings_mol.program, 'RELAX', settings_mol.E_slab_mol)
+    settings = Settings(VERBOSE=False)
+    results_mol = get_calculations_results(settings.program, 'RELAX', [0,0])
     energies_mol = []
     indices_mol = []
-    for key, val in results_mol['energy'].items():
+    for key, val in results_mol['energies'].items():
         energies_mol.append(val)
         indices_mol.append(key)
     i_min = indices_mol[energies_mol.index(min(energies_mol))]
     fragments_data["mol"]["energy"] = min(energies_mol)
-    fragments_data["mol"]["site"] = datafile['Sites'][i_min]
+    fragments_data["mol"]["site"] = datafile['site'][i_min]
+    print("Mol energy collected.")
 
 
     #repeat for each fragment
@@ -411,17 +412,18 @@ def get_diss_energies():
         outdir = f'fragments/{fragment_name}'
         os.chdir(outdir)
         datafile = pd.read_csv(labels_filename, index_col=0)
-        settings_mol = Settings()
-        results_mol = get_calculations_results(settings_mol.program, 'RELAX', settings_mol.E_slab_mol)
+        results_mol = get_calculations_results(settings.program, 'RELAX', [0,0])
         energies_mol = []
         indices_mol = []
-        for key, val in results_mol['energy'].items():
+        for key, val in results_mol['energies'].items():
             energies_mol.append(val)
             indices_mol.append(key)
         i_min = indices_mol[energies_mol.index(min(energies_mol))]
         fragments_data[fragment_name]["energy"] = min(energies_mol)
-        fragments_data[fragment_name]["site"] = datafile['Sites'][i_min]
+        fragments_data[fragment_name]["site"] = datafile['site'][i_min]
         os.chdir(main_dir)
+
+        print(f"{fragment_name} energy collected.")
     
     text = []
 
@@ -431,7 +433,7 @@ def get_diss_energies():
         initial_fragment_name = combination[0]
         dissoc_products_total_ads_en = sum([ fragments_data[frag]["energy"] for frag in products_names])
         initial_fragment_energy = fragments_data[ initial_fragment_name ]["energy"]
-        diss_en = dissoc_products_total_ads_en - initial_fragment_energy
+        diss_en = dissoc_products_total_ads_en - initial_fragment_energy - settings.E_slab_mol[0] * (len(combination[1]) - 1)
 
         fragments_names = '{0}({1}) -> '.format(initial_fragment_name, fragments_data[initial_fragment_name]["site"]).format()    \
             +' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in products_names])
@@ -441,3 +443,5 @@ def get_diss_energies():
     with open('DISSOCIATION.txt', 'w') as f:
         f.write( '{0:70}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
         f.writelines( text )
+
+    print(f"Dissociation results written to {'DISSOCIATION.txt'}")
