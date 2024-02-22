@@ -291,7 +291,12 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
 
         settings.dftprogram_settings_dict['control'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
         settings.dftprogram_settings_dict['system'].update({'nosym' : True})
-        settings.dftprogram_settings_dict['system'].update({'starting_magnetization(1)' : 1.0})        
+        if 'SYSTEM' in manual_dft_override and 'nspin' not in manual_dft_override['SYSTEM']:
+            settings.dftprogram_settings_dict['system'].update({'nspin' : 2}) #spin-polarized for isolated fragments (if not explicitly disabled in manual_dft_override)
+
+        if settings.dftprogram_settings_dict['system'].get('nspin') == 2:
+            for i, pseudo in enumerate(settings.dftprogram_settings_dict['pseudopotentials']):
+                settings.dftprogram_settings_dict['system'].update({f'starting_magnetization({i+1})' : 0.6})        
         settings.dftprogram_settings_dict['electrons'].update({'mixing_beta' : 0.1})
         settings.dftprogram_settings_dict['kpts'] = None
         settings.dftprogram_settings_dict['koffset'] = None
@@ -304,9 +309,6 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
                 for k, v in manual_dft_override['ELECTRONS'].items():
                     settings.dftprogram_settings_dict['electrons'][k] = v
 
-        #TODO: delete atomic species that are not present (check custom_labels)
-
-    
 
 
     elif settings.program == 'VASP':
@@ -341,6 +343,8 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
                 
         if missing_isym: s.append('ISYM = 0')
         if missing_magmom: s.append(f'MAGMOM = {natoms_mol}*0.6')
+
+        #TODO: check that if we set MAGMOM when ispin = 1 it does not give an error in VASP
 
 
         if manual_dft_override is not None:
@@ -416,6 +420,8 @@ def override_settings_adsorbed_fragment(program : str, dft_section : list, dft_s
                 card = None
 
             dft_newlines.append(line)
+
+        #TODO: set the magmoms if not in dft_settings_dict, to match the number of atoms
         
 
     return dft_newlines    
