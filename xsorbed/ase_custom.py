@@ -253,14 +253,14 @@ class Atoms_custom(Atoms):
 
     def set_custom_labels(self, custom_labels=None):
         """Set custom_labels."""
-        if custom_labels is None:
-            self.set_array('custom_labels', None)
-        self.set_array('custom_labels', custom_labels, str, ())
+
+        labels = ['{:3}'.format(label) for label in custom_labels]
+        self.set_array('custom_labels', labels, str, ())
 
     def get_custom_labels(self):
         """Get array of custom_labels."""
         if 'custom_labels' in self.arrays:
-            return self.arrays['custom_labels'].copy()
+            return [label.strip() for label in self.arrays['custom_labels'].copy()]
         else:
             return None
 
@@ -1861,7 +1861,7 @@ def search_lines(delim: str, cursor: _CURSOR, lines: _CHUNK) -> _CURSOR:
         delim, f'Did not find starting point for delimiter {delim}')
 
 
-def parse_custom(self, cursor: _CURSOR, lines: _CHUNK) -> _RESULT:
+def parse_kpoints_outcar_custom(self, cursor: _CURSOR, lines: _CHUNK) -> _RESULT:
     nkpts = self.get_from_header('nkpts')
     nbands = self.get_from_header('nbands')
     weights = self.get_from_header('kpt_weights')
@@ -1920,4 +1920,4 @@ ase.io.extxyz.write_xyz = write_xyz_custom
 ase.io.pov.POVRAY.write_pov = write_pov
 ase.io.pov.POVRAY.write_ini = write_ini
 ase.io.pov.POVRAY.material_styles_dict = material_styles_dict
-ase.io.vasp_parsers.vasp_outcar_parsers.Kpoints.parse = parse_custom
+ase.io.vasp_parsers.vasp_outcar_parsers.Kpoints.parse = parse_kpoints_outcar_custom
