@@ -17,7 +17,7 @@
    
    mol_subset_atoms              = 0 1 3 14        #indices of the subset of atoms to be included from the molecule. don't specify it if all atoms have to be included
    molecule_axis                 = atoms 3 14      #indices of the two atoms to define the x-axis direction, or vector to take as x-axis (e.g.) molecule_axis = vector 1 1 0
-   selected_atom_index           = 0               #selected atom in molecule file, to be placed in all adsorption sites
+   selected_atom_index           = 0               #selected atom in molecule file, to be placed in all adsorption sites. If -1, use the center of mass of the molecule
 
    screening_atom_distance       = 2.0             #DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
    screening_min_distance        = 1.5             #minimum distance (in A) of ANY atom from surface, must be < selected_atom_distance. The molecule is translated upwards if necessary, in order to meet this requirement.

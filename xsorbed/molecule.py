@@ -63,12 +63,15 @@ class Molecule:
 
         #SET CONSTRAINTS
         if fixed_indices_mol:
-            c = [FixCartesian(atom_index, mask=[not x for x in fix_mol_xyz]) for atom_index in fixed_indices_mol]  #we need to negate: in qe 0 = fix, here 1(true)=fix
+            c = [FixCartesian(idx, mask=[not x for x in fix_mol_xyz]) for idx in fixed_indices_mol]  #we need to negate: in qe 0 = fix, here 1(true)=fix
             self.mol_ase.set_constraint(c)
         ###############################################################
             
         #Translate reference atom to origin
-        self.mol_ase.translate(-self.mol_ase.get_positions()[atom_index])
+        if atom_index != -1:
+            self.mol_ase.translate(-self.mol_ase.get_positions()[atom_index])
+        else:
+            self.mol_ase.translate(-self.mol_ase.get_center_of_mass())
             
         #select atoms subset
         if atoms_subset:            
@@ -93,9 +96,12 @@ class Molecule:
 
             self.mol_ase = self.mol_ase[included_indices]
 
-        ref_idx = [atom.index for atom in self.mol_ase if np.allclose(atom.position, [0,0,0])]
-        if len(ref_idx) != 1: raise ValueError('Reference atom index not found.')
-        self.reference_atom_index = ref_idx[0]
+        if atom_index != -1:
+            ref_idx = [atom.index for atom in self.mol_ase if np.allclose(atom.position, [0,0,0])]
+            if len(ref_idx) != 1: raise ValueError('Reference atom index not found.')
+            self.reference_atom_index = ref_idx[0]
+        else:
+            self.reference_atom_index = -1
         self.constrained_indices = [constr.a for constr in self.mol_ase.constraints]
         self.natoms = len(self.mol_ase)
 
