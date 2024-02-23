@@ -254,7 +254,9 @@ class Atoms_custom(Atoms):
     def set_custom_labels(self, custom_labels=None):
         """Set custom_labels."""
 
-        labels = ['{:3}'.format(label) for label in custom_labels]
+        if custom_labels is not None:
+            labels = ['{:3}'.format(label) for label in custom_labels]
+        else: labels=None
         self.set_array('custom_labels', labels, str, ())
 
     def get_custom_labels(self):
@@ -382,7 +384,7 @@ def read_espresso_in_custom(fileobj):
         card_lines, n_atoms=data['system']['nat'], cell=cell, alat=alat)
 
     symbols = [label_to_symbol(position[0]) for position in positions_card]
-    custom_labels = ['{:3}'.format(position[0]) for position in positions_card]
+    custom_labels = [position[0] for position in positions_card]
     positions = [position[1] for position in positions_card]
     magmoms = [species_info[position[0]]["magmom"] for position in positions_card]
     
@@ -928,7 +930,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
             # convert to Atoms object
             symbols = [label_to_symbol(position[0]) for position in
                        positions_card]
-            custom_labels = ['{:3}'.format(position[0]) for position in positions_card]
+            custom_labels = [position[0] for position in positions_card]
             positions = [position[1] for position in positions_card]
             structure = Atoms_custom(symbols=symbols, positions=positions, cell=cell,
                               pbc=True, custom_labels=custom_labels)
@@ -1145,7 +1147,7 @@ def parse_pwo_start_custom(lines, index=0):
             for at_line in lines[idx + 1:idx + 1 + info['nat']]:
                 sym, x, y, z = parse_position_line(at_line)
                 info['symbols'].append(label_to_symbol(sym))
-                custom_labels.append('{:3}'.format(sym))
+                custom_labels.append(sym)
                 info['positions'].append([x * info['celldm(1)'],
                                           y * info['celldm(1)'],
                                           z * info['celldm(1)']])
