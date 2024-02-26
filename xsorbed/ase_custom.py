@@ -320,6 +320,35 @@ class Atoms_custom(Atoms):
         return numbers
 #################################################
 
+
+def todict_fixed(self):
+    return {'name': 'FixCartesian',
+            'kwargs': {'a': self.a, 'mask': ~self.mask}}    
+
+def convert_constraint_flags(constraint_flags):
+    """Convert Quantum ESPRESSO constraint flags to ASE Constraint objects.
+
+    Parameters
+    ----------
+    constraint_flags : list[tuple[int, int, int]]
+        List of constraint flags (0: fixed, 1: moved) for all the atoms.
+        If the flag is None, there are no constraints on the atom.
+
+    Returns
+    -------
+    constraints : list[FixAtoms | FixCartesian]
+        List of ASE Constraint objects.
+    """
+    constraints = []
+    for i, constraint in enumerate(constraint_flags):
+        if constraint is None:
+            continue
+        # mask: False (0): moved, True (1): fixed
+        mask = ~np.asarray(constraint, bool)
+        constraints.append(FixCartesian(i, mask))
+    return constraints
+
+
 #simply reads labels for the atoms and stores them in an interal list.
 @iofunction('rU')
 def read_espresso_in_custom(fileobj):
@@ -386,6 +415,7 @@ def read_espresso_in_custom(fileobj):
     symbols = [label_to_symbol(position[0]) for position in positions_card]
     custom_labels = [position[0] for position in positions_card]
     positions = [position[1] for position in positions_card]
+    constraint_flags = [position[2] for position in positions_card]
     magmoms = [species_info[position[0]]["magmom"] for position in positions_card]
     
 
@@ -393,6 +423,7 @@ def read_espresso_in_custom(fileobj):
     # e.g magmom, forces.
     atoms = Atoms_custom(symbols=symbols, positions=positions, cell=cell, pbc=True,
                   magmoms=magmoms, custom_labels=custom_labels)
+    atoms.set_constraint(convert_constraint_flags(constraint_flags))
 
     return atoms
 
@@ -932,8 +963,10 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
                        positions_card]
             custom_labels = [position[0] for position in positions_card]
             positions = [position[1] for position in positions_card]
+            constraint_flags = [position[2] for position in positions_card]
             structure = Atoms_custom(symbols=symbols, positions=positions, cell=cell,
                               pbc=True, custom_labels=custom_labels)
+            structure.set_constraint(convert_constraint_flags(constraint_flags))
 
         # Extract calculation results
         # Energy
@@ -1914,6 +1947,7 @@ import ase.io.espresso
 import ase.io.extxyz
 import ase.io.pov
 import ase.io.vasp_parsers.vasp_outcar_parsers
+import ase.constraints
 ase.io.espresso.write_espresso_in = write_espresso_in_custom
 ase.io.espresso.read_espresso_in = read_espresso_in_custom
 ase.io.espresso.read_espresso_out = read_espresso_out_custom
@@ -1923,3 +1957,4 @@ ase.io.pov.POVRAY.write_pov = write_pov
 ase.io.pov.POVRAY.write_ini = write_ini
 ase.io.pov.POVRAY.material_styles_dict = material_styles_dict
 ase.io.vasp_parsers.vasp_outcar_parsers.Kpoints.parse = parse_kpoints_outcar_custom
+ase.constraints.FixCartesian.todict = todict_fixed

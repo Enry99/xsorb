@@ -65,6 +65,7 @@ class Molecule:
         if fixed_indices_mol:
             c = [FixCartesian(idx, mask=[not x for x in fix_mol_xyz]) for idx in fixed_indices_mol]  #we need to negate: in qe 0 = fix, here 1(true)=fix
             self.mol_ase.set_constraint(c)
+        else: self.mol_ase.set_constraint() #clean possible constraints read from file
         ###############################################################
             
         #Translate reference atom to origin

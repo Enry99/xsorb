@@ -17,7 +17,7 @@ Once the download is completed, it is necessary to go to iside the downloaded fo
 
 to add the executable in the `PATH` variable. With this operation, the user can launch the program from any folder. The next step is to install the required dependencies stored in the 'requirements.txt' file. This step can be performed with the command:
 
-`pip install -r requirements.txt`
+`python3 -m pip install -r requirements.txt`
 
 Xsorb is interfaced with Quantum Espresso to perform the DFT calculations. It is, therefore, necessary to compile and install the `pw.x` executable before launching the calculations.
 

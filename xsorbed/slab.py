@@ -72,7 +72,7 @@ class Slab:
             fixed_atoms_indices = fixed_indices_slab
 
         c = [FixCartesian(atom_index, mask=[not x for x in fix_slab_xyz]) for atom_index in fixed_atoms_indices]  #we need to negate: in qe 0 = fix, here 1(true)=fix
-        self.slab_ase.set_constraint(c)
+        self.slab_ase.set_constraint(c) #if no user-defined constraints, c is empty. This is necessary to clean possible constraints read from file (in Molecule there is an if else.)
         ###############################################################
 
         if sort_atoms_by_z:
