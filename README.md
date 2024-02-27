@@ -37,7 +37,7 @@ The program requires the following Python libraries:
 - [`pymatgen`](https://pymatgen.org/)
 - [`numpy`](https://numpy.org/)
 - [`matplotlib`](https://matplotlib.org/)
-- [`natsort`](https://natsort.readthedocs.io/en/5.4.1/index.html)
+- [`pandas`](https://pandas.pydata.org/)
 
 
 ### Optional requirements
