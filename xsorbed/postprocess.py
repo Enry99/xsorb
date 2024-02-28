@@ -10,6 +10,7 @@ Collection of functions for generating images
 
 import numpy as np
 import glob, os, shutil
+from ase import Atoms
 from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
@@ -127,6 +128,60 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
     return configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH, CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices
 
 #OK (code agnostic)
+def get_centered_mol_and_slab(mol : Atoms, slab : Atoms):
+    """
+    Get the centered molecule and slab.
+
+    Parameters:
+    - mol (Atoms): The molecule.
+    - slab (Atoms): The slab.
+
+    Returns:
+    mol (Atoms): The centered molecule.
+    slab (Atoms): The centered slab.
+    mol_center (ndarray): The center of the molecule in xy, i.e. [xc, yc, 0].
+    """
+
+    from ase import neighborlist
+    from scipy import sparse
+
+    #avoid modifying the original structure
+    mol = mol.copy()
+    slab = slab.copy()
+
+    #replicate in both directions to have at least one fully connected molecule
+    mol.set_constraint()
+    mol_replicated = mol * [2,2,1]
+    mol_replicated.set_pbc(False)
+
+    #get the indices of the atoms in each molecule (connected components)
+    cutoffs = neighborlist.natural_cutoffs(mol_replicated, mult=1.2)
+    neighborList = neighborlist.NeighborList(cutoffs, self_interaction=False, bothways=True)
+    neighborList.update(mol_replicated)
+    cmatrix = neighborList.get_connectivity_matrix()
+    n_components, component_list = sparse.csgraph.connected_components(cmatrix)
+    molecules_indices = [ [ atom_id for atom_id in range(len(component_list)) if component_list[atom_id] == molecule_id ] \
+                            for molecule_id in range(n_components) ]
+    
+    #find the molecule with the highest number of atoms (which is therefore fully connected)
+    max_molecule_idx = np.argmax([len(molecule) for molecule in molecules_indices])
+    mol_replicated = mol_replicated[molecules_indices[max_molecule_idx]]
+
+    #fin the center of mass of the fully connected molecule, that will be translated at the center of the cell
+    mol_center = mol_replicated.get_center_of_mass()
+    mol_center[2] = 0 #we don't want to translate in the z direction (just xy)
+
+    cell_center = slab.cell[:][0]/2 + slab.cell[:][1]/2  #a1/2 + a2/2 (vector sum)
+
+    mol.translate(cell_center - mol_center)
+    slab.translate(cell_center - mol_center)
+    #wrap both since we translated them (also the molecule, since we might have chosen a different replica)
+    mol.wrap()
+    slab.wrap()
+
+    return mol, slab, mol_center
+
+#OK (code agnostic)
 def get_decorated_structures(configs : list, 
                              mol_atoms_indices : list, 
                              slab_atoms_indices : list,
@@ -160,14 +215,16 @@ def get_decorated_structures(configs : list,
                     if not center_molecule: first_frame = False
                 Nslab = len(slab)
 
-                if(center_molecule): 
+                if(center_molecule):
+                    #use the same translation for all frame, to avoid jumps
                     if first_frame:
-                        mol_center = np.array([np.mean(mol.get_positions()[:,0]), np.mean(mol.get_positions()[:,1]), 0])
+                        _, _, mol_center = get_centered_mol_and_slab(mol, slab)
                         cell_center = config.cell[:][0]/2 + config.cell[:][1]/2  #a1/2 + a2/2
                         first_frame = False
 
                     mol.translate(cell_center - mol_center)
                     slab.translate(cell_center - mol_center)
+                    mol.wrap()
                     slab.wrap()
 
                 newconfigs[-1].append(slab + mol) 
@@ -181,13 +238,7 @@ def get_decorated_structures(configs : list,
             Nslab = len(slab)
 
             if(center_molecule): 
-                
-                mol_center = np.array([np.mean(mol.get_positions()[:,0]), np.mean(mol.get_positions()[:,1]), 0])
-                cell_center = config.cell[:][0]/2 + config.cell[:][1]/2  #a1/2 + a2/2
-
-                mol.translate(cell_center - mol_center)
-                slab.translate(cell_center - mol_center)
-                slab.wrap()
+                mol, slab, _ = get_centered_mol_and_slab(mol, slab)
                 
             newconfigs.append(slab + mol)
 
