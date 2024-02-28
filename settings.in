@@ -28,6 +28,7 @@
    y_rot_angles                  = 0 90            #rotation about y axis (performed secondly)
    z_rot_angles                  = 0 90            #rotation about z axis (performed lastly)
    vertical_angles               = x               #which angles for y_rot == +/- 90. Options: x (use x_rot_angles), z (use z_rot_angles), none, list [list of angles] (custom list)
+   individual_rotations          = 12 50 86, 1 7 8 #list of individual rotations, not to be included in the combinations. Each one is a list of 3 angles (in deg)
 
    layers_height                 = 0.5             #delta_z within which atoms are considered to be part of the same layer (for fixing atoms). This is different from the surface_height flag, used for surface adsorption sites.
    fixed_indices_slab            = 0 1 2           #fix chosen atoms of the slab for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all

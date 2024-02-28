@@ -75,8 +75,30 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
         y_rot_angles=settings.y_rot_angles,
         z_rot_angles=settings.z_rot_angles, 
         vert_angles_list=settings.vertical_angles,
+        individual_rotations=settings.individual_rotations,
         save_image=SAVEFIG,
         VERBOSE=VERBOSE)
+
+    
+    # Move possible additional rotations to the end, to keep the already present calculations untouched
+    # BEWARE: removing a rotation breaks the already present indices, possible future TODO: use a dictionary to keep track of the indices
+    if os.path.isfile(labels_filename):    
+        previous_labels = np.genfromtxt(labels_filename, delimiter=',', names=True)
+        previous_rotations = np.unique([x.tolist()[1:4] for x in previous_labels], axis=0)
+        new_rotations = [list(map(float, l.split(',')[:-1])) for l in rotations_labels]
+        
+
+        #move the new rotations to the end of the list
+        for newrot, rot_label_csv, mol_config in zip(new_rotations, rotations_labels.copy(), all_mol_configs_ase.copy()):
+        
+            print(newrot, np.any([np.allclose(newrot, oldrot, atol=1e-3) for oldrot in previous_rotations]))
+            if not np.any([np.allclose(newrot, oldrot, atol=1e-3) for oldrot in previous_rotations]):
+                
+                print(f'New rotation {newrot} found. It will be added to the configurations.')
+                rotations_labels.remove(rot_label_csv)
+                rotations_labels.append(rot_label_csv) 
+                all_mol_configs_ase.remove(mol_config)
+                all_mol_configs_ase.append(mol_config)             
 
 
     #Adsorption of molecule on all adsorption sites for all molecule orientations
@@ -141,6 +163,9 @@ def write_inputs(settings : Settings,
     - calc_type: 'SCREENING' or 'RELAX'
     - OVERRIDE_SETTINGS: override some specifc settings (e.g. conv tresholds)
     - INTERACTIVE: interactive mode: ask before overwriting files that are already present
+
+    Returns:
+    - written_indices: list of the indices of the configurations for which the input files have been written
     '''
     
     if INTERACTIVE: print('Writing input files...')
@@ -151,6 +176,8 @@ def write_inputs(settings : Settings,
     ANSWER_ALL = False
     answer = 'yes'
     
+    written_indices = []
+
     for i, atoms in zip(calc_indices, all_mol_on_slab_configs_ase):
         
         file_label = f'{calc_type.lower()}_{i}'
@@ -174,8 +201,11 @@ def write_inputs(settings : Settings,
         j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{i}'
         calc = Calculator(settings, file_label, atoms, j_dir) 
         calc.write_input(atoms)
+        written_indices.append(i)
 
     if INTERACTIVE: print('All input files written.') 
+
+    return written_indices
 
 #OK (code agnostic) 
 def obtain_fullrelax_indices(settings : Settings,
@@ -213,7 +243,8 @@ def obtain_fullrelax_indices(settings : Settings,
                 break
             else: print('Value not recognized. Try again.')
         if 'n' in answer:
-            sys.exit(1)
+            print('Quitting.')
+            sys.exit(0)
 
 
     if exclude is None: exclude = []
@@ -334,7 +365,8 @@ def generate(SAVEFIG=False):
                  all_mol_on_slab_configs_ase,
                  indices_list,
                  calc_type='SCREENING',
-                 OVERRIDE_SETTINGS=False)
+                 OVERRIDE_SETTINGS=False,
+                 INTERACTIVE=True)
 
 #OK (code agnostic)   
 def launch_screening(SAVEFIG : bool = False):
@@ -351,19 +383,17 @@ def launch_screening(SAVEFIG : bool = False):
 
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
-    indices_list = np.arange(len(all_mol_on_slab_configs_ase))
-
-    write_inputs(settings, 
-                all_mol_on_slab_configs_ase,
-                indices_list,
-                calc_type='SCREENING', 
-                INTERACTIVE=True)
+    written_indices = write_inputs(settings, 
+                                    all_mol_on_slab_configs_ase,
+                                    calc_indices=np.arange(len(all_mol_on_slab_configs_ase)),
+                                    calc_type='SCREENING', 
+                                    INTERACTIVE=True)
 
     launch_jobs(program=settings.program,
                 calc_type='SCREENING',
                 jobscript=settings.jobscript,
                 sbatch_command=settings.sbatch_command,
-                indices_list=indices_list)    
+                indices_list=written_indices)    
 
 #OK (code agnostic)  
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, REGENERATE=False, BY_SITE = False):

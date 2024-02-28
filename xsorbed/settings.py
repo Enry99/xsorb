@@ -184,6 +184,11 @@ class Settings:
             self.vertical_angles    = np.array([0.])
         else:
             self.vertical_angles    = np.array(script_settings_dict['STRUCTURE']['vertical_angles'][1:], dtype=float).tolist()
+
+        if 'individual_rotations' in script_settings_dict['STRUCTURE']:
+            self.individual_rotations   = [np.array(rot.split(), dtype=float).tolist() for rot in script_settings_dict['STRUCTURE']['individual_rotations'].split(',')]
+        else:
+            self.individual_rotations   = []
          
 
         self.fixed_indices_slab     = np.array(script_settings_dict['STRUCTURE']['fixed_indices_slab'].split(), dtype=int).tolist()
