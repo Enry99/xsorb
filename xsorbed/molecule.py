@@ -113,6 +113,7 @@ class Molecule:
             y_rot_angles : list,
             z_rot_angles : list,
             vert_angles_list : list = [0],
+            individual_rotations : list = None,
             save_image = False,
             VERBOSE : bool = False
             ):
@@ -148,6 +149,10 @@ class Molecule:
             for x_angle in x_rot_angles:         
                 for z_angle in z_rot_angles:
                         rotations_list.append([x_angle, y_angle, z_angle])
+
+        #add also the individual rotations
+        if individual_rotations:
+            rotations_list += individual_rotations
                                 
         #perform the rotations 
         for (x_angle, y_angle, z_angle) in rotations_list:
