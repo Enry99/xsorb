@@ -59,7 +59,7 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
     if i_or_f == 'i': #read from input file
         
         results = None
-        calc_indices = _get_configurations_numbers()
+        calc_indices = [i for i in _get_configurations_numbers() if os.path.isfile(IN_FILE_PATHS[calc_type][settings.program].format(i))]
         configs = [read(IN_FILE_PATHS[calc_type][settings.program].format(i)) for i in calc_indices]
 
     elif i_or_f == 'f': #read from output file
@@ -88,7 +88,6 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
                    fix_mol_xyz=settings.fix_mol_xyz)
     
 
-    #TODO: put here the reindexing for VASP (POSCAR only, since for the outputs it already reads the reindexing file)
     mol_atoms_indices = np.arange(mol.natoms) if settings.mol_before_slab else np.arange(mol.natoms) + slab.natoms
     slab_atoms_indices = np.arange(slab.natoms) if not settings.mol_before_slab else np.arange(slab.natoms) + mol.natoms
 
