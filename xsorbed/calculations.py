@@ -91,7 +91,6 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
         #move the new rotations to the end of the list
         for newrot, rot_label_csv, mol_config in zip(new_rotations, rotations_labels.copy(), all_mol_configs_ase.copy()):
         
-            print(newrot, np.any([np.allclose(newrot, oldrot, atol=1e-3) for oldrot in previous_rotations]))
             if not np.any([np.allclose(newrot, oldrot, atol=1e-3) for oldrot in previous_rotations]):
                 
                 print(f'New rotation {newrot} found. It will be added to the configurations.')

@@ -94,6 +94,8 @@ class Slab:
         - fixed_layers_slab: list of layers of the slab to be fixed 
         '''
 
+        #TODO: substitute with ase.geometry.geometry.get_layers
+        
         fixed_atoms_indices = []
         original_positions = self.slab_ase.positions
         positions = self.slab_ase.positions.copy().tolist()
@@ -270,14 +272,19 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
     - min_distance: minimum required distance along z
     '''
 
+    #Make replicas to conisder the pbcs
+    slab_rep = slab * (3,3,1)
+    point = slab.cell[:][0] + slab.cell[:][1]
+    slab_rep.translate(-point) 
+
     #First, find the closest slab-mol atoms pair
-    i_mol, j_slab, _ = closest_pair(slab, mol)
+    i_mol, j_slab, _ = closest_pair(slab_rep, mol)
 
     #Find the z coordinates of the closest atoms pair, and half their covalent distance
-    half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
+    half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab_rep[j_slab].symbol]] \
                                 + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
     zmol = mol[i_mol].position[2]
-    zslab = slab[j_slab].position[2]
+    zslab = slab_rep[j_slab].position[2]
 
     #Calculate the distance required to enforce the minimum distance
     necessary_min_z_dist = max(min_z_distance_from_surf, half_covalent_distance)
