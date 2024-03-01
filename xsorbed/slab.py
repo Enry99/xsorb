@@ -273,25 +273,33 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
     '''
 
     #Make replicas to conisder the pbcs
+    #TODO: in the future, change this with neighbours, instead of replicating the cell
     slab_rep = slab * (3,3,1)
     point = slab.cell[:][0] + slab.cell[:][1]
     slab_rep.translate(-point) 
 
-    #First, find the closest slab-mol atoms pair
-    i_mol, j_slab, _ = closest_pair(slab_rep, mol)
+    dz_tot = 0
+    molcopy = mol.copy()
+    while(True):
+        #First, find the closest slab-mol atoms pair
+        i_mol, j_slab, _ = closest_pair(slab_rep, molcopy)
 
-    #Find the z coordinates of the closest atoms pair, and half their covalent distance
-    half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab_rep[j_slab].symbol]] \
-                                + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
-    zmol = mol[i_mol].position[2]
-    zslab = slab_rep[j_slab].position[2]
+        #Find the z coordinates of the closest atoms pair, and half their covalent distance
+        half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab_rep[j_slab].symbol]] \
+                                    + covalent_radii[atomic_numbers[molcopy[i_mol].symbol]])
+        zmol = molcopy[i_mol].position[2]
+        zslab = slab_rep[j_slab].position[2]
 
-    #Calculate the distance required to enforce the minimum distance
-    necessary_min_z_dist = max(min_z_distance_from_surf, half_covalent_distance)
-    if(zmol < zslab + necessary_min_z_dist):
-        return zslab + necessary_min_z_dist - zmol
-    else:
-        return None
+        #Calculate the distance required to enforce the minimum distance
+        necessary_min_z_dist = max(min_z_distance_from_surf, half_covalent_distance)
+        if(zmol < zslab + necessary_min_z_dist):
+            dz = zslab + necessary_min_z_dist - zmol
+            dz_tot += dz
+            molcopy.translate([0,0,dz])
+        else:
+            break
+    
+    return dz_tot
 
 
 def mol_bonded_to_slab(slab : Atoms, mol: Atoms):
