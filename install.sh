@@ -1,6 +1,6 @@
 xsorb_path=$(pwd)
 
-if !(grep -q ${xsorb_path} ~/.bashrc) 
+if !(grep -q ${xsorb_path} ~/.bashrc)
 then
 echo "export PATH=${xsorb_path}/xsorbed:\${PATH}" >> ~/.bashrc
 echo "export PYTHONPATH=${xsorb_path}:\${PYTHONPATH}" >> ~/.bashrc

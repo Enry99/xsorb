@@ -4,7 +4,8 @@
    slab_filename                 = 'slab.pwo'           #path of file containing the slab atomic coordinates. The list of supported file types can be found on ASE website
    molecule_filename             = 'molecule.pwo'       #path of file containing the molecule atomic coordinates. The list of supported file types can be found on ASE website 
    jobscript                     = 'job_simple' sbatch  #path of a jobscript for running Quantum Espresso and submit command for the job scheduler
-   E_slab_mol                    = 0 0                  #slab and isolated molecule energies (in Ry).
+   E_slab_mol                    = 0 0                  #slab and isolated molecule energies (in the default energy units of the DFT program, i.e. Ry for QE, eV for VASP).
+   screening_conv_thr            = 5e-3 5e-2            #optional custom convergence treshold(s) for screening (2 values - energy and forces for QE, 1 value - energy OR force (EDIFFG) for VASP)
 /
 
 
@@ -16,7 +17,7 @@
    
    mol_subset_atoms              = 0 1 3 14        #indices of the subset of atoms to be included from the molecule. don't specify it if all atoms have to be included
    molecule_axis                 = atoms 3 14      #indices of the two atoms to define the x-axis direction, or vector to take as x-axis (e.g.) molecule_axis = vector 1 1 0
-   selected_atom_index           = 0               #selected atom in molecule file, to be placed in all adsorption sites
+   selected_atom_index           = 0               #selected atom in molecule file, to be placed in all adsorption sites. If -1, use the center of mass of the molecule
 
    screening_atom_distance       = 2.0             #DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
    screening_min_distance        = 1.5             #minimum distance (in A) of ANY atom from surface, must be < selected_atom_distance. The molecule is translated upwards if necessary, in order to meet this requirement.
@@ -27,6 +28,7 @@
    y_rot_angles                  = 0 90            #rotation about y axis (performed secondly)
    z_rot_angles                  = 0 90            #rotation about z axis (performed lastly)
    vertical_angles               = x               #which angles for y_rot == +/- 90. Options: x (use x_rot_angles), z (use z_rot_angles), none, list [list of angles] (custom list)
+   individual_rotations          = 12 50 86, 1 7 8 #list of individual rotations, not to be included in the combinations. Each one is a list of 3 angles (in deg)
 
    layers_height                 = 0.5             #delta_z within which atoms are considered to be part of the same layer (for fixing atoms). This is different from the surface_height flag, used for surface adsorption sites.
    fixed_indices_slab            = 0 1 2           #fix chosen atoms of the slab for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
@@ -34,6 +36,10 @@
    fixed_indices_mol             = 3               #fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
    fix_slab_xyz                  = 0 0 0           #coordinates to fix for the selected atoms in slab (as in QE, so 0 = fix)
    fix_mol_xyz                   = 0 0 1           #coordinates to fix for the selected atoms in molecule
+
+   mol_before_slab               = False           #put molecule before slab in the order of atoms
+   sort_atoms_by_z               = True
+   translate_slab                = True            #translate the slab upwards so that it is at least 1A above the cell bottom
 /
 
 
@@ -90,3 +96,25 @@ K_POINTS automatic
 
 
 @/ESPRESSO
+
+
+@VASP
+
+&GENERAL
+   vasp_pp_path       = 'VASP_PP_PATH' #The pseudopotentials are expected to be in: LDA: VASP_PP_PATH/potpaw/,  PBE: VASP_PP_PATH/potpaw_PBE/,  PW91: $VASP_PP_PATH/potpaw_GGA/
+   vasp_xc_functional = 'PBE' #default PBE
+   vasp_pseudo_setups = {"base": "recommended", "6": "C_h", "C": "_s"}
+
+   pymatgen_set       = MPRelaxSet
+/
+
+&INCAR
+
+/
+
+
+&KPOINTS
+
+/
+
+@/VASP

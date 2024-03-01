@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from ase.atoms import Atoms, default
+from ase.io.espresso import create_units,_PW_START,_PW_END,_PW_CELL,_PW_POS,_PW_MAGMOM,_PW_FORCE,\
+    _PW_TOTEN,_PW_STRESS,_PW_FERMI,_PW_HIGHEST_OCCUPIED,_PW_HIGHEST_OCCUPIED_LOWEST_FREE,_PW_KPTS,_PW_BANDS,_PW_BANDSTRUCTURE
 from ase.io.espresso import *
+
 
 
 import copy
@@ -250,14 +253,16 @@ class Atoms_custom(Atoms):
 
     def set_custom_labels(self, custom_labels=None):
         """Set custom_labels."""
-        if custom_labels is None:
-            self.set_array('custom_labels', None)
-        self.set_array('custom_labels', custom_labels, str, ())
+
+        if custom_labels is not None:
+            labels = ['{:3}'.format(label) for label in custom_labels]
+        else: labels=None
+        self.set_array('custom_labels', labels, str, ())
 
     def get_custom_labels(self):
         """Get array of custom_labels."""
         if 'custom_labels' in self.arrays:
-            return self.arrays['custom_labels'].copy()
+            return [label.strip() for label in self.arrays['custom_labels'].copy()]
         else:
             return None
 
@@ -314,6 +319,35 @@ class Atoms_custom(Atoms):
                 numbers.append(int(s))
         return numbers
 #################################################
+
+
+def todict_fixed(self):
+    return {'name': 'FixCartesian',
+            'kwargs': {'a': self.a, 'mask': ~self.mask}}    
+
+def convert_constraint_flags(constraint_flags):
+    """Convert Quantum ESPRESSO constraint flags to ASE Constraint objects.
+
+    Parameters
+    ----------
+    constraint_flags : list[tuple[int, int, int]]
+        List of constraint flags (0: fixed, 1: moved) for all the atoms.
+        If the flag is None, there are no constraints on the atom.
+
+    Returns
+    -------
+    constraints : list[FixAtoms | FixCartesian]
+        List of ASE Constraint objects.
+    """
+    constraints = []
+    for i, constraint in enumerate(constraint_flags):
+        if constraint is None:
+            continue
+        # mask: False (0): moved, True (1): fixed
+        mask = ~np.asarray(constraint, bool)
+        constraints.append(FixCartesian(i, mask))
+    return constraints
+
 
 #simply reads labels for the atoms and stores them in an interal list.
 @iofunction('rU')
@@ -381,13 +415,15 @@ def read_espresso_in_custom(fileobj):
     symbols = [label_to_symbol(position[0]) for position in positions_card]
     custom_labels = [position[0] for position in positions_card]
     positions = [position[1] for position in positions_card]
-    magmoms = [species_info[label]["magmom"] for label in custom_labels]
+    constraint_flags = [position[2] for position in positions_card]
+    magmoms = [species_info[position[0]]["magmom"] for position in positions_card]
     
 
     # TODO: put more info into the atoms object
     # e.g magmom, forces.
     atoms = Atoms_custom(symbols=symbols, positions=positions, cell=cell, pbc=True,
                   magmoms=magmoms, custom_labels=custom_labels)
+    atoms.set_constraint(convert_constraint_flags(constraint_flags))
 
     return atoms
 
@@ -778,24 +814,7 @@ def construct_namelist_custom(parameters=None, warn=False, **kwargs):
 
 
 #################################################
-
 units = create_units('2006')
-# Section identifiers
-_PW_START = 'Program PWSCF'
-_PW_END = 'End of self-consistent calculation'
-_PW_CELL = 'CELL_PARAMETERS'
-_PW_POS = 'ATOMIC_POSITIONS'
-_PW_MAGMOM = 'Magnetic moment per site'
-_PW_FORCE = 'Forces acting on atoms'
-_PW_TOTEN = '!    total energy'
-_PW_STRESS = 'total   stress'
-_PW_FERMI = 'the Fermi energy is'
-_PW_HIGHEST_OCCUPIED = 'highest occupied level'
-_PW_HIGHEST_OCCUPIED_LOWEST_FREE = 'highest occupied, lowest unoccupied level'
-_PW_KPTS = 'number of k points='
-_PW_BANDS = _PW_END
-_PW_BANDSTRUCTURE = 'End of band structure calculation'
-
 def read_espresso_out_custom(fileobj, index=-1, results_required=True):
     """Reads Quantum ESPRESSO output files.
 
@@ -944,8 +963,10 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
                        positions_card]
             custom_labels = [position[0] for position in positions_card]
             positions = [position[1] for position in positions_card]
+            constraint_flags = [position[2] for position in positions_card]
             structure = Atoms_custom(symbols=symbols, positions=positions, cell=cell,
                               pbc=True, custom_labels=custom_labels)
+            structure.set_constraint(convert_constraint_flags(constraint_flags))
 
         # Extract calculation results
         # Energy
@@ -1177,11 +1198,9 @@ def parse_pwo_start_custom(lines, index=0):
 
 
 #################################################
-from ase.io.extxyz import XYZError, key_val_str_to_dict, parse_properties, SinglePointCalculator, paropen, Calculator, all_properties, output_column_format
-# partition ase.calculators.calculator.all_properties into two lists:
-#  'per-atom' and 'per-config'
-per_atom_properties = ['forces', 'stresses', 'charges', 'magmoms', 'energies']
-per_config_properties = ['energy', 'stress', 'dipole', 'magmom', 'free_energy']
+from ase.io.extxyz import XYZError, Calculator, SinglePointCalculator, \
+        key_val_str_to_dict, parse_properties, paropen, output_column_format,  \
+        all_properties, per_atom_properties, per_config_properties
 
 def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
                     nvec=0):
@@ -1546,12 +1565,558 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
             fileobj.write(fmt % tuple(data[i]))
 
 
+#################################################
+#fix for ASE 3.22.1 with the content of the GitLab repository, as of 2023. REMOVE in future release of ASE.
+
+from ase.io.pov import pa, pc
+def write_pov(self, path):
+    """Write pov file."""
+
+    point_lights = '\n'.join(f"light_source {{{pa(loc)} {pc(rgb)}}}"
+                                for loc, rgb in self.point_lights)
+
+    area_light = ''
+    if self.area_light is not None:
+        loc, color, width, height, nx, ny = self.area_light
+        area_light += f"""\nlight_source {{{pa(loc)} {pc(color)}
+area_light <{width:.2f}, 0, 0>, <0, {height:.2f}, 0>, {nx:n}, {ny:n}
+adaptive 1 jitter}}"""
+
+    fog = ''
+    if self.depth_cueing and (self.cue_density >= 1e-4):
+        # same way vmd does it
+        if self.cue_density > 1e4:
+            # larger does not make any sense
+            dist = 1e-4
+        else:
+            dist = 1. / self.cue_density
+        fog += f'fog {{fog_type 1 distance {dist:.4f} '\
+                f'color {pc(self.background)}}}'
+
+    mat_style_keys = (f'#declare {k} = {v}'
+                        for k, v in self.material_styles_dict.items())
+    mat_style_keys = '\n'.join(mat_style_keys)
+
+    # Draw unit cell
+    cell_vertices = ''
+    if self.cell_vertices is not None:
+        for c in range(3):
+            for j in ([0, 0], [1, 0], [1, 1], [0, 1]):
+                p1 = self.cell_vertices[tuple(j[:c]) + (0,) + tuple(j[c:])]
+                p2 = self.cell_vertices[tuple(j[:c]) + (1,) + tuple(j[c:])]
+
+                distance = np.linalg.norm(p2 - p1)
+                if distance < 1e-12:
+                    continue
+
+                cell_vertices += f'cylinder {{{pa(p1)}, {pa(p2)}, '\
+                                    f'Rcell pigment {{Black}}}}\n'
+                # all strings are f-strings for consistency
+        cell_vertices = cell_vertices.strip('\n')
+
+    # Draw atoms
+    a = 0
+    atoms = ''
+    for loc, dia, col in zip(self.positions, self.diameters, self.colors):
+        tex = 'ase3'
+        trans = 0.
+        if self.textures is not None:
+            tex = self.textures[a]
+        if self.transmittances is not None:
+            trans = self.transmittances[a]
+        atoms += f'atom({pa(loc)}, {dia/2.:.2f}, {pc(col)}, '\
+                    f'{trans}, {tex}) // #{a:n}\n'
+        a += 1
+    atoms = atoms.strip('\n')
+
+    # Draw atom bonds
+    bondatoms = ''
+    for pair in self.bondatoms:
+        # Make sure that each pair has 4 componets: a, b, offset,
+        #                                           bond_order, bond_offset
+        # a, b: atom index to draw bond
+        # offset: original meaning to make offset for mid-point.
+        # bond_oder: if not supplied, set it to 1 (single bond).
+        #            It can be  1, 2, 3, corresponding to single,
+        #            double, triple bond
+        # bond_offset: displacement from original bond position.
+        #              Default is (bondlinewidth, bondlinewidth, 0)
+        #              for bond_order > 1.
+        if len(pair) == 2:
+            a, b = pair
+            offset = (0, 0, 0)
+            bond_order = 1
+            bond_offset = (0, 0, 0)
+        elif len(pair) == 3:
+            a, b, offset = pair
+            bond_order = 1
+            bond_offset = (0, 0, 0)
+        elif len(pair) == 4:
+            a, b, offset, bond_order = pair
+            bond_offset = (self.bondlinewidth, self.bondlinewidth, 0)
+        elif len(pair) > 4:
+            a, b, offset, bond_order, bond_offset = pair
+        else:
+            raise RuntimeError('Each list in bondatom must have at least '
+                                '2 entries. Error at %s' % pair)
+
+        if len(offset) != 3:
+            raise ValueError('offset must have 3 elements. '
+                                'Error at %s' % pair)
+        if len(bond_offset) != 3:
+            raise ValueError('bond_offset must have 3 elements. '
+                                'Error at %s' % pair)
+        if bond_order not in [0, 1, 2, 3]:
+            raise ValueError('bond_order must be either 0, 1, 2, or 3. '
+                                'Error at %s' % pair)
+
+        # Up to here, we should have all a, b, offset, bond_order,
+        # bond_offset for all bonds.
+
+        # Rotate bond_offset so that its direction is 90 deg. off the bond
+        # Utilize Atoms object to rotate
+        if bond_order > 1 and np.linalg.norm(bond_offset) > 1.e-9:
+            tmp_atoms = Atoms('H3')
+            tmp_atoms.set_cell(self.cell)
+            tmp_atoms.set_positions([
+                self.positions[a],
+                self.positions[b],
+                self.positions[b] + np.array(bond_offset),
+            ])
+            tmp_atoms.center()
+            tmp_atoms.set_angle(0, 1, 2, 90)
+            bond_offset = tmp_atoms[2].position - tmp_atoms[1].position
+
+        R = np.dot(offset, self.cell)
+        mida = 0.5 * (self.positions[a] + self.positions[b] + R)
+        midb = 0.5 * (self.positions[a] + self.positions[b] - R)
+        if self.textures is not None:
+            texa = self.textures[a]
+            texb = self.textures[b]
+        else:
+            texa = texb = 'ase3'
+
+        if self.transmittances is not None:
+            transa = self.transmittances[a]
+            transb = self.transmittances[b]
+        else:
+            transa = transb = 0.
+
+        # draw bond, according to its bond_order.
+        # bond_order == 0: No bond is plotted
+        # bond_order == 1: use original code
+        # bond_order == 2: draw two bonds, one is shifted by bond_offset/2,
+        #                  and another is shifted by -bond_offset/2.
+        # bond_order == 3: draw two bonds, one is shifted by bond_offset,
+        #                  and one is shifted by -bond_offset, and the
+        #                  other has no shift.
+        # To shift the bond, add the shift to the first two coordinate in
+        # write statement.
+
+        posa = self.positions[a]
+        posb = self.positions[b]
+        cola = self.colors[a]
+        colb = self.colors[b]
+
+        if bond_order == 1:
+            draw_tuples = (posa, mida, cola, transa, texa),\
+                            (posb, midb, colb, transb, texb)
+
+        elif bond_order == 2:
+            bs = [x / 2 for x in bond_offset]
+            draw_tuples = (posa - bs, mida - bs, cola, transa, texa),\
+                            (posb - bs, midb - bs, colb, transb, texb),\
+                            (posa + bs, mida + bs, cola, transa, texa),\
+                            (posb + bs, midb + bs, colb, transb, texb)
+
+        elif bond_order == 3:
+            bs = bond_offset
+            draw_tuples = (posa, mida, cola, transa, texa),\
+                            (posb, midb, colb, transb, texb),\
+                            (posa + bs, mida + bs, cola, transa, texa),\
+                            (posb + bs, midb + bs, colb, transb, texb),\
+                            (posa - bs, mida - bs, cola, transa, texa),\
+                            (posb - bs, midb - bs, colb, transb, texb)
+
+        bondatoms += ''.join(f'cylinder {{{pa(p)}, '
+                                f'{pa(m)}, Rbond texture{{pigment '
+                                f'{{color {pc(c)} '
+                                f'transmit {tr}}} finish{{{tx}}}}}}}\n'
+                                for p, m, c, tr, tx in
+                                draw_tuples)
+
+    bondatoms = bondatoms.strip('\n')
+
+    # Draw constraints if requested
+    constraints = ''
+    if self.exportconstraints:
+        for a in self.constrainatoms:
+            dia = self.diameters[a]
+            loc = self.positions[a]
+            trans = 0.0
+            if self.transmittances is not None:
+                trans = self.transmittances[a]
+            constraints += f'constrain({pa(loc)}, {dia/2.:.2f}, Black, '\
+                f'{trans}, {tex}) // #{a:n} \n'
+    constraints = constraints.strip('\n')
+
+    pov = f"""#version 3.6;
+#include "colors.inc"
+#include "finish.inc"
+
+global_settings {{assumed_gamma 2.2 max_trace_level 6}}
+background {{{pc(self.background)}{' transmit 1.0' if self.transparent else ''}}}
+camera {{{self.camera_type}
+right -{self.image_width:.2f}*x up {self.image_height:.2f}*y
+direction {self.image_plane:.2f}*z
+location <0,0,{self.camera_dist:.2f}> look_at <0,0,0>}}
+{point_lights}
+{area_light if area_light != '' else '// no area light'}
+{fog if fog != '' else '// no fog'}
+{mat_style_keys}
+#declare Rcell = {self.celllinewidth:.3f};
+#declare Rbond = {self.bondlinewidth:.3f};
+
+#macro atom(LOC, R, COL, TRANS, FIN)
+sphere{{LOC, R texture{{pigment{{color COL transmit TRANS}} finish{{FIN}}}}}}
+#end
+#macro constrain(LOC, R, COL, TRANS FIN)
+union{{torus{{R, Rcell rotate 45*z texture{{pigment{{color COL transmit TRANS}} finish{{FIN}}}}}}
+    torus{{R, Rcell rotate -45*z texture{{pigment{{color COL transmit TRANS}} finish{{FIN}}}}}}
+    translate LOC}}
+#end
+
+{cell_vertices if cell_vertices != '' else '// no cell vertices'}
+{atoms}
+{bondatoms}
+{constraints if constraints != '' else '// no constraints'}
+"""  # noqa: E501
+
+    with open(path, 'w') as fd:
+        fd.write(pov)
+
+    return path
+
+
+def write_ini(self, path):
+    """Write ini file."""
+
+    ini_str = f"""\
+Input_File_Name={path.with_suffix('.pov').name}
+Output_to_File=True
+Output_File_Type=N
+Output_Alpha={'on' if self.transparent else 'off'}
+; if you adjust Height, and width, you must preserve the ratio
+; Width / Height = {self.canvas_width/self.canvas_height:f}
+Width={self.canvas_width}
+Height={self.canvas_height}
+Antialias=True
+Antialias_Threshold=0.1
+Display={self.display}
+Display_Gamma=2.2
+Pause_When_Done={self.pause}
+Verbose=False
+Max_Image_Buffer_Memory=1024
+"""
+    with open(path, 'w') as fd:
+        fd.write(ini_str)
+    return path
+
+
+
+
+
+material_styles_dict = dict(
+    simple='finish {phong 0.7 ambient 0.4 diffuse 0.55}',
+    # In general, 'pale' doesn't conserve energy and can look
+    # strange in many cases.
+    pale=('finish {ambient 0.9 diffuse 0.30 roughness 0.001 '
+        'specular 0.2 }'),
+    intermediate=('finish {ambient 0.4 diffuse 0.6 specular 0.1 '
+                'roughness 0.04}'),
+    vmd=(
+        'finish {ambient 0.2 diffuse 0.80 phong 0.25 phong_size 10.0 '
+        'specular 0.2 roughness 0.1}'),
+    jmol=('finish {ambient 0.4 diffuse 0.6 specular 1 roughness 0.001 '
+        'metallic}'),
+    ase2=('finish {ambient 0.2 brilliance 3 diffuse 0.6 metallic '
+        'specular 0.7 roughness 0.04 reflection 0.15}'),
+    ase3=('finish {ambient 0.4 brilliance 2 diffuse 0.6 metallic '
+        'specular 1.0 roughness 0.001 reflection 0.0}'),
+    glass=('finish {ambient 0.4 diffuse 0.35 specular 1.0 '
+        'roughness 0.001}'),
+    glass2=('finish {ambient 0.3 diffuse 0.3 specular 1.0 '
+            'reflection 0.25 roughness 0.001}'),
+)
+#################################################
+
+
+#fix for VASP >= 6.0.0 OUTCAR (already fixed on ASE repository, but not yet in 3.22.1)
+from typing import Sequence, Dict, Any
+_CURSOR = int
+_CHUNK = Sequence[str]
+_RESULT = Dict[str, Any]
+
+class NoNonEmptyLines(Exception):
+    """No more non-empty lines were left in the provided chunck"""
+
+
+class UnableToLocateDelimiter(Exception):
+    """Did not find the provided delimiter"""
+    def __init__(self, delimiter, msg):
+        self.delimiter = delimiter
+        super().__init__(msg)
+
+def find_next_non_empty_line(cursor: _CURSOR, lines: _CHUNK) -> _CURSOR:
+    """Fast-forward the cursor from the current position to the next
+    line which is non-empty.
+    Returns the new cursor position on the next non-empty line.
+    """
+    for line in lines[cursor:]:
+        if line.strip():
+            # Line was non-empty
+            return cursor
+        # Empty line, increment the cursor position
+        cursor += 1
+    # There was no non-empty line
+    raise NoNonEmptyLines("Did not find a next line which was not empty")
+
+
+def search_lines(delim: str, cursor: _CURSOR, lines: _CHUNK) -> _CURSOR:
+    """Search through a chunk of lines starting at the cursor position for
+    a given delimiter. The new position of the cursor is returned."""
+    for line in lines[cursor:]:
+        if delim in line:
+            # The cursor should be on the line with the delimiter now
+            assert delim in lines[cursor]
+            return cursor
+        # We didn't find the delimiter
+        cursor += 1
+    raise UnableToLocateDelimiter(
+        delim, f'Did not find starting point for delimiter {delim}')
+
+
+def parse_kpoints_outcar_custom(self, cursor: _CURSOR, lines: _CHUNK) -> _RESULT:
+    nkpts = self.get_from_header('nkpts')
+    nbands = self.get_from_header('nbands')
+    weights = self.get_from_header('kpt_weights')
+    spinpol = self.get_from_header('spinpol')
+    nspins = 2 if spinpol else 1
+
+    kpts = []
+    for spin in range(nspins):
+        # for Vasp 6, they added some extra information after the spin components.
+        # so we might need to seek the spin component line
+        cursor = search_lines(f'spin component {spin + 1}', cursor, lines)
+
+        cursor += 2  # Skip two lines
+        for _ in range(nkpts):
+            # Skip empty lines
+            cursor = find_next_non_empty_line(cursor, lines)
+
+            line = self.get_line(cursor, lines)
+            # Example line:
+            # "k-point     1 :       0.0000    0.0000    0.0000"
+            parts = line.strip().split()
+            ikpt = int(parts[1]) - 1  # Make kpt idx start from 0
+            weight = weights[ikpt]
+
+            cursor += 2  # Move down two
+            eigenvalues = np.zeros(nbands)
+            occupations = np.zeros(nbands)
+            for n in range(nbands):
+                # Example line:
+                # "      1      -9.9948      1.00000"
+                parts = lines[cursor].strip().split()
+                eps_n, f_n = map(float, parts[1:])
+                occupations[n] = f_n
+                eigenvalues[n] = eps_n
+                cursor += 1
+            kpt = SinglePointKPoint(weight,
+                                    spin,
+                                    ikpt,
+                                    eps_n=eigenvalues,
+                                    f_n=occupations)
+            kpts.append(kpt)
+
+    return {'kpts': kpts}
+
+
+
+##################################
+#add resorting for poscar if ase-sort.dat is preset
+
+from ase.utils import reader
+from ase.io.vasp import get_atomtypes_from_formula, atomtypes_outpot
+
+@reader
+def read_vasp(filename='CONTCAR'):
+    """Import POSCAR/CONTCAR type file.
+
+    Reads unitcell, atom positions and constraints from the POSCAR/CONTCAR
+    file and tries to read atom types from POSCAR/CONTCAR header, if this fails
+    the atom types are read from OUTCAR or POTCAR file.
+    """
+
+    from ase.constraints import FixAtoms, FixScaled
+    from ase.data import chemical_symbols
+
+    fd = filename
+    # The first line is in principle a comment line, however in VASP
+    # 4.x a common convention is to have it contain the atom symbols,
+    # eg. "Ag Ge" in the same order as later in the file (and POTCAR
+    # for the full vasp run). In the VASP 5.x format this information
+    # is found on the fifth line. Thus we save the first line and use
+    # it in case we later detect that we're reading a VASP 4.x format
+    # file.
+    line1 = fd.readline()
+
+    lattice_constant = float(fd.readline().split()[0])
+
+    # Now the lattice vectors
+    a = []
+    for ii in range(3):
+        s = fd.readline().split()
+        floatvect = float(s[0]), float(s[1]), float(s[2])
+        a.append(floatvect)
+
+    basis_vectors = np.array(a) * lattice_constant
+
+    # Number of atoms. Again this must be in the same order as
+    # in the first line
+    # or in the POTCAR or OUTCAR file
+    atom_symbols = []
+    numofatoms = fd.readline().split()
+    # Check whether we have a VASP 4.x or 5.x format file. If the
+    # format is 5.x, use the fifth line to provide information about
+    # the atomic symbols.
+    vasp5 = False
+    try:
+        int(numofatoms[0])
+    except ValueError:
+        vasp5 = True
+        atomtypes = numofatoms
+        numofatoms = fd.readline().split()
+
+    # check for comments in numofatoms line and get rid of them if necessary
+    commentcheck = np.array(['!' in s for s in numofatoms])
+    if commentcheck.any():
+        # only keep the elements up to the first including a '!':
+        numofatoms = numofatoms[:np.arange(len(numofatoms))[commentcheck][0]]
+
+    if not vasp5:
+        # Split the comment line (first in the file) into words and
+        # try to compose a list of chemical symbols
+        from ase.formula import Formula
+        atomtypes = []
+        for word in line1.split():
+            word_without_delims = re.sub(r"-|_|,|\.|=|[0-9]|^", "", word)
+            if len(word_without_delims) < 1:
+                continue
+            try:
+                atomtypes.extend(list(Formula(word_without_delims)))
+            except ValueError:
+                # print(atomtype, e, 'is comment')
+                pass
+        # Now the list of chemical symbols atomtypes must be formed.
+        # For example: atomtypes = ['Pd', 'C', 'O']
+
+        numsyms = len(numofatoms)
+        if len(atomtypes) < numsyms:
+            # First line in POSCAR/CONTCAR didn't contain enough symbols.
+
+            # Sometimes the first line in POSCAR/CONTCAR is of the form
+            # "CoP3_In-3.pos". Check for this case and extract atom types
+            if len(atomtypes) == 1 and '_' in atomtypes[0]:
+                atomtypes = get_atomtypes_from_formula(atomtypes[0])
+            else:
+                atomtypes = atomtypes_outpot(fd.name, numsyms)
+        else:
+            try:
+                for atype in atomtypes[:numsyms]:
+                    if atype not in chemical_symbols:
+                        raise KeyError
+            except KeyError:
+                atomtypes = atomtypes_outpot(fd.name, numsyms)
+
+    for i, num in enumerate(numofatoms):
+        numofatoms[i] = int(num)
+        [atom_symbols.append(atomtypes[i]) for na in range(numofatoms[i])]
+
+    # Check if Selective dynamics is switched on
+    sdyn = fd.readline()
+    selective_dynamics = sdyn[0].lower() == 's'
+
+    # Check if atom coordinates are cartesian or direct
+    if selective_dynamics:
+        ac_type = fd.readline()
+    else:
+        ac_type = sdyn
+    cartesian = ac_type[0].lower() == 'c' or ac_type[0].lower() == 'k'
+    tot_natoms = sum(numofatoms)
+    atoms_pos = np.empty((tot_natoms, 3))
+    if selective_dynamics:
+        selective_flags = np.empty((tot_natoms, 3), dtype=bool)
+    for atom in range(tot_natoms):
+        ac = fd.readline().split()
+        atoms_pos[atom] = (float(ac[0]), float(ac[1]), float(ac[2]))
+        if selective_dynamics:
+            curflag = []
+            for flag in ac[3:6]:
+                curflag.append(flag == 'F')
+            selective_flags[atom] = curflag
+    if cartesian:
+        atoms_pos *= lattice_constant
+    atoms = Atoms(symbols=atom_symbols, cell=basis_vectors, pbc=True)
+    if cartesian:
+        atoms.set_positions(atoms_pos)
+    else:
+        atoms.set_scaled_positions(atoms_pos)
+    if selective_dynamics:
+        constraints = []
+        indices = []
+        for ind, sflags in enumerate(selective_flags):
+            if sflags.any() and not sflags.all():
+                constraints.append(FixScaled(atoms.get_cell(), ind, sflags))
+            elif sflags.all():
+                indices.append(ind)
+        if indices:
+            constraints.append(FixAtoms(indices))
+        if constraints:
+            atoms.set_constraint(constraints)
+
+    # Resort if ase-sort.dat is present
+    sortfile = f'{os.path.dirname(filename.name)}/ase-sort.dat'
+    if os.path.isfile(sortfile):
+        resort_list = []
+        with open(sortfile, 'r') as fd:
+            for line in fd:
+                sort, resort = line.split()
+                resort_list.append(int(resort))
+
+        atoms = atoms[resort_list]
+
+    return atoms
+
+
+
+#################################
 
 # Runtime patching
 import ase.io.espresso
 import ase.io.extxyz
+import ase.io.pov
+import ase.io.vasp_parsers.vasp_outcar_parsers
+import ase.constraints
+import ase.io.vasp
 ase.io.espresso.write_espresso_in = write_espresso_in_custom
 ase.io.espresso.read_espresso_in = read_espresso_in_custom
 ase.io.espresso.read_espresso_out = read_espresso_out_custom
 ase.io.extxyz._read_xyz_frame = _read_xyz_frame_custom
 ase.io.extxyz.write_xyz = write_xyz_custom
+ase.io.pov.POVRAY.write_pov = write_pov
+ase.io.pov.POVRAY.write_ini = write_ini
+ase.io.pov.POVRAY.material_styles_dict = material_styles_dict
+ase.io.vasp_parsers.vasp_outcar_parsers.Kpoints.parse = parse_kpoints_outcar_custom
+ase.constraints.FixCartesian.todict = todict_fixed
+ase.io.vasp.read_vasp = read_vasp

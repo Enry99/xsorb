@@ -9,51 +9,64 @@ Small helper class to collect the settings read from settings.in
 """
 
 
-import sys
 import numpy as np
-import input
+from xsorbed import input
+from xsorbed.dftcode_specific import UNITS_TO_EV_FACTOR, HYBRID_SCREENING_THRESHOLDS
 
+#OK (code agnostic) 
 class Settings:
+    '''
+    Class to read the settings.in and store all the parameters for the adsorption structures generation 
+    and for the dft code
 
-    def __init__(self, settings_filename : str = "settings.in", read_energies = True) -> None:
+    Args:
+    - settings_filename: path for the settings file
+    - read_energies: try to read molecule and slab energies from files
+    '''
+
+    def __init__(self, settings_filename : str = "settings.in", read_energies : bool = True, VERBOSE : bool = True):
+        '''
+        Args:
+        - settings_filename: path for the settings file
+        - read_energies: try to read molecule and slab energies from files        
+        '''
 
         #variables read from settings.in
-        script_settings_dict, self.espresso_settings_dict, self.atomic_species, self.kpoints, self.last_dump, self.text = input.read_input_file(settings_filename)
+        script_settings_dict, self.dftprogram_settings_dict, program = input.read_input_file(settings_filename)
+
+        #set the dft program
+        self.program = program
     
-
-        #check for existence of the main blocks
-        blocks = ['INPUT','STRUCTURE']
-        for block in blocks:
-            if block not in script_settings_dict:
-                print("'"+block+"' block not found in settings.in.")
-                sys.exit(1)  
+        #check for existence of the main cards for the adsorption structure generation
+        cards = ['INPUT','STRUCTURE']
+        for card in cards:
+            if card not in script_settings_dict:
+                raise RuntimeError(f"{card} card not found in settings.in.") 
 
 
-        #check existence of mandatory flags in blocks
+        #check existence of mandatory flags in cards ######################################
         mandatory_flags = {
             'INPUT' : ['slab_filename','molecule_filename', 'jobscript'], 
             'STRUCTURE' : ['selected_atom_index', 'molecule_axis', 'x_rot_angles', 'y_rot_angles', 'z_rot_angles'], 
             }
-        for block in mandatory_flags:
-            for flag in mandatory_flags[block]:
-                if flag not in script_settings_dict[block]:
-                    print("Mandatory flag {0} not found in block {1} while reading settings.in.".format(flag, block))
-                    sys.exit(1)
+        for card in mandatory_flags:
+            for flag in mandatory_flags[card]:
+                if flag not in script_settings_dict[card]:
+                    raise RuntimeError(f"Mandatory flag {flag} not found in card {card} while reading settings.in.")
+        ####################################################################################
 
+        # check that the various flags are given in the correct format   ###################  
         script_settings_dict['INPUT']['jobscript'] = [x.strip("'") for x in script_settings_dict['INPUT']['jobscript'].split()]
         script_settings_dict['STRUCTURE']['molecule_axis'] = [x.strip("'") for x in script_settings_dict['STRUCTURE']['molecule_axis'].split()]
 
         if script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'atoms':
             if len(script_settings_dict['STRUCTURE']['molecule_axis'][1:]) != 2:
-                print("Error: you must specify two integers as indices of the two atoms for the molecule axis.")
-                sys.exit(1)
+                raise ValueError("Error: you must specify two integers as indices of the two atoms for the molecule axis.")
         elif script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'vector':
             if len(script_settings_dict['STRUCTURE']['molecule_axis'][1:]) != 3:
-                print("Error: you must specify three numbers for the vector representing the molecule axis.")
-                sys.exit(1)            
+                raise ValueError("Error: you must specify three numbers for the vector representing the molecule axis.")         
         else:
-            print("Error: molecule_axis must be specified with 'atoms' or 'vector'")
-            sys.exit(1)
+            raise ValueError("Error: molecule_axis must be specified with 'atoms' or 'vector'")
 
         if 'vertical_angles' in script_settings_dict['STRUCTURE']:
             script_settings_dict['STRUCTURE']['vertical_angles'] = [x.strip("'") for x in script_settings_dict['STRUCTURE']['vertical_angles'].split()]
@@ -61,26 +74,64 @@ class Settings:
                 and script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'z'
                 and script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'none'
                 and script_settings_dict['STRUCTURE']['vertical_angles'][0] != 'list'):
-                    print("Error: vertical_angles requires either 'x', 'z', 'none' or 'list' [list of custom angles].")
-                    sys.exit(1)             
+                    raise ValueError("Error: vertical_angles requires either 'x', 'z', 'none' or 'list' [list of custom angles].")         
 
             if (script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'x' 
                 or script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'z'
                 or script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'none') and len(script_settings_dict['STRUCTURE']['vertical_angles']) > 1 :
-                    print("Error: the specified mode for vertical_angles does not support additional arguments.")
-                    sys.exit(1) 
+                    raise ValueError("Error: the specified mode for vertical_angles does not support additional arguments.")
+            
             if(script_settings_dict['STRUCTURE']['vertical_angles'][0] == 'list' and len(script_settings_dict['STRUCTURE']['vertical_angles']) == 1):
-                    print("Error: the specified mode for vertical_angles requires at least one angle (e.g. 0)")
-                    sys.exit(1)
+                    raise ValueError("Error: the specified mode for vertical_angles requires at least one angle (e.g. 0)")
         else: script_settings_dict['STRUCTURE']['vertical_angles'] = ['x']
 
         if 'fixed_indices_slab' in script_settings_dict['STRUCTURE'] and 'fixed_layers_slab' in script_settings_dict['STRUCTURE']:
-            print("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")
-            sys.exit(1)
+            raise ValueError("You can specify the fixed slab atoms either by 'fixed_indices_slab' or 'fixed_layers_slab', not both.")
 
+        ####################################################################################
+
+        #Finally read data from dictionary and initialize the actual variables
+
+
+        #&INPUT:
+        self.slab_filename          = script_settings_dict['INPUT']['slab_filename']
+        self.molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
+        self.jobscript              = script_settings_dict['INPUT']['jobscript'][0]
+        self.sbatch_command         = script_settings_dict['INPUT']['jobscript'][1]
+        if 'screening_conv_thr' in script_settings_dict['INPUT']:
+            self.screening_conv_thr = np.array(script_settings_dict['INPUT']['screening_conv_thr'].split(), dtype=float).tolist()
+        else: self.screening_conv_thr = HYBRID_SCREENING_THRESHOLDS[program]
+        # read E_slab_mol from settings.in (priority over value from file) 
+        if 'E_slab_mol' in script_settings_dict['INPUT']:
+            E_slab_mol_str = script_settings_dict['INPUT']['E_slab_mol'].split()
+            if len(E_slab_mol_str) != 2:
+                raise ValueError("If you specify the tag E_slab_mol you must provide TWO values.")
+            self.E_slab_mol = (np.array(E_slab_mol_str, dtype=float)*UNITS_TO_EV_FACTOR[program]).tolist()  
+        else: self.E_slab_mol = [0,0]
+
+        #if E_slab_mol not in settings.in, try to read from file. If not possible, set it to [0,0]
+        if(0 in self.E_slab_mol and read_energies):
+            if 'mol_subset_atoms' in script_settings_dict['STRUCTURE']:
+                print('Using a subset of the molecule atoms. Molecule energy not extracted.')
+            else:
+                try:
+                    from ase.io import read
+                    from xsorbed import ase_custom
+                    #try to read E_salb_mol directly from files
+                    slab_en = read(self.slab_filename).get_potential_energy()
+                    mol_en = read(self.molecule_filename).get_potential_energy()
+                    self.E_slab_mol = [slab_en, mol_en]
+                    print("Slab and molecule energies read from files.")
+                except:
+                    print('It was not possible to obtain slab and molecule energy in any way. Total energies will be displayed instead.')
+                    self.E_slab_mol = [0, 0]
+
+
+
+        #&STRUCTURE
 
         #set non-specified flags to default.
-        optional_flags_list = {
+        optional_structure_flags_list = {
             'symm_reduce'              : 0.01,
             'near_reduce'              : 0.01,
             'surface_height'           : 0.9,
@@ -96,52 +147,15 @@ class Settings:
             'fixed_indices_mol'        : ' ',
             'fix_slab_xyz'             : '0 0 0',
             'fix_mol_xyz'              : '0 0 1',
+            'mol_before_slab'          : 'False',
+            'sort_atoms_by_z'          : 'True',
+            'translate_slab'           : 'True'
         }
-        for flag in optional_flags_list:
+        for flag in optional_structure_flags_list:
             if flag not in script_settings_dict['STRUCTURE']:
-                script_settings_dict['STRUCTURE'].update({flag : optional_flags_list[flag]})
-        if 'IONS' not in self.espresso_settings_dict:
-            self.espresso_settings_dict['IONS'] = {}
-        if 'ion_dynamics' not in self.espresso_settings_dict['IONS']:
-            self.espresso_settings_dict['IONS'].update({'ion_dynamics': 'bfgs'})
-        if len(self.kpoints) == 2: #so no gamma but also no offset
-            self.kpoints.append([0,0,0])
+                script_settings_dict['STRUCTURE'].update({flag : optional_structure_flags_list[flag]})                
 
-
-        #Finally read data from dictionary and initialize the actual variables
-
-        #&INPUT:
-        self.slab_filename          = script_settings_dict['INPUT']['slab_filename']
-        self.molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
-        self.jobscript              = script_settings_dict['INPUT']['jobscript'][0]
-        self.sbatch_command         = script_settings_dict['INPUT']['jobscript'][1]
-        self.E_slab_mol = np.array(
-            script_settings_dict['INPUT']['E_slab_mol'].split(), dtype=float
-            ).tolist() if 'E_slab_mol' in script_settings_dict['INPUT'] else []
-
-        if len(self.E_slab_mol) != 2 and len(self.E_slab_mol) != 0:
-            print("If you specify the tag E_slab_mol you must provide TWO values. Quitting.")
-            sys.exit(1)
-
-        if(not self.E_slab_mol and read_energies):
-            #try to read E_salb_mol directly from files (if files are completed pwos)
-            if(self.slab_filename.split('.')[-1] == 'pwo' 
-                and self.molecule_filename.split('.')[-1] == 'pwo'
-                and script_settings_dict['STRUCTURE']['mol_subset_atoms'] == ' '):
-
-                slab_en = self._read_energy(self.slab_filename)
-                mol_en  = self._read_energy(self.molecule_filename)
-                if slab_en is not None and mol_en is not None:
-                    print("Slab and molecule energies read from files.")
-                    self.E_slab_mol = [slab_en, mol_en]
-            
-        if not self.E_slab_mol and read_energies:
-            print('It was not possible to obtain slab and molecule energy in any way. Total energies will be displayed instead.')
-            self.E_slab_mol = [0, 0]
-            
-
-
-        #&STRUCTURE
+        # initialize the class variables with dictionary values
         self.symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
         self.near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
         self.surface_height         = float(script_settings_dict['STRUCTURE']['surface_height'])
@@ -170,6 +184,11 @@ class Settings:
             self.vertical_angles    = np.array([0.])
         else:
             self.vertical_angles    = np.array(script_settings_dict['STRUCTURE']['vertical_angles'][1:], dtype=float).tolist()
+
+        if 'individual_rotations' in script_settings_dict['STRUCTURE']:
+            self.individual_rotations   = [np.array(rot.split(), dtype=float).tolist() for rot in script_settings_dict['STRUCTURE']['individual_rotations'].split(',')]
+        else:
+            self.individual_rotations   = []
          
 
         self.fixed_indices_slab     = np.array(script_settings_dict['STRUCTURE']['fixed_indices_slab'].split(), dtype=int).tolist()
@@ -178,46 +197,15 @@ class Settings:
         self.fix_slab_xyz           = np.array(script_settings_dict['STRUCTURE']['fix_slab_xyz'].split(), dtype=int).tolist() 
         self.fix_mol_xyz            = np.array(script_settings_dict['STRUCTURE']['fix_mol_xyz'].split(), dtype=int).tolist()
 
-
-        #&PSEUDO
-        self.pseudopotentials       = {}
-        for i, typ in enumerate(self.atomic_species):
-            self.pseudopotentials.update({typ[0] : typ[2]})
-
-        #KPOINTS
-        if(len(self.kpoints) > 1): #so no gamma
-            self.kpoints[1] = np.array(self.kpoints[1], dtype=int).tolist()
-            self.kpoints[2] = np.array(self.kpoints[2], dtype=int).tolist()
-
-
-        #Espresso &CONTROL
-        self.espresso_settings_dict['CONTROL'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
-        
-
-        #Espresso &IONS
-        self.ion_dynamics = self.espresso_settings_dict['IONS']['ion_dynamics']
+        self.sort_atoms_by_z        = True if 'true' in script_settings_dict['STRUCTURE']['sort_atoms_by_z'].lower() else False #to allow also .true./.false.
+        self.translate_slab         = True if 'true' in script_settings_dict['STRUCTURE']['translate_slab'].lower() else False
+        self.mol_before_slab        = True if 'true' in script_settings_dict['STRUCTURE']['mol_before_slab'].lower() else False
 
         self.sites_find_args = {
-            "distance":0,   #the distance isn't set from here, but inside the molecule, by translating the mol upwards by the chosen amount
             'symm_reduce':self.symm_reduce, 
             'near_reduce':self.near_reduce, 
             'no_obtuse_hollow':True}
 
         #import json
         #print(json.dumps(self.__dict__, indent=4))
-
-    def _read_energy(self, filename : str):
-        with open(filename, 'r') as f:
-            pwo = f.readlines()
-
-        toten = 0
-        scf_terminated = False
-        for line in pwo: #make sure to get the last one (useful in relaxations)
-            if '!' in line: 
-                toten = line.split()[4]
-            if 'End of self-consistent calculation' in line:
-                scf_terminated = True
-        if(scf_terminated and toten != 0): 
-            return float(toten)
-        else: return None
 

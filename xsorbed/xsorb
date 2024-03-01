@@ -15,129 +15,14 @@ https://gitlab.com/triboteam/xsorbed/-/wikis/home
 
 """
 
-#Import statements#####################################################################
-import os, sys
-import argparse
-#
-from filenames import *
-########################################################################################
+import sys
+from xsorbed.cli_parser import cli_parse_xsorb
+from xsorbed.common_definitions import VERSION
 
-
-
-def cli_parse():
-
-    parser = argparse.ArgumentParser(
-        description='Select one of the commands below. The program will read further input informations from the file "settings.in"'
-        )
-
-    parser.add_argument('--v', '--version', action='version', version='%(prog)s '+VERSION)
-
-
-    calc_group = parser.add_argument_group(title='Calculation options')
-    #main flags
-    main_calc = calc_group.add_mutually_exclusive_group()
-    main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
-    main_calc.add_argument('-s', nargs='*', type=float, help='launch screening. Optional arguments: e_tot_conv_thr forc_conv_thr (default 5e-3 5e-2)')
-    main_calc.add_argument('-r', action='store_true', help='launch final relaxations')
-    main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) screening or relax calculations')
-    #optional flags
-    relax_options = calc_group.add_mutually_exclusive_group()
-    relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum) for the final relaxation. Default 5 (or 1 with --by-site)')
-    relax_options.add_argument('--t', type=float, help='energy threshold above minimum (in eV) for choosing the configurations for the final relaxation')
-    relax_options.add_argument('--i', nargs='+', type=int, help='select specific configurations (by label) for relaxation')
-    calc_group.add_argument('--by-site', action='store_true', default=False, help='Select the most favorable configurations for full relax site-by-site site instead of overall')
-    calc_group.add_argument('--exclude', nargs='+', type=int, help='exclude selected configurations from the final relaxation')
-    calc_group.add_argument('--regenerate', action='store_true', default=False, help='re-generate structures for final relaxations instead of reading the positions from screening')
-    calc_group.add_argument('--save-figs', action='store_true', help='plot also the figures (sites + molecule orientations) when using -g or -r')
-    calc_group.add_argument('--saveas', type=str, help='generate also files in the desired format besides the pwi(s), e.g. cif, xyz, ...')
-
-
-
-    energy_group = parser.add_argument_group(title='Energies collection options')  
-    #main flags
-    main_energy = energy_group.add_mutually_exclusive_group()
-    main_energy.add_argument('-es', action='store_true', help='save screening energies to file')
-    main_energy.add_argument('-er', action='store_true', help='save final relax energies to file')
-    energy_group.add_argument('--txt', action='store_true', help='write well formatted txt file instead of csv for -es or -er  (sorted by screen. en.)')
-    main_energy.add_argument('-plot-energies-scr', action='store_true', help='save image with energies evolution during screening')
-    main_energy.add_argument('-plot-energies', action='store_true', help='save image with energies evolution during final relax')
-
-
-    visualization_group = parser.add_argument_group(title='Visualization options')
-    #main flags
-    main_visual = visualization_group.add_mutually_exclusive_group()
-    main_visual.add_argument('-sites', action='store_true',  help='plot the identified high-symmetry sites sites with labels')
-    main_visual.add_argument('-sites-all', action='store_true',  help='plot ALL the high-symmetry sites sites with labels')
-    main_visual.add_argument('-screening-images', nargs='?', choices=['i', 'f'], const='f', help="save images of the screening configurations. Option: 'i'/'f' for initial or final positions. Default: f")
-    main_visual.add_argument('-relax-images', nargs='?', choices=['i', 'f'], const='f', help="save images of the relaxations. Option: 'i'/'f' for initial or final positions. Default: f")
-    #main_visual.add_argument('-render-image', nargs=2, help='select which image to render and the rotations list for the camera (syntax: [s/r][index] [rotations], e.g. r12 -10z,-80x)')
-    main_visual.add_argument('-screening-animations', action='store_true', help='save animations of the screening in gif (default) or mp4 format (for povray)')
-    main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the full relaxations (screen.+final) in gif (default) or mp4 format (for povray)')
-    main_visual.add_argument('-view', type=str, help='select which config to open with ase gui (syntax: [s/r][index], e.g. s3)')
-    main_visual.add_argument('-savefiles', nargs=3, help='save files in specific format (syntax: [format] [calc_type] [i/f], e.g. cif screening i or xyz relax f)')
-    #optional flags
-    visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
-    visualization_group.add_argument('--width-res', type=int, help='resolution width (in pixel) for povray')
-
-
-    #parsing the command line
-    args = parser.parse_args()
-
-
-    #Check presence of incompatible commands belonging to different groups
-    args_dict = vars(args)
-    calc_command = [ key for key in args_dict if args_dict[key] and (key=='s' or key=='g' or key=='r' or key=='restart') ]
-    energy_command = [ key for key in args_dict if args_dict[key] and (key=='es' or key=='er' or key=='plot_energies_scr' or key=='plot_energies') ]
-    visual_command = [ key for key in args_dict if args_dict[key] and (key=='sites' or key=='sites-all' or key=='screening-images'  
-        or key=='relax-images' or key=='screening-animations' or key=='relax-animations' or key=='view' or key=='savefiles') ]
-
-    if calc_command and energy_command:
-        parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], energy_command[0]))
-    elif calc_command and visual_command:
-        parser.error("argument -{1}: not allowed with argument -{0}".format(calc_command[0], visual_command[0]))
-    elif energy_command and visual_command:
-        parser.error("argument -{1}: not allowed with argument -{0}".format(energy_command[0], visual_command[0]))
-  
-
-    #Check for all incompatible OPTIONAL arguments
-    if args.save_figs and not args.g and not args.s:
-        parser.error("--save-figs option can only be used with -g or -s")
-    if args.saveas and not args.g and not args.s and not args.r:
-        parser.error("--saveas option can only be used with -g, -s or -r")
-    if args.n and not args.r:
-        parser.error("--n option can only be used with -r")
-    if args.t and not args.r:
-        parser.error("--t option can only be used with -r")
-    if args.i and not args.r:
-        parser.error("--i option can only be used with -r")
-    if args.by_site and not args.r:
-        parser.error("--by-site option can only be used with -r")
-    if args.by_site and args.i:
-        parser.error("--by-site option cannot be used with --i")
-    if args.exclude and not args.r:
-        parser.error("--exclude option can only be used with -r")
-    if args.regenerate and not args.r:
-        parser.error("--regenerate option can only be used with -r")
-    if args.povray and not args.screening_images and not args.relax_images and not args.screening_animations and not args.relax_animations: # and not args.render_image:
-        parser.error("--povray option can only be used with -screening-images or -relax-images or -screening-animations or -relax-animations")
-    if args.width_res is not None and not args.povray:
-        parser.error("--width-res can be specified only for povray rendering")
-
-    #Final check on values that are not already dealt with by argparse
-    if(args.view):
-        if args.view[0] != 's' and args.view[0] != 'r':
-            parser.error('-view must be followed by a string in the form [s/r][int] e.g. s3')
-        try:
-            i = int(args.view[1:])
-            if(i<0): raise RuntimeError("Index cannot be negative")
-        except:
-            parser.error('-view must be followed by a string in the form [s/r][int] e.g. s3 (with int >=0)')
-
-    if args.s is not None:
-        if len(args.s) != 0 and len(args.s) != 2:
-            parser.error('-s command requires either no argument (the default 5e-3 and 5e-2 will be used) or TWO arguments.')
-
-    return args
+#NOTE: dire che xsorb supporta ibrav
+#TODO: dictionary.get(keyname, value) #se non c'è la chiave ritorna value. Sostituire i vari if con questo
+#TODO (future): substitute settings.in and manual parsing with configparser, make the Settings class a dict. 
+#TODO (future): substitute the results dict with a pandas dataframe
 
 
 def main():
@@ -148,54 +33,42 @@ def main():
         print("No command provided. The program will now terminate.")
         return 1
     
-    args = cli_parse()
+    args = cli_parse_xsorb()
 
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
-    from settings import Settings
-    from io_utils import write_energies, restart_jobs
-    from calculations import generate, final_relax, saveas
+    from io_utils import write_results_to_file, restart_jobs, saveas
+    from calculations import generate, launch_screening, final_relax, regenerate_missing_sitelabels
     from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
     ############################################################################################
 
     #calc
     if(args.g):
-        generate(RUN = False, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+        generate(SAVEFIG=args.save_figs)
 
-    elif(args.s is not None):
-        if not args.s: args.s = hybrid_screening_thresholds
-        generate(RUN = True, etot_forc_conv = args.s, SAVEFIG=args.save_figs, saveas_format=args.saveas)
+    elif(args.s):
+        launch_screening(SAVEFIG=args.save_figs)
 
     elif(args.r):
-        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, indices=args.i, REGENERATE=args.regenerate, BY_SITE=args.by_site)
+        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, required_indices=args.i, REGENERATE=args.regenerate, BY_SITE=args.by_site)
 
     elif(args.restart):
-        restart_jobs(which='screening' if args.restart == 's' else 'relax')
+        restart_jobs(calc_type = 'SCREENING' if args.restart == 's' else 'RELAX')
+
+    elif(args.regenerate_labels):
+        regenerate_missing_sitelabels()
 
 
 
     #energies
-    elif(args.es):
-        try:
-            E_slab_mol = Settings().E_slab_mol
-        except: #option in case settings.in or some other input file is no more present.
-            E_slab_mol = []
-        write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening', TXT=args.txt)
-
-    elif(args.er):
-        try:
-            E_slab_mol = Settings().E_slab_mol
-        except: #option in case settings.in or some other input file is no more present.
-            E_slab_mol = []
-        if not os.path.isfile(screening_energies_filename):
-            write_energies(labels_filename, screening_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'screening')
-        write_energies(screening_energies_filename, relax_energies_filename, E_slab_mol=E_slab_mol, pwo_prefix=pw_files_prefix+'relax', TXT=args.txt)
+    elif(args.e):
+        write_results_to_file(TXT=args.txt)
     
     elif(args.plot_energies_scr):
-        plot_energy_evolution(which='screening')
+        plot_energy_evolution(calc_type = 'SCREENING')
     
     elif(args.plot_energies):
-        plot_energy_evolution(which='relax')
+        plot_energy_evolution(calc_type = 'RELAX')
 
 
     #visualization
@@ -203,23 +76,31 @@ def main():
         plot_adsorption_sites(ALL = args.sites_all)
 
     elif(args.screening_images):
-        config_images(which='screening', i_or_f = args.screening_images[0],  povray=args.povray, witdth_res=args.width_res)
+        config_images(calc_type='SCREENING', i_or_f = args.screening_images[0],
+                      rotations=args.rotation, povray=args.povray, 
+                      width_res=args.width_res, depth_cueing=args.depth_cueing, 
+                      center_molecule=args.center_mol, cut_vacuum=args.cut_vacuum)
 
     elif(args.relax_images):
-        config_images(which='relax', i_or_f = args.relax_images[0], povray=args.povray, witdth_res=args.width_res)
+        config_images(calc_type='RELAX', i_or_f = args.relax_images[0], 
+                      rotations=args.rotation, povray=args.povray, 
+                      width_res=args.width_res, depth_cueing=args.depth_cueing, 
+                      center_molecule=args.center_mol, cut_vacuum=args.cut_vacuum)
 
     #elif(args.render_image):
     #    config_images(which=args.render_image[0][0], index=args.render_image[0][1:], 
-    #        rotations = args.render_image[1], povray=args.povray, witdth_res=args.width_res)
+    #        rotations = args.render_image[1], povray=args.povray, width_res=args.width_res)
 
     elif(args.relax_animations or args.screening_animations):
-        relax_animations(povray=args.povray, witdth_res=args.width_res, SCREEN_ONLY=args.screening_animations)
+        relax_animations('SCREENING' if args.screening_animations else 'RELAX', 
+                         povray=args.povray, width_res=args.width_res, 
+                         depth_cueing=args.depth_cueing, cut_vacuum=args.cut_vacuum)
 
     elif(args.view):
-        view_config(which=args.view[0], index=int(args.view[1:]))
+        view_config('SCREENING' if args.view[0] == 's' else 'RELAX', in_or_out = args.view[1], index=int(args.view[2]))
 
     elif(args.savefiles is not None):
-        saveas(which=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])
+        saveas(calc_type=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])
 
 
 
