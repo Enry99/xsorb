@@ -169,7 +169,7 @@ class Molecule:
         if VERBOSE: print('All molecular configurations generated.') 
 
         if(save_image):
-            save_rotations_images(configs_ase, labels, VERBOSE)
+            save_rotations_images(configs_ase, labels, VERBOSE=True)
 
         return configs_ase, labels
 
@@ -187,12 +187,14 @@ def save_rotations_images(configs_ase : list, labels : list, figname : str = 'mo
 
     rows_fig = max(int(np.ceil(len(configs_ase)/5)), 1)
     cols_fig = max(int(np.ceil(len(configs_ase)/rows_fig)), 1)
-    fig = plt.figure(figsize=(10 * cols_fig / 5, 5 * rows_fig / 3))
+    fig = plt.figure(figsize=(3*10 * cols_fig / 5, 3*5 * rows_fig / 3))
     axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs_ase) + 1)]
 
     for i, conf in enumerate(configs_ase):
-        plot_atoms(conf, axes[i])
-        axes[i].set_title('({0}, {1}, {2})'.format(* labels[i][0].split(',')))
+        center = (conf.cell[:][0]/2 + conf.cell[:][1]/2)
+        conf.translate(center)
+        plot_atoms(conf, axes[i], show_unit_cell=2)
+        axes[i].set_title('({0}, {1}, {2})'.format(* labels[i].split(',')))
     fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
     fig.savefig(figname, dpi=800, bbox_inches='tight')
 
