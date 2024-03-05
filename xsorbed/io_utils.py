@@ -324,7 +324,7 @@ def restart_jobs(calc_type : str):
     '''
 
     from settings import Settings
-    settings = Settings()
+    settings = Settings(read_energies=False)
 
     existing_indices = _get_actually_present_outputs(settings.program, calc_type)
     indices_to_restart = [index for index in existing_indices if is_completed(settings.program, calc_type, 'RELAX_COMPLETED', index)]
@@ -355,7 +355,7 @@ def saveas(calc_type : str, i_or_f : str, saveas_format : str):
     - saveas_format: file format, e.g. xyz
     '''
 
-    settings = Settings()
+    settings = Settings(read_energies=False)
 
     if i_or_f == 'i':
         FILE_PATHS = IN_FILE_PATHS

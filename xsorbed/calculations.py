@@ -352,7 +352,7 @@ def generate(SAVEFIG=False):
     - SAVEFIG: save an image of the adsorption sites and of the molecular rotations when generating the configurations
     '''
     
-    settings=Settings()
+    settings=Settings(read_energies=False)
 
     all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG)
 
