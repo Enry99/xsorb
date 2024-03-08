@@ -327,7 +327,7 @@ def restart_jobs(calc_type : str):
     settings = Settings(read_energies=False)
 
     existing_indices = _get_actually_present_outputs(settings.program, calc_type)
-    indices_to_restart = [index for index in existing_indices if is_completed(settings.program, calc_type, 'RELAX_COMPLETED', index)]
+    indices_to_restart = [index for index in existing_indices if not is_completed(settings.program, calc_type, 'RELAX_COMPLETED', index)]
 
     #edit input files
     edit_files_for_restart(settings.program, calc_type, indices_to_restart)  
