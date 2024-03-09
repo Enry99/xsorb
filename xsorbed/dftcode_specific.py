@@ -32,7 +32,7 @@ UNITS_TO_EV_FACTOR = {
 OPTIMIZATION_COMPLETED_STRINGS = {
         #'VASP' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
         'VASP' : 'finalpos', #in vasprun.xml
-        'ESPRESSO': 'Final energy'
+        'ESPRESSO': 'Begin final coordinates'
 }
 
 
@@ -519,7 +519,6 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
                     if 'from_scratch' in line:
                         lines[i] = lines[i].replace('from_scratch','restart')
                         break
-                f.writelines(lines)
             with open(IN_FILE_PATHS[calc_type][program].format(index), 'w') as f:
                 f.writelines(lines)
 
@@ -540,7 +539,6 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
                         istart_found = True
                         break
                 if not istart_found: lines.append('ISTART = 1\n')
-                f.writelines(lines)
 
             with open(incar, 'w') as f:
                 f.writelines(lines)
