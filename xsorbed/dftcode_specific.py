@@ -29,18 +29,23 @@ UNITS_TO_EV_FACTOR = {
     'ESPRESSO': create_units('2006')['Rydberg']
 }
 
-COMPLETION_STRINGS = {
-    'RELAX_COMPLETED': {
+OPTIMIZATION_COMPLETED_STRINGS = {
         #'VASP' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
         'VASP' : 'finalpos', #in vasprun.xml
         'ESPRESSO': 'Final energy'
-    },
-
-    'SCF_NONCONVERGED': {
-        'VASP': 'abcdefgxyz', #TODO: vasp does not stop the relax if one scf does not converge, so not necessary
-        'ESPRESSO': 'convergence NOT achieved'
-    }
 }
+
+
+SCF_NONCONVERGED_STRINGS = {
+    'VASP': 'abcdefgxyz', #TODO: vasp does not stop the relax if one scf does not converge, so not necessary
+    'ESPRESSO': 'convergence NOT achieved'
+}
+
+SCF_CONVERGED_STRINGS = {
+    'VASP': 'abcdefgxyz', #TODO: update
+    'ESPRESSO': '!'
+}
+
 
 OUT_FILE_PATHS = {
     'SCREENING': {

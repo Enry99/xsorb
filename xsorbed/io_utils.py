@@ -13,7 +13,7 @@ import os, shutil
 import numpy as np
 import pandas as pd
 from ase.io import read, write
-from xsorbed.dftcode_specific import edit_files_for_restart, COMPLETION_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
+from xsorbed.dftcode_specific import edit_files_for_restart, OPTIMIZATION_COMPLETED_STRINGS, SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
 from xsorbed.settings import Settings
 from xsorbed.slab import Slab, mol_bonded_to_slab
 from xsorbed.molecule import Molecule
@@ -25,14 +25,13 @@ TEST = False #do not actually launch the jobs, simply prints the command
 
 
 #OK (code agnostic) 
-def is_completed(program : str, calc_type : str, completion_type : str, i_calc : int):
+def optimization_completed(program : str, calc_type : str, i_calc : int):
     '''
     Check if the given calculation is completed, reading the output file
 
     Args:
     - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
     - calc_type: 'SCREENING' or 'RELAX'
-    - completion_type: 'RELAX_COMPLETED' or 'SCF_NONCONVERGED'
     - i_calc: numeric index of the calculation
 
     Returns:
@@ -40,7 +39,7 @@ def is_completed(program : str, calc_type : str, completion_type : str, i_calc :
     '''
 
     filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
-    searchfor = COMPLETION_STRINGS[completion_type][program]
+    searchfor = OPTIMIZATION_COMPLETED_STRINGS[program]
     
     with open(filename, 'r') as f:
         file_content = f.readlines()
@@ -52,6 +51,37 @@ def is_completed(program : str, calc_type : str, completion_type : str, i_calc :
             break
     
     return completed
+
+def scf_not_converged(program : str, calc_type : str, i_calc : int):
+    '''
+    Check if the given calculation has not reached SCF convergence, reading the output file
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - i_calc: numeric index of the calculation
+
+    Returns:
+    True or False
+    '''
+
+    filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
+    searchfor = SCF_NONCONVERGED_STRINGS[program]
+    convergence_string = SCF_CONVERGED_STRINGS[program]
+    
+    with open(filename, 'r') as f:
+        file_content = f.readlines()
+
+    # the last one (conv or not conv) determines the status
+    nonconv = False
+    for line in file_content:
+        if searchfor in line:
+            nonconv = True
+            continue
+        if convergence_string in line: 
+            nonconv = False
+    
+    return nonconv
 
 #OK (code agnostic) 
 def _get_configurations_numbers():
@@ -139,8 +169,8 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
 
         if energy is not None:
             energy -= (E_slab_mol[0]+E_slab_mol[1])
-        relax_completed = is_completed(program, calc_type, 'RELAX_COMPLETED', index)
-        scf_nonconverged = is_completed(program, calc_type, 'SCF_NONCONVERGED', index)
+        relax_completed = optimization_completed(program, calc_type, index)
+        scf_nonconverged = scf_not_converged(program, calc_type, index)
 
         results['energies'].update({index : energy})
         results['relax_completed'].update({index : relax_completed})
@@ -327,7 +357,7 @@ def restart_jobs(calc_type : str):
     settings = Settings(read_energies=False)
 
     existing_indices = _get_actually_present_outputs(settings.program, calc_type)
-    indices_to_restart = [index for index in existing_indices if not is_completed(settings.program, calc_type, 'RELAX_COMPLETED', index)]
+    indices_to_restart = [index for index in existing_indices if not optimization_completed(settings.program, calc_type, index)]
 
     #edit input files
     edit_files_for_restart(settings.program, calc_type, indices_to_restart)  
