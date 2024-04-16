@@ -190,7 +190,8 @@ def save_rotations_images(configs_ase : list, labels : list, figname : str = 'mo
     fig = plt.figure(figsize=(3*10 * cols_fig / 5, 3*5 * rows_fig / 3))
     axes = [fig.add_subplot(rows_fig,cols_fig,i) for i in range(1,len(configs_ase) + 1)]
 
-    for i, conf in enumerate(configs_ase):
+    for i, atoms in enumerate(configs_ase):
+        conf = atoms.copy()
         center = (conf.cell[:][0]/2 + conf.cell[:][1]/2)
         conf.translate(center)
         plot_atoms(conf, axes[i], show_unit_cell=2)
