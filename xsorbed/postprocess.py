@@ -422,10 +422,10 @@ def view_config(calc_type : str, in_or_out : str, index : int):
     
     if in_or_out == 'in':
         FILE_PATHS = IN_FILE_PATHS
-    elif in_or_out == 'f':
+    elif in_or_out == 'out':
         FILE_PATHS = OUT_FILE_PATHS
     else:
-        raise ValueError(f'in or out not recongized. You provided {in_or_out}.')
+        raise ValueError(f'in or out not recognized. You provided {in_or_out}.')
 
     file = FILE_PATHS[calc_type][settings.program].format(index)
 
