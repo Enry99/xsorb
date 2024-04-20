@@ -97,7 +97,7 @@ def main():
                          depth_cueing=args.depth_cueing, cut_vacuum=args.cut_vacuum)
 
     elif(args.view):
-        view_config('SCREENING' if args.view[0] == 's' else 'RELAX', in_or_out = args.view[1], index=int(args.view[2]))
+        view_config('SCREENING' if args.view[0] == 's' else 'RELAX', index=int(args.view[1]), in_or_out = args.view[2])
 
     elif(args.savefiles is not None):
         saveas(calc_type=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])

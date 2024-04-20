@@ -54,7 +54,7 @@ def build_xsorb_parser():
     #main_visual.add_argument('-render-image', nargs=2, help='select which image to render and the rotations list for the camera (syntax: [s/r][index] [rotations], e.g. r12 -10z,-80x)')
     main_visual.add_argument('-screening-animations', action='store_true', help='save animations of the screening in gif (default) or mp4 format (for povray)')
     main_visual.add_argument('-relax-animations', action='store_true', help='save animations of the full relaxations (screen.+final) in gif (default) or mp4 format (for povray)')
-    main_visual.add_argument('-view', nargs=3, type=str, help='select which config to open with ase gui (syntax: [s/r] [in/out] [index], e.g. s in 3)')
+    main_visual.add_argument('-view', nargs=3, type=str, help='select which config to open with ase gui (syntax: [s/r] [index] [in/out], e.g. s 3 out).')
     main_visual.add_argument('-savefiles', nargs=3, help='save files in specific format (syntax: [format] [calc_type] [i/f], e.g. cif screening i or xyz relax f)')
     #optional flags
     visualization_group.add_argument('--povray', action='store_true', help='use povray to render images (if installed)')
@@ -126,12 +126,14 @@ def validate_xsorb_args(args : argparse.Namespace, parser : argparse.ArgumentPar
     # Final check on values that are not already dealt with by argparse
     if(args.view):
         if args.view[0] != 's' and args.view[0] != 'r':
-            parser.error('-view must be followed by a string in the form [s/r][int] e.g. s3')
+            parser.error('The first argument of -view must be either "s" or "r".')
+        if(args.view[2] != 'in' and args.view[2] != 'out'):
+            parser.error("The third argument of -view must be either 'in' or 'out'.")
         try:
             i = int(args.view[1:])
-            if(i<0): raise RuntimeError("Index cannot be negative")
+            if(i<0): raise ValueError("Index cannot be negative")
         except:
-            parser.error('-view must be followed by a string in the form [s/r][int] e.g. s3 (with int >=0)')
+            parser.error('The second argument of -view must be a non-negative integrer. The syntax is: [s/r] [index] [in/out], e.g. s 3 out')
 
 
 def cli_parse_xsorb():

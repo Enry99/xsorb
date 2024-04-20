@@ -408,7 +408,7 @@ def config_images(calc_type : str,
 
 
 #OK (code agnostic)
-def view_config(calc_type : str, in_or_out : str, index : int):
+def view_config(calc_type : str, index : int, in_or_out : str):
     '''
     View the selected config with ASE viewer
 
