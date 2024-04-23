@@ -25,7 +25,7 @@ from xsorbed import ase_custom
 
 TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs for the isolated fragments
 
-#OK (code agnostic)
+
 def generate_isolated_fragment(settings : Settings, fragment_dict : dict):
     """
     Generate isolated fragment from a molecule based on the provided settings and a dictionary for the fragment.
@@ -68,7 +68,7 @@ def generate_isolated_fragment(settings : Settings, fragment_dict : dict):
 
     return mol
     
-#OK (code agnostic)
+
 def generate_all_isolated_fragments(settings : Settings, fragments_dict : dict, VERBOSE : bool = True):
     
     structures = []
@@ -81,7 +81,7 @@ def generate_all_isolated_fragments(settings : Settings, fragments_dict : dict, 
 
     return structures
 
-#OK (code agnostic) 
+
 def write_fragments_inputs(settings : Settings, 
                            fragments_dict : dict, 
                            molecules : list,
@@ -152,7 +152,7 @@ def write_fragments_inputs(settings : Settings,
 
     return frag_list
 
-#OK (code agnostic) 
+
 def launch_fragments_jobs(program : str, jobscript : str, sbatch_command : str, fragments_list : list):
     '''
     Launch the calculations.
@@ -189,7 +189,7 @@ def launch_fragments_jobs(program : str, jobscript : str, sbatch_command : str, 
         else: os.system(launch_string)  #launches the jobscript in j_dir from j_dir
         os.chdir(main_dir) ####################
 
-#OK (code agnostic) 
+
 def isolated_fragments(RUN=False):
     """
     Generate isolated fragments and launch fragment jobs.

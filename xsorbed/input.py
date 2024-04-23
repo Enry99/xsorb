@@ -11,7 +11,7 @@ and return them as two dictionaries (script settings and dft program settings)
 
 from dftcode_specific import get_dftprogram_settings, SUPPORTED_PROGRAMS
 
-#OK (code agnostic)
+
 def _is_number(s : str):
     try:
         float(s)
@@ -19,7 +19,7 @@ def _is_number(s : str):
     except ValueError:
         return False
 
-#OK (code agnostic)
+
 def _read_card(lines : list, CONVERT : bool = False):
     '''
     Read a card with Espresso-style formatting, returning a dictionary with the entries
@@ -55,7 +55,7 @@ def _read_card(lines : list, CONVERT : bool = False):
 
     return  card_dict
 
-#OK (code agnostic)
+
 def read_input_file(filename: str):
     '''
     Parse the settings.in file, returning a dictionary with the STRUCTURE settings, 

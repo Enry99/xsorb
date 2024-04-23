@@ -13,7 +13,7 @@ import numpy as np
 from xsorbed import input
 from xsorbed.dftcode_specific import UNITS_TO_EV_FACTOR, HYBRID_SCREENING_THRESHOLDS
 
-#OK (code agnostic) 
+
 class Settings:
     '''
     Class to read the settings.in and store all the parameters for the adsorption structures generation 

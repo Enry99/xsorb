@@ -22,7 +22,7 @@ from xsorbed.common_definitions import *
 from xsorbed import ase_custom
 
 
-#OK (code agnostic)
+
 def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBOSE : bool = False):
     '''
     Generate all adsorption structures considering the combinations of 
@@ -119,7 +119,7 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
 
     return all_mol_on_slab_configs_ase, full_labels
 
-#OK (code agnostic)
+
 def write_labels_csvfile(full_labels : list, labels_filename : str):
     '''
     Write the labels of the configurations to a csv file.
@@ -133,7 +133,7 @@ def write_labels_csvfile(full_labels : list, labels_filename : str):
         for i, label in enumerate(full_labels):
             csvfile.write(f'{i},{label}\n')
 
-#OK (code agnostic)
+
 def regenerate_missing_sitelabels():
     '''
     Re-generate the site_labels.csv file if it was accidentally deleted, using the info from settings.in
@@ -145,7 +145,7 @@ def regenerate_missing_sitelabels():
 
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
-#OK (code agnostic)  
+ 
 def write_inputs(settings : Settings, 
                  all_mol_on_slab_configs_ase : list, 
                  calc_indices : list,
@@ -206,7 +206,7 @@ def write_inputs(settings : Settings,
 
     return written_indices
 
-#OK (code agnostic) 
+
 def obtain_fullrelax_indices(settings : Settings,
                              n_configs: int = None, 
                              threshold : float = None, 
@@ -290,7 +290,7 @@ def obtain_fullrelax_indices(settings : Settings,
 
     return calculations_indices
 
-#OK (code agnostic) 
+
 def obtain_fullrelax_structures(settings : Settings, calculations_indices : list, REGENERATE : bool = False):
     '''
     Returns a list with the adsorption configurations for the full relax, either reading the final coordinates
@@ -342,7 +342,7 @@ def obtain_fullrelax_structures(settings : Settings, calculations_indices : list
 
     return all_mol_on_slab_configs_ase
 
-#OK (code agnostic)  
+ 
 def generate(SAVEFIG=False):
     '''
     Generates adsorption configurations and writes the inputs, using the settings for the final relaxations.
@@ -367,7 +367,7 @@ def generate(SAVEFIG=False):
                  OVERRIDE_SETTINGS=False,
                  INTERACTIVE=True)
 
-#OK (code agnostic)   
+  
 def launch_screening(SAVEFIG : bool = False):
     '''
     Generates adsorption configurations, writes inputs and launches calculations for the preliminary screening.
@@ -394,7 +394,7 @@ def launch_screening(SAVEFIG : bool = False):
                 sbatch_command=settings.sbatch_command,
                 indices_list=written_indices)    
 
-#OK (code agnostic)  
+ 
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, REGENERATE=False, BY_SITE = False):
     '''
     Reads/generates adsorption configurations, writes inputs and launches calculations for the final relax.

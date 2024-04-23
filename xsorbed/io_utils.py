@@ -24,7 +24,7 @@ import ase_custom
 TEST = False #do not actually launch the jobs, simply prints the command
 
 
-#OK (code agnostic) 
+
 def optimization_completed(program : str, calc_type : str, i_calc : int):
     '''
     Check if the given calculation is completed, reading the output file
@@ -83,7 +83,7 @@ def scf_not_converged(program : str, calc_type : str, i_calc : int):
     
     return nonconv
 
-#OK (code agnostic) 
+
 def _get_configurations_numbers():
     '''
     Function to get the list of indices from the site_labels.csv file
@@ -94,7 +94,7 @@ def _get_configurations_numbers():
     site_labels = np.genfromtxt(labels_filename, delimiter=',', names=True, dtype=int)
     return site_labels['Label']
 
-#OK (code agnostic) 
+
 def _get_actually_present_outputs(program : str, calc_type : str):
     '''
     Function to get the list of indices of the outputs that are actually present.
@@ -111,7 +111,7 @@ def _get_actually_present_outputs(program : str, calc_type : str):
 
     return existing_indices
 
-#OK (code agnostic) 
+
 def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bool = False):
     '''
     Returns the TOTAL energy for a given configuration, or None if not available
@@ -135,7 +135,7 @@ def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bo
     except:
         return None
 
-#OK (code agnostic) 
+
 def get_calculations_results(program : str, calc_type : str, E_slab_mol : list = [0,0], full_evolution : bool = False, VERBOSE : bool =True):
     '''
     Returns a dictionary in the format
@@ -182,7 +182,7 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
     
     return results
 
-#OK (code agnostic) 
+
 def write_results_to_file(TXT=False):
     '''
     Function to write the calculations results to a csv file.
@@ -287,7 +287,7 @@ def write_results_to_file(TXT=False):
 
     print('Results file written.')
 
-#OK (code agnostic) 
+
 def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices : list):
     '''
     Reads output file and returns True if the molecule is bonded to the surface
@@ -306,7 +306,7 @@ def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices 
 
     return mol_bonded_to_slab(slab, mol)
 
-#OK (code agnostic) 
+
 def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command : str, indices_list : list):
     '''
     Launch the calculations.
@@ -344,7 +344,7 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
         else: os.system(launch_string)  #launches the jobscript in j_dir from j_dir
         os.chdir(main_dir) ####################
 
-#OK (code agnostic) 
+
 def restart_jobs(calc_type : str):
     '''
     Restart the uncompleted calculations
@@ -374,7 +374,7 @@ def restart_jobs(calc_type : str):
 
         os.chdir(main_dir)
 
-#OK (code agnostic)
+
 def saveas(calc_type : str, i_or_f : str, saveas_format : str):
     '''
     Save all the configurations in a different format, e.g. xyz or cif.

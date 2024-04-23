@@ -21,7 +21,7 @@ from xsorbed.io_utils import get_calculations_results, _get_configurations_numbe
 from xsorbed.dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
 from xsorbed.common_definitions import *
 
-#OK (code agnostic)
+
 def plot_adsorption_sites(ALL : bool = False):
     '''
     Plot an image of the surface with the adsorption sites, with parameters
@@ -45,7 +45,7 @@ def plot_adsorption_sites(ALL : bool = False):
                                figname = 'adsorption_sites_all.png' if ALL else 'adsorption_sites.png',
                                VERBOSE = True)
 
-#OK (code agnostic)
+
 def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : bool = False):
     
     settings = Settings()
@@ -126,7 +126,7 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
 
     return configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH, CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices
 
-#OK (code agnostic)
+
 def get_centered_mol_and_slab(mol : Atoms, slab : Atoms):
     """
     Get the centered molecule and slab.
@@ -180,7 +180,7 @@ def get_centered_mol_and_slab(mol : Atoms, slab : Atoms):
 
     return mol, slab, mol_center
 
-#OK (code agnostic)
+
 def get_decorated_structures(configs : list, 
                              mol_atoms_indices : list, 
                              slab_atoms_indices : list,
@@ -271,7 +271,7 @@ def get_decorated_structures(configs : list,
 
     return newconfigs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list
 
-#OK (code agnostic)
+
 def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, povray : bool, results : dict):
 
     from matplotlib import pyplot as plt
@@ -308,7 +308,7 @@ def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, po
         axes[i].set_yticks([])
     fig.savefig(f"{calc_type.lower()}_overview{'_pov' if povray else ''}.png", dpi=700, bbox_inches='tight')
 
-#OK (code agnostic)
+
 def config_images(calc_type : str, 
                   i_or_f = 'f', 
                   povray : bool = False, 
@@ -407,7 +407,7 @@ def config_images(calc_type : str,
     print(f'All images saved in {figures_dir}.')
 
 
-#OK (code agnostic)
+
 def view_config(calc_type : str, index : int, in_or_out : str):
     '''
     View the selected config with ASE viewer
@@ -436,7 +436,7 @@ def view_config(calc_type : str, index : int, in_or_out : str):
     except:
         print('It was not possible to read the requested configuration.')
             
-#OK (code agnostic)
+
 def relax_animations(calc_type : str,
                      povray : bool = False, 
                      width_res : int = None, 
@@ -541,7 +541,7 @@ def relax_animations(calc_type : str,
 
     print(f'All animations saved to {savedir}.')
 
-#OK (code agnostic)
+
 def plot_energy_evolution(calc_type : str):
 
     from matplotlib import pyplot as plt

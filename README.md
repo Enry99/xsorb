@@ -1,7 +1,7 @@
 # Xsorb
 
 xSorb is a lightweight, flexible and user-friendly tool to generate and run ab initio calculations of molecules adsorbed over surfaces. 
-Relying on Quantum Espresso for ab initio calculations and on two well-established Python libraries (ASE and Pymatgen) to generate the structures, it allows to produce and explore a large number of adsorption configurations of a molecule on a surface, finally identifying the most stable configuration  and computing the associated adsorption energy.
+Relying on either Quantum Espresso or VASP for ab initio calculations and on two well-established Python libraries (ASE and Pymatgen) to generate the structures, it allows to produce and explore a large number of adsorption configurations of a molecule on a surface, finally identifying the most stable configuration  and computing the associated adsorption energy.
 
 # Installation
 
@@ -19,7 +19,7 @@ to add the executable in the `PATH` variable. With this operation, the user can 
 
 `python3 -m pip install -r requirements.txt`
 
-Xsorb is interfaced with Quantum Espresso to perform the DFT calculations. It is, therefore, necessary to compile and install the `pw.x` executable before launching the calculations.
+Xsorb is interfaced with Quantum Espresso and VASP to perform the DFT calculations. It is, therefore, necessary to compile and install the corresponding executable before launching the calculations.
 
 After the installation, the program works through a command-line interface (CLI) by running:  
 
