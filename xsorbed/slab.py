@@ -21,6 +21,7 @@ from matplotlib import pyplot as plt
 import matplotlib.patheffects as PathEffects
 import numpy as np
 from ase.constraints import FixCartesian
+from ase.build import make_supercell
 
 from xsorbed import ase_custom
 
@@ -274,7 +275,7 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
 
     #Make replicas to conisder the pbcs
     #TODO: in the future, change this with neighbours, instead of replicating the cell
-    slab_rep = slab * (3,3,1)
+    slab_rep = make_supercell(slab, [[3,0,0], [0,3,0], [0,0,1]], wrap=False)
     point = slab.cell[:][0] + slab.cell[:][1]
     slab_rep.translate(-point) 
 
