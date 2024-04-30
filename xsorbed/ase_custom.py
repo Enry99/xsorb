@@ -1062,57 +1062,56 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
 
         
         # Bands
-        try:
-            kpts = None
-            kpoints_warning = "Number of k-points >= 100: " + \
-                            "set verbosity='high' to print the bands."
+        kpts = None
+        kpoints_warning = "Number of k-points >= 100: " + \
+                          "set verbosity='high' to print the bands."
 
-            for bands_index in indexes[_PW_BANDS] + indexes[_PW_BANDSTRUCTURE]:
-                if image_index < bands_index < next_index:
-                    bands_index += 2
-
-                    if pwo_lines[bands_index].strip() == kpoints_warning:
-                        continue
-
-                    assert ibzkpts is not None
-                    spin, bands, eigenvalues = 0, [], [[], []]
-
-                    while True:
-                        L = pwo_lines[bands_index].replace('-', ' -').split()
-                        if len(L) == 0:
-                            if len(bands) > 0:
-                                eigenvalues[spin].append(bands)
-                                bands = []
-                        elif L == ['occupation', 'numbers']:
-                            # Skip the lines with the occupation numbers
-                            bands_index += len(eigenvalues[spin][0]) // 8 + 1
-                        elif L[0] == 'k' and L[1].startswith('='):
-                            pass
-                        elif 'SPIN' in L:
-                            if 'DOWN' in L:
-                                spin += 1
-                        else:
-                            try:
-                                bands.extend(map(float, L))
-                            except ValueError:
-                                break
+        for bands_index in indexes[_PW_BANDS] + indexes[_PW_BANDSTRUCTURE]:
+            if image_index < bands_index < next_index:
+                bands_index += 1
+                # skip over the lines with DFT+U occupation matrices
+                if 'enter write_ns' in pwo_lines[bands_index]:
+                    while 'exit write_ns' not in pwo_lines[bands_index]:
                         bands_index += 1
+                bands_index += 1
 
-                    if spin == 1:
-                        assert len(eigenvalues[0]) == len(eigenvalues[1])
-                    assert len(eigenvalues[0]) == len(ibzkpts), \
-                        (np.shape(eigenvalues), len(ibzkpts))
+                if pwo_lines[bands_index].strip() == kpoints_warning:
+                    continue
 
-                    kpts = []
-                    for s in range(spin + 1):
-                        for w, k, e in zip(weights, ibzkpts, eigenvalues[s]):
-                            kpt = SinglePointKPoint(w, s, k, eps_n=e)
-                            kpts.append(kpt)
+                assert ibzkpts is not None
+                spin, bands, eigenvalues = 0, [], [[], []]
 
-            kpts_read = True
-        except AssertionError:
-            kpts_read = False
-            print("Warning: failed to read bands from file.")
+                while True:
+                    L = pwo_lines[bands_index].replace('-', ' -').split()
+                    if len(L) == 0:
+                        if len(bands) > 0:
+                            eigenvalues[spin].append(bands)
+                            bands = []
+                    elif L == ['occupation', 'numbers']:
+                        # Skip the lines with the occupation numbers
+                        bands_index += len(eigenvalues[spin][0]) // 8 + 1
+                    elif L[0] == 'k' and L[1].startswith('='):
+                        pass
+                    elif 'SPIN' in L:
+                        if 'DOWN' in L:
+                            spin += 1
+                    else:
+                        try:
+                            bands.extend(map(float, L))
+                        except ValueError:
+                            break
+                    bands_index += 1
+
+                if spin == 1:
+                    assert len(eigenvalues[0]) == len(eigenvalues[1])
+                assert len(eigenvalues[0]) == len(ibzkpts), \
+                    (np.shape(eigenvalues), len(ibzkpts))
+
+                kpts = []
+                for s in range(spin + 1):
+                    for w, k, e in zip(weights, ibzkpts, eigenvalues[s]):
+                        kpt = SinglePointKPoint(w, s, k, eps_n=e)
+                        kpts.append(kpt)
 
         # Put everything together
         #
@@ -1123,8 +1122,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
                                         forces=forces, stress=stress,
                                         magmoms=magmoms, efermi=efermi,
                                         ibzkpts=ibzkpts)
-        if kpts_read:
-            calc.kpts = kpts
+        calc.kpts = kpts
         structure.calc = calc
 
         yield structure
