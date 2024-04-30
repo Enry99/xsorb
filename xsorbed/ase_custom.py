@@ -592,6 +592,8 @@ def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
                         mass=Atom(label_to_symbol(label)).mass,
                         pseudo=pseudo))
 
+        if '' in atoms.get_custom_labels():
+            atoms.set_custom_labels(atoms.symbols)          
         for atom, label in zip(atoms, atoms.get_custom_labels()):
 
             # only inclued mask if something is fixed
