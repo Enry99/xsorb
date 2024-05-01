@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from ase.atoms import Atoms, default
-from ase.io.espresso import create_units,_PW_START,_PW_END,_PW_CELL,_PW_POS,_PW_MAGMOM,_PW_FORCE,\
-    _PW_TOTEN,_PW_STRESS,_PW_FERMI,_PW_HIGHEST_OCCUPIED,_PW_HIGHEST_OCCUPIED_LOWEST_FREE,_PW_KPTS,_PW_BANDS,_PW_BANDSTRUCTURE
-from ase.io.espresso import *
-
-
+from ase.constraints import FixAtoms, FixCartesian, FixScaled
+from ase.io.espresso import create_units,KEYS,_PW_START,_PW_END,_PW_CELL,_PW_POS,_PW_MAGMOM,_PW_FORCE,\
+    _PW_TOTEN,_PW_STRESS,_PW_FERMI,_PW_HIGHEST_OCCUPIED,_PW_HIGHEST_OCCUPIED_LOWEST_FREE,_PW_KPTS,_PW_BANDS,_PW_BANDSTRUCTURE,\
+    iofunction,read_fortran_namelist,get_cell_parameters,get_atomic_species,get_atomic_positions,label_to_symbol,get_valence_electrons,\
+    ibrav_to_cell,Namelist,SinglePointKPoint,cell_to_ibrav,ibrav_to_cell,kspacing_to_grid,kpts2sizeandoffsets,atomic_numbers,\
+    OrderedDict,warnings,kpoint_convert,SinglePointDFTCalculator,kpts2ndarray,parse_position_line,re,os
 
 import copy
 import numpy as np
@@ -179,8 +180,11 @@ class Atoms_custom(Atoms):
                 calculator = atoms.calc
             if info is None:
                 info = copy.deepcopy(atoms.info)
-            if custom_labels is None and atoms.has('custom_labels'):
-                custom_labels = atoms.get_custom_labels()
+            if custom_labels is None:
+                if atoms.has('custom_labels'):
+                    custom_labels = atoms.get_custom_labels()
+                else:
+                    custom_labels = atoms.get_chemical_symbols()
 
         self.arrays = {}
 
@@ -300,7 +304,7 @@ class Atoms_custom(Atoms):
         #add constraints from the second
         othercp = other.copy()
         for constr in othercp.constraints:
-            if isinstance(constr, FixCartesian):  
+            if isinstance(constr, FixCartesian) or isinstance(constr, FixScaled):  
                 constr.a += n1         
                 self.constraints += [constr]
 
@@ -591,9 +595,7 @@ def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
                         label=label, 
                         mass=Atom(label_to_symbol(label)).mass,
                         pseudo=pseudo))
-
-        if '' in atoms.get_custom_labels():
-            atoms.set_custom_labels(atoms.symbols)          
+         
         for atom, label in zip(atoms, atoms.get_custom_labels()):
 
             # only inclued mask if something is fixed
