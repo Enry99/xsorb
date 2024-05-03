@@ -118,7 +118,7 @@ def read_input_file(filename: str):
                 
                 #begin card
                 if line.strip()[0] == '&':
-                    block_name = line.split('&')[1].strip()
+                    block_name = line.split('&')[1].strip().upper()
                     in_card = True
                     continue
 
