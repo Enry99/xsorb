@@ -105,37 +105,52 @@ def parse_espresso_settings(block_str_list : list):
     #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, 
     #as they are read from the input structures
     #NOTE 2: This code does not yet support the following Espresso blocks:
-    #OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS, HUBBARD
+    #OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS
+    #NOTE 3: Mass info from pseudopotentials is not kept, and the default mass of each element as defined in ASE is used.
     
     from ase.io.espresso import read_fortran_namelist    
     
     # parse namelist section and extract remaining lines
     dftprogram_settings_dict, card_lines = read_fortran_namelist(block_str_list)
 
-    #parse ATOMIC_SPECIES and K_POINTS
+    #parse ATOMIC_SPECIES, K_POINTS and HUBBARD
+    hubbard_corrections = False
     for i, line in enumerate(card_lines):
         if('ATOMIC_SPECIES' in line.upper()):
             atomic_species_index = i
         if('K_POINTS' in line.upper()):
             k_points_index = i
+        if('HUBBARD' in line.upper()):
+            hubbard_index = i
+            hubbard_corrections = True
+
+    def end_of_card(card, line):
+
+        cards_list = ['ATOMIC_SPECIES',
+                      'ATOMIC_POSITIONS',
+                      'K_POINTS',
+                      'ADDITIONAL_K_POINTS',
+                      'CELL_PARAMETERS',
+                      'CONSTRAINTS',
+                      'OCCUPATIONS',
+                      'ATOMIC_VELOCITIES',
+                      'ATOMIC_FORCES',
+                      'SOLVENTS',
+                      'HUBBARD']
+
+        for other_card in cards_list:
+            if other_card == card.upper(): continue
+            if other_card in line.upper(): return True
+        
+        return False
 
     #ATOMIC_SPECIES
-    i = atomic_species_index+1
-
     dftprogram_settings_dict['pseudopotentials'] = {}
+    i = atomic_species_index+1
     while i < len(card_lines):
         line = card_lines[i]
         
-        if ('ATOMIC_POSITIONS' in line.upper() or 
-        'K_POINTS' in line.upper() or 
-        'ADDITIONAL_K_POINTS' in line.upper() or 
-        'CELL_PARAMETERS' in line.upper() or 
-        'CONSTRAINTS' in line.upper() or 
-        'OCCUPATIONS' in line.upper() or 
-        'ATOMIC_VELOCITIES' in line.upper() or 
-        'ATOMIC_FORCES' in line.upper() or 
-        'SOLVENTS' in line.upper() or 
-        'HUBBARD' in line.upper()): break       
+        if end_of_card(card='ATOMIC_SPECIES', line=line): break       
         
         element, mass, pseudo = line.split()
         dftprogram_settings_dict['pseudopotentials'].update({element : pseudo})
@@ -149,6 +164,20 @@ def parse_espresso_settings(block_str_list : list):
         line = card_lines[k_points_index+1]
         dftprogram_settings_dict['kpts'] = list(map(int, line.split()[:3]))
         dftprogram_settings_dict['koffset'] = list(map(int, line.split()[3:]))
+
+
+    dftprogram_settings_dict['additional_cards'] = []
+
+    #HUBBARD
+    if hubbard_corrections:
+        i = hubbard_index
+        while i < len(card_lines):
+            line = card_lines[i]
+            
+            if end_of_card(card='HUBBARD', line=line): break       
+            
+            dftprogram_settings_dict['additional_cards'] += [line]    
+            i+=1
 
     return dftprogram_settings_dict
 
@@ -236,7 +265,7 @@ def override_settings(settings, calc_type : str):
             settings.dftprogram_settings_dict['control'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
 
             if 'ions' not in settings.dftprogram_settings_dict: settings.dftprogram_settings_dict['ions'] = {}
-            settings.dftprogram_settings_dict['ions'].update({'upscale': 1})
+            settings.dftprogram_settings_dict['ions'].update({'upscale': 1}) #TODO: lasciarlo scegliere all'utente
 
 
         elif settings.program == 'VASP':
@@ -440,7 +469,8 @@ def Calculator(settings, label : str, atoms, directory : str):
                         pseudopotentials=settings.dftprogram_settings_dict['pseudopotentials'],
                         kpts=settings.dftprogram_settings_dict["kpts"],
                         koffset=settings.dftprogram_settings_dict["koffset"],
-                        input_data=settings.dftprogram_settings_dict)
+                        input_data=settings.dftprogram_settings_dict,
+                        additional_cards=settings.dftprogram_settings_dict['additional_cards'])
                             
     elif settings.program == 'VASP':
         

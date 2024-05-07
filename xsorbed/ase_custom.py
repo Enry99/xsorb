@@ -436,7 +436,8 @@ def read_espresso_in_custom(fileobj):
 #This simply passes through the pseudopotentials, leaving the order unchanged, and keeps the labels of the atoms
 def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
                       kspacing=None, kpts=None, koffset=(0, 0, 0),
-                      crystal_coordinates=False, **kwargs):
+                      crystal_coordinates=False, additional_cards=None,
+                      **kwargs):
     """
     Create an input file for pw.x.
 
@@ -701,6 +702,15 @@ def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
                    '{cell[2][0]:.14f} {cell[2][1]:.14f} {cell[2][2]:.14f}\n'
                    ''.format(cell=atoms.cell))
         pwi.append('\n')
+
+
+    if additional_cards:
+        if isinstance(additional_cards, list):
+            additional_cards = "\n".join(additional_cards)
+            additional_cards += "\n\n"
+
+        pwi.append(additional_cards)
+
 
     # Positions - already constructed, but must appear after namelist
     if crystal_coordinates:
