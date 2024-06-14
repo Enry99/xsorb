@@ -79,11 +79,22 @@ class Slab:
         if sort_atoms_by_z:
             self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])  #sort atoms by height (from higher to lower)
 
+        
         #create pymatgen version of the slab, and initialize the AdsorbateSiteFinder
-        slabcopy = self.slab_ase.copy() 
-        del slabcopy.constraints #to suppress the warning about constraints not supported in pymatgen
-        self.slab_pymat = AseAtomsAdaptor.get_structure(slabcopy)
-        self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height)
+        
+        # First, check if the cell is defined according to the right-handed rule, if not, swap the first two vectors
+        # so that the surface normal is found correctly by AdsorbateSiteFinder. Otherwise, the sites will be found on the bottom surface.
+        # This also ensures that when using VASP it does not complain.
+        cell = self.slab_ase.cell
+        if np.dot(np.cross(cell[0], cell[1]), cell[2]) < 0:
+            self.slab_ase.set_cell(cell[[1, 0, 2], :])
+
+        import warnings
+        with warnings.catch_warnings(): #to suppress the warning about constraints not supported in pymatgen
+            warnings.simplefilter("ignore")
+            self.slab_pymat = AseAtomsAdaptor.get_structure(self.slab_ase)
+
+        self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height) 
 
 
     def _find_atom_indices_fixed_layers(self, layers_threshold : float, fixed_layers_slab : list):
