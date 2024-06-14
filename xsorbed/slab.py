@@ -262,14 +262,12 @@ def closest_pair(slab : Atoms, mol: Atoms):
     - slab: Atoms object for the slab
     - mol: Atoms object for the molecule 
     '''
-    distances = []
-    for mol_atom in mol:
-        for slab_atom in slab:
-            distances.append(np.linalg.norm(mol_atom.position - slab_atom.position))
-    mindist = min(distances)
+    from ase.geometry import get_distances
 
-    i_min = distances.index(mindist)
-    i_mol, j_slab = ( i_min // len(slab), i_min % len(slab) )
+    dist_matrix = get_distances(mol.positions, slab.positions, slab.cell, pbc=True)[1]
+
+    i_mol, j_slab = np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
+    mindist = dist_matrix[i_mol, j_slab]
 
     return i_mol, j_slab, mindist
 
@@ -285,23 +283,17 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
     - min_distance: minimum required distance along z
     '''
 
-    #Make replicas to conisder the pbcs
-    #TODO: in the future, change this with neighbours, instead of replicating the cell
-    slab_rep = make_supercell(slab, [[3,0,0], [0,3,0], [0,0,1]], wrap=False)
-    point = slab.cell[:][0] + slab.cell[:][1]
-    slab_rep.translate(-point) 
-
     dz_tot = 0
     molcopy = mol.copy()
     while(True):
         #First, find the closest slab-mol atoms pair
-        i_mol, j_slab, _ = closest_pair(slab_rep, molcopy)
+        i_mol, j_slab, _ = closest_pair(slab, molcopy)
 
         #Find the z coordinates of the closest atoms pair, and half their covalent distance
-        half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab_rep[j_slab].symbol]] \
+        half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
                                     + covalent_radii[atomic_numbers[molcopy[i_mol].symbol]])
         zmol = molcopy[i_mol].position[2]
-        zslab = slab_rep[j_slab].position[2]
+        zslab = slab[j_slab].position[2]
 
         #Calculate the distance required to enforce the minimum distance
         necessary_min_z_dist = max(min_z_distance_from_surf, half_covalent_distance)
