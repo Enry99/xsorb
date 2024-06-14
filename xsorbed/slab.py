@@ -235,8 +235,9 @@ class Slab:
                 #print("The molecule was translated further by {0} to enforce minimum distance.".format(dz))
                 final_deltaz += dz
                 
-
-            adsorption_structures.append(mol + self.slab_ase if mol_before_slab else self.slab_ase + mol)
+            struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
+            struct.cell = self.slab_ase.cell
+            adsorption_structures.append(struct)
             full_labels.append(rotation_label+site_label+'{:.3f}'.format(final_deltaz))
 
         return adsorption_structures, full_labels
