@@ -21,11 +21,11 @@ from matplotlib import pyplot as plt
 import matplotlib.patheffects as PathEffects
 import numpy as np
 from ase.constraints import FixCartesian
-from ase.build import make_supercell
+from ase.geometry import get_distances
 
 from xsorbed import ase_custom
 
-#NOTE: ALL MODIFICATIONS DONE
+
 class Slab:
     '''
         Class to read slab from file (e.g. Quantum ESPRESSO pwi/pwo or VASP POSCAR),
@@ -262,7 +262,6 @@ def closest_pair(slab : Atoms, mol: Atoms):
     - slab: Atoms object for the slab
     - mol: Atoms object for the molecule 
     '''
-    from ase.geometry import get_distances
 
     dist_matrix = get_distances(mol.positions, slab.positions, slab.cell, pbc=True)[1]
 

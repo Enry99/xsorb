@@ -13,8 +13,6 @@ from ase.calculators.vasp import Vasp
 from xsorbed.common_definitions import *
 
 #TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
-#TODO: Check that ase-sort.dat is used to sort the files back in the initial order when reading the outputs.
-#It does not work when reading poscar, it should work with outcar/vasprun.xml
 
 SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO']
 

@@ -19,7 +19,7 @@ from ase.constraints import FixCartesian
 
 from xsorbed import ase_custom 
 
-#NOTE: ALL MODIFICATIONS DONE
+
 class Molecule:
     '''
         Class to read molecule from file (e.g. Quantum ESPRESSO pwi/pwo or VASP POSCAR),
