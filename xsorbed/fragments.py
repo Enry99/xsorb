@@ -112,7 +112,7 @@ def write_fragments_inputs(settings : Settings,
         os.makedirs(outdir, exist_ok=True)
 
         if INTERACTIVE:
-            if os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name)): 
+            if os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program['RELAX']].format(fragment_name)): 
                 print(f'{fragment_name} output file already present, possibly from a running calculation. You can decide to re-calculate it or skip it.')        
                 while True:
                     answer = input('Re-calculate? ("y" = yes, "n" = no): ')
@@ -121,7 +121,7 @@ def write_fragments_inputs(settings : Settings,
                     else: print('Value not recognized. Try again.')
                 if 'n' in answer: continue
 
-            if os.path.exists(FRAGMENTS_IN_FILE_PATHS[settings.program].format(fragment_name)):
+            if os.path.exists(FRAGMENTS_IN_FILE_PATHS[settings.program['RELAX']].format(fragment_name)):
                 print(f'{fragment_name} input file already present.')
                 while True:
                     answer = input('Overwrite? ("y" = yes, "n" = no): ')
@@ -184,7 +184,7 @@ def launch_fragments_jobs(program : str, jobscript : str, sbatch_command : str, 
             f.writelines(lines)
 
 
-        launch_string = f"{sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX_FRAGS[program].format(fragment)}"
+        launch_string = f"{sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX_FRAGS[program['RELAX']].format(fragment)}"
         if(TEST): print(launch_string)
         else: os.system(launch_string)  #launches the jobscript in j_dir from j_dir
         os.chdir(main_dir) ####################
@@ -207,7 +207,7 @@ def isolated_fragments(RUN=False):
 
     frag_list = write_fragments_inputs(settings, fragments_dict, molecules, OVERRIDE_SETTINGS=True, INTERACTIVE=True)
 
-    if RUN: launch_fragments_jobs(settings.program, settings.jobscript, settings.sbatch_command, frag_list)
+    if RUN: launch_fragments_jobs(settings.program['RELAX'], settings.jobscript, settings.sbatch_command, frag_list)
 
 
 
@@ -293,12 +293,12 @@ def setup_fragments_screening(RUN = False):
 
         frag_initial = generate_isolated_fragment(settings, fragment_dict)
         
-        if not os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name)):
+        if not os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program['RELAX']].format(fragment_name)):
             print(f"Isolated {fragment_name} was not relaxed. Its initial structure will be used.")
             ase_custom.write_xyz_custom(f'{outdir}/{fragment_name}.xyz', frag_initial.mol_ase)
             fragment_filename = f'{outdir}/{fragment_name}.xyz'
         else:
-            fragment_filename = FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name)
+            fragment_filename = FRAGMENTS_OUT_FILE_PATHS[settings.program['RELAX']].format(fragment_name)
     
 
 
@@ -332,7 +332,7 @@ def setup_fragments_screening(RUN = False):
 
                                 dft_settings_override=fragment_dict.get("dft_settings_override", None)
                                 )
-            settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict, program=settings.program)  
+            settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict, program=settings.program['RELAX'])  
             with open(f'{outdir}/settings.in', 'w') as f:
                 f.writelines(settings_lines)
 
@@ -390,7 +390,7 @@ def get_diss_energies():
 
     datafile = pd.read_csv(labels_filename, index_col=0)
     settings = Settings(VERBOSE=False)
-    results_mol = get_calculations_results(settings.program, 'RELAX', [0,0])
+    results_mol = get_calculations_results(settings.program['RELAX'], 'RELAX', [0,0])
     energies_mol = []
     indices_mol = []
     for key, val in results_mol['energies'].items():
@@ -412,7 +412,7 @@ def get_diss_energies():
         outdir = f'fragments/{fragment_name}'
         os.chdir(outdir)
         datafile = pd.read_csv(labels_filename, index_col=0)
-        results_mol = get_calculations_results(settings.program, 'RELAX', [0,0])
+        results_mol = get_calculations_results(settings.program['RELAX'], 'RELAX', [0,0])
         energies_mol = []
         indices_mol = []
         for key, val in results_mol['energies'].items():

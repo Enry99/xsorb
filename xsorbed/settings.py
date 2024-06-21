@@ -36,7 +36,7 @@ class Settings:
         script_settings_dict, self.dftprogram_settings_dict, program = input.read_input_file(settings_filename)
 
         #set the dft program
-        self.program = program
+        self.program = {'SCREENING': 'ML' if self.ml_screening else program, 'RELAX': program}
     
         #check for existence of the main cards for the adsorption structure generation
         cards = ['INPUT','STRUCTURE']
@@ -58,6 +58,8 @@ class Settings:
 
         # check that the various flags are given in the correct format   ###################  
         script_settings_dict['INPUT']['jobscript'] = [x.strip("'") for x in script_settings_dict['INPUT']['jobscript'].split()]
+        if 'jobscript_ml' in script_settings_dict['INPUT']:
+            script_settings_dict['INPUT']['jobscript_ml'] = [x.strip("'") for x in script_settings_dict['INPUT']['jobscript_ml'].split()]
         script_settings_dict['STRUCTURE']['molecule_axis'] = [x.strip("'") for x in script_settings_dict['STRUCTURE']['molecule_axis'].split()]
 
         if script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'atoms':
@@ -99,19 +101,27 @@ class Settings:
         self.molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
         self.jobscript              = script_settings_dict['INPUT']['jobscript'][0]
         self.sbatch_command         = script_settings_dict['INPUT']['jobscript'][1]
+        self.ml_screening           = True if 'true' in script_settings_dict['INPUT']['ml_screening'].lower() else False
+        self.jobscript_ml           = script_settings_dict['INPUT']['jobscript_ml'][0] if 'jobscript_ml' in script_settings_dict['INPUT'] else None
+        self.sbatch_command_ml      = script_settings_dict['INPUT']['jobscript_ml'][1] if 'jobscript_ml' in script_settings_dict['INPUT'] else None
+        
+        if self.ml_screening and (self.jobscript_ml is None or self.sbatch_command_ml is None):
+            raise ValueError("Error: you must specify jobscript_ml to use ML screening.")
         if 'screening_conv_thr' in script_settings_dict['INPUT']:
             self.screening_conv_thr = np.array(script_settings_dict['INPUT']['screening_conv_thr'].split(), dtype=float).tolist()
-        else: self.screening_conv_thr = HYBRID_SCREENING_THRESHOLDS[program]
+        else: self.screening_conv_thr = HYBRID_SCREENING_THRESHOLDS[program['SCREENING']]
         # read e_slab_mol from settings.in (priority over value from file) 
         if 'e_slab_mol' in script_settings_dict['INPUT']:
             E_slab_mol_str = script_settings_dict['INPUT']['e_slab_mol'].split()
             if len(E_slab_mol_str) != 2:
                 raise ValueError("If you specify the tag E_slab_mol you must provide TWO values.")
-            self.E_slab_mol = (np.array(E_slab_mol_str, dtype=float)*UNITS_TO_EV_FACTOR[program]).tolist()  
+            self.E_slab_mol = (np.array(E_slab_mol_str, dtype=float)*UNITS_TO_EV_FACTOR[program['RELAX']]).tolist()  
         else: self.E_slab_mol = [0,0]
 
         #if E_slab_mol not in settings.in, try to read from file. If not possible, set it to [0,0]
-        if(0 in self.E_slab_mol and read_energies):
+        if self.ml_screening:
+            self.E_slab_mol = [0, 0] #set to 0 if ml_screening is active
+        elif(0 in self.E_slab_mol and read_energies):
             if 'mol_subset_atoms' in script_settings_dict['STRUCTURE']:
                 print('Using a subset of the molecule atoms. Molecule energy not extracted.')
             else:

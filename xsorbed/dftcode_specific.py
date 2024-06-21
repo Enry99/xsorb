@@ -16,23 +16,26 @@ from xsorbed.common_definitions import *
 #TODO: Check that ase-sort.dat is used to sort the files back in the initial order when reading the outputs.
 #It does not work when reading poscar, it should work with outcar/vasprun.xml
 
-SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO']
+SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO', 'ML']
 
 HYBRID_SCREENING_THRESHOLDS = {
     'VASP' : [-0.5], # ~ -2e-2 Ry/Bohr
-    'ESPRESSO' : [5e-3, 5e-2]
+    'ESPRESSO' : [5e-3, 5e-2],
+    'ML': 0.05
 }
 
 
 UNITS_TO_EV_FACTOR = {
     'VASP' : 1,
-    'ESPRESSO': create_units('2006')['Rydberg']
+    'ESPRESSO': create_units('2006')['Rydberg'],
+    'ML': 1
 }
 
 OPTIMIZATION_COMPLETED_STRINGS = {
         #'VASP' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
         'VASP' : 'finalpos', #in vasprun.xml
-        'ESPRESSO': 'Begin final coordinates'
+        'ESPRESSO': 'Begin final coordinates',
+        'ML': 'Optimization completed.'
 }
 
 
@@ -46,11 +49,24 @@ SCF_CONVERGED_STRINGS = {
     'ESPRESSO': '!'
 }
 
+LOG_FILE_PATHS = {
+    'SCREENING': {
+        'VASP': screening_outdir+'/{0}/vasprun.xml',
+        'ESPRESSO': 'screening_{0}.pwo',
+        'ML': screening_outdir+'/{0}/screening_{0}.log'
+    },
+
+    'RELAX': {
+        'VASP': relax_outdir+'/{0}/vasprun.xml',
+        'ESPRESSO': 'relax_{0}.pwo',
+    }
+}
 
 OUT_FILE_PATHS = {
     'SCREENING': {
         'VASP': screening_outdir+'/{0}/vasprun.xml',
         'ESPRESSO': 'screening_{0}.pwo',
+        'ML': screening_outdir+'/{0}/screening_{0}.traj'
     },
 
     'RELAX': {
@@ -63,6 +79,7 @@ IN_FILE_PATHS = {
     'SCREENING': {
         'VASP': screening_outdir+'/{0}/POSCAR',
         'ESPRESSO': 'screening_{0}.pwi',
+        'ML': screening_outdir+'/{0}/screening_{0}.xyz'
     },
 
     'RELAX': {
@@ -75,6 +92,7 @@ SBATCH_POSTFIX = {
     'SCREENING': {
         'VASP': '',
         'ESPRESSO': '{0}/screening_{1}.pwi {0}/screening_{1}.pwo',
+        'ML': '{0}/screening_{1}.xyz'
     },
 
     'RELAX': {

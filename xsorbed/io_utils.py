@@ -13,7 +13,7 @@ import os, shutil
 import numpy as np
 import pandas as pd
 from ase.io import read, write
-from xsorbed.dftcode_specific import edit_files_for_restart, OPTIMIZATION_COMPLETED_STRINGS, SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
+from xsorbed.dftcode_specific import edit_files_for_restart, OPTIMIZATION_COMPLETED_STRINGS, SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, LOG_FILE_PATHS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
 from xsorbed.settings import Settings
 from xsorbed.slab import Slab, mol_bonded_to_slab
 from xsorbed.molecule import Molecule
@@ -38,7 +38,7 @@ def optimization_completed(program : str, calc_type : str, i_calc : int):
     True or False
     '''
 
-    filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
+    filename = LOG_FILE_PATHS[calc_type][program].format(i_calc)
     searchfor = OPTIMIZATION_COMPLETED_STRINGS[program]
     
     with open(filename, 'r') as f:
@@ -65,7 +65,9 @@ def scf_not_converged(program : str, calc_type : str, i_calc : int):
     True or False
     '''
 
-    filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
+    if program == 'ML': return False
+
+    filename = LOG_FILE_PATHS[calc_type][program].format(i_calc)
     searchfor = SCF_NONCONVERGED_STRINGS[program]
     convergence_string = SCF_CONVERGED_STRINGS[program]
     
@@ -201,7 +203,7 @@ def write_results_to_file(TXT=False):
 
     if os.path.isdir(screening_outdir): #for screening
         screening_results = \
-            get_calculations_results(program=settings.program, calc_type='SCREENING', E_slab_mol=settings.E_slab_mol)
+            get_calculations_results(program=settings.program['SCREENING'], calc_type='SCREENING', E_slab_mol=settings.E_slab_mol)
               
         column_name = 'Eads_scr(eV)' if 0 not in settings.E_slab_mol else 'Etot_scr(eV)'
 
@@ -230,7 +232,7 @@ def write_results_to_file(TXT=False):
 
     if os.path.isdir(relax_outdir): #for relax
         relax_results = \
-            get_calculations_results(program=settings.program, calc_type='RELAX', E_slab_mol=settings.E_slab_mol)
+            get_calculations_results(program=settings.program['RELAX'], calc_type='RELAX', E_slab_mol=settings.E_slab_mol)
         
         column_name = 'Eads_rel(eV)' if 0 not in settings.E_slab_mol else 'Etot_rel(eV)'
 
@@ -263,13 +265,13 @@ def write_results_to_file(TXT=False):
     bonding_status = []
     for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None        
         if os.path.isdir(relax_outdir) and i in relax_results['energies'] and relax_results['energies'][i]: #prioritize status from relax over screening
-            status = check_bond_status(settings.program, 
+            status = check_bond_status(settings.program['RELAX'], 
                                                     calc_type='RELAX', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
             bonding_status.append('Yes' if status else 'No')
         elif i in screening_results['energies'] and screening_results['energies'][i]:
-            status = check_bond_status(settings.program, 
+            status = check_bond_status(settings.program['SCREENING'], 
                                                     calc_type='SCREENING', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
@@ -356,11 +358,14 @@ def restart_jobs(calc_type : str):
     from settings import Settings
     settings = Settings(read_energies=False)
 
-    existing_indices = _get_actually_present_outputs(settings.program, calc_type)
-    indices_to_restart = [index for index in existing_indices if not optimization_completed(settings.program, calc_type, index)]
+    if settings.program[calc_type] == 'ML':
+        raise RuntimeError("ML calculations cannot be restarted.")
+
+    existing_indices = _get_actually_present_outputs(settings.program[calc_type], calc_type)
+    indices_to_restart = [index for index in existing_indices if not optimization_completed(settings.program[calc_type], calc_type, index)]
 
     #edit input files
-    edit_files_for_restart(settings.program, calc_type, indices_to_restart)  
+    edit_files_for_restart(settings.program[calc_type], calc_type, indices_to_restart)  
 
     #launch the calculations
     main_dir = os.getcwd()
@@ -368,7 +373,7 @@ def restart_jobs(calc_type : str):
         j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{index}'
         os.chdir(j_dir)
 
-        launch_string = f"{settings.sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][settings.program].format(main_dir, index)}"
+        launch_string = f"{settings.sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][settings.program[calc_type]].format(main_dir, index)}"
         if(TEST): print(launch_string)
         else: os.system(launch_string)  #launchs the jobscript in j_dir from j_dir 
 

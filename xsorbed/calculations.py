@@ -181,7 +181,7 @@ def write_inputs(settings : Settings,
         
         file_label = f'{calc_type.lower()}_{i}'
 
-        corresponding_outfile = OUT_FILE_PATHS[calc_type][settings.program].format(i)
+        corresponding_outfile = OUT_FILE_PATHS[calc_type][settings.program[calc_type]].format(i)
         
         #if in interactive mode, ask before overwriting
         if(INTERACTIVE and os.path.isfile(corresponding_outfile)): #convoluted, but it works
@@ -226,7 +226,7 @@ def obtain_fullrelax_indices(settings : Settings,
     
         
     print('Collecting energies from screening...')
-    screening_results = get_calculations_results(program=settings.program, calc_type='SCREENING')
+    screening_results = get_calculations_results(program=settings.program['SCREENING'], calc_type='SCREENING')
     print('Screening energies collected.')
     
     
@@ -326,7 +326,7 @@ def obtain_fullrelax_structures(settings : Settings, calculations_indices : list
         
         all_mol_on_slab_configs_ase = []
         for index in calculations_indices:
-            atoms = read(OUT_FILE_PATHS['SCREENING'][settings.program].format(index))
+            atoms = read(OUT_FILE_PATHS['SCREENING'][settings.program['SCREENING']].format(index))
             #set constraints from mol and slab if when we are reading the whole pre-relaxed structure
             
             if settings.mol_before_slab:
@@ -431,7 +431,7 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
                 calc_type='RELAX', 
                 INTERACTIVE=True)
 
-    launch_jobs(program=settings.program,
+    launch_jobs(program=settings.program['RELAX'],
                 calc_type='RELAX',
                 jobscript=settings.jobscript,
                 sbatch_command=settings.sbatch_command,

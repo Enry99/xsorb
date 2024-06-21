@@ -59,14 +59,14 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
     if i_or_f == 'i': #read from input file
         
         results = None
-        calc_indices = [i for i in _get_configurations_numbers() if os.path.isfile(IN_FILE_PATHS[calc_type][settings.program].format(i))]
-        configs = [read(IN_FILE_PATHS[calc_type][settings.program].format(i)) for i in calc_indices]
+        calc_indices = [i for i in _get_configurations_numbers() if os.path.isfile(IN_FILE_PATHS[calc_type][settings.program[calc_type]].format(i))]
+        configs = [read(IN_FILE_PATHS[calc_type][settings.program[calc_type]].format(i)) for i in calc_indices]
 
     elif i_or_f == 'f': #read from output file
 
-        results = get_calculations_results(settings.program, calc_type, settings.E_slab_mol)
+        results = get_calculations_results(settings.program[calc_type], calc_type, settings.E_slab_mol)
         calc_indices = [key for key, val in results['energies'].items() if val is not None]
-        configs = [read(OUT_FILE_PATHS[calc_type][settings.program].format(i), index=index) for i in calc_indices]
+        configs = [read(OUT_FILE_PATHS[calc_type][settings.program[calc_type]].format(i), index=index) for i in calc_indices]
 
     
     #read slab and mol 
@@ -427,7 +427,7 @@ def view_config(calc_type : str, index : int, in_or_out : str):
     else:
         raise ValueError(f'in or out not recognized. You provided {in_or_out}.')
 
-    file = FILE_PATHS[calc_type][settings.program].format(index)
+    file = FILE_PATHS[calc_type][settings.program[calc_type]].format(index)
 
     try:
         import xsorbed.ase_custom #to make sure that read is correctly monkey-patched
@@ -549,7 +549,7 @@ def plot_energy_evolution(calc_type : str):
     
     settings = Settings()
 
-    results = get_calculations_results(program=settings.program, 
+    results = get_calculations_results(program=settings.program[calc_type], 
                                         calc_type=calc_type,
                                         E_slab_mol=settings.E_slab_mol,
                                         full_evolution=True)
