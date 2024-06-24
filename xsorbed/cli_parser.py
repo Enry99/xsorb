@@ -130,7 +130,7 @@ def validate_xsorb_args(args : argparse.Namespace, parser : argparse.ArgumentPar
         if(args.view[2] != 'in' and args.view[2] != 'out'):
             parser.error("The third argument of -view must be either 'in' or 'out'.")
         try:
-            i = int(args.view[1:])
+            i = int(args.view[1])
             if(i<0): raise ValueError("Index cannot be negative")
         except:
             parser.error('The second argument of -view must be a non-negative integrer. The syntax is: [s/r] [index] [in/out], e.g. s 3 out')

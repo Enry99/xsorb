@@ -418,7 +418,7 @@ def view_config(calc_type : str, index : int, in_or_out : str):
     - index: index of the configuration
     '''
 
-    settings = Settings()
+    settings = Settings(read_energies=False)
     
     if in_or_out == 'in':
         FILE_PATHS = IN_FILE_PATHS
