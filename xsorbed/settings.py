@@ -212,8 +212,8 @@ class Settings:
         else:
             self.sites_find_args = {}
             if script_settings_dict['STRUCTURE']['max_cn'] is not None:
-                self.sites_find_args.update({'max_cn': int(script_settings_dict['STRUCTURE']['max_cn'])})
-            self.sites_find_args.update({'max_cn_offset': int(script_settings_dict['STRUCTURE']['max_cn_offset'])})
+                self.sites_find_args.update({'max_cn': float(script_settings_dict['STRUCTURE']['max_cn'])})
+            self.sites_find_args.update({'max_cn_offset': float(script_settings_dict['STRUCTURE']['max_cn_offset'])})
         #import json
         #print(json.dumps(self.__dict__, indent=4))
 

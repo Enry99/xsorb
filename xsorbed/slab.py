@@ -220,7 +220,7 @@ class Slab:
 
     def find_adsorption_sites_amorphous(self, **kwargs):
         from pymatgen.analysis.local_env import CrystalNN
-        nn = CrystalNN()
+        nn = CrystalNN(weighted_cn=True)
 
         if kwargs.get('VERBOSE'): print('Finding adsorption sites...')
 
@@ -229,7 +229,7 @@ class Slab:
         import warnings
         with warnings.catch_warnings(): #to suppress the warning
             warnings.simplefilter("ignore")
-            cn_list = [nn.get_cn(self.asf.slab, idx) for idx in surf_sites_indices]
+            cn_list = [nn.get_cn(self.asf.slab, idx, use_weights=True) for idx in surf_sites_indices]
 
         adsites = []
         adsite_labels = []
@@ -239,7 +239,7 @@ class Slab:
             if cn <= max_cn:
                 adsites.append(coords)
                 atom_species = self.asf.slab[idx].species_string
-                adsite_labels.append('{0} ontop_{1}(cn={2}),{3:.3f},{4:.3f},'.format(len(adsite_labels), atom_species, cn, *coords[:2]))
+                adsite_labels.append('{0} ontop_{1}(cn={2:.1f}),{3:.3f},{4:.3f},'.format(len(adsite_labels), atom_species, cn, *coords[:2]))
 
         if kwargs['selected_sites']:
             adsites = adsites[kwargs['selected_sites']]
@@ -396,12 +396,12 @@ def save_adsites_image(adsites : list,
         
 
         fig = plt.figure(figsize=(4,3))
-        ax = fig.add_subplot(111)
+        ax = fig.add_subplot()
         #ax.xaxis.set_tick_params(labelsize=5)
         #ax.yaxis.set_tick_params(labelsize=5)
 
         #plot slab without the sites, using Pymatgen's function
-        plot_slab(slab_pymat, ax, adsorption_sites=False, window=1.0, decay=0.25)
+        plot_slab(slab_pymat, ax, adsorption_sites=False, repeat=3, window=0.6, decay=0.25)
 
 
         #plot the sites on the slab
@@ -410,9 +410,10 @@ def save_adsites_image(adsites : list,
         crosses_size = 6.0 * 25. / w
         fontsize     = 2.0 * 25. / w
         mew          = 1.0 * 25. / w
+        marker='x'
 
         if not crystal:
-            coord_nums = [int(label.split('(')[1].split(')')[0].split('=')[1]) for label in adsite_labels]
+            coord_nums = [float(label.split('(')[1].split(')')[0].split('=')[1]) for label in adsite_labels]
             from matplotlib import cm
             from matplotlib.colors import Normalize
             cmap = cm.get_cmap('viridis_r')
@@ -432,17 +433,21 @@ def save_adsites_image(adsites : list,
             else:
                 color = cmap(norm(coord_nums[i]))
                 
+            ax.plot(*site_xy, #plot twice to have the edge in black
+                    color='black', marker=marker, 
+                    markersize=crosses_size*1.05, 
+                    mew=mew*1.4, 
+                    zorder=500000) # zorder to ensure that all crosses are drawn on top
             ax.plot(*site_xy, 
-                    color=color, marker="x", 
+                    color=color, marker=marker, 
                     markersize=crosses_size, 
                     mew=mew, 
-                    linestyle="", 
-                    zorder=500000) # zorder to ensure that all crosses are drawn on top
+                    zorder=600000) # zorder to ensure that all crosses are drawn on top
             ax.annotate(str(i), 
                         xy=site_xy, 
                         xytext=site_xy, 
                         fontsize=fontsize, 
-                        path_effects=[PathEffects.withStroke(linewidth=0.25,foreground="w")], 
+                        path_effects=[PathEffects.withStroke(linewidth=0.3,foreground="w")], 
                         zorder=1000000) # zorder to ensure that the text is on top of the crosses
                             
         if crystal:
