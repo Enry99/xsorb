@@ -133,6 +133,7 @@ def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bo
             atoms_list = read(filename, index=':')
             return np.array([a.get_potential_energy() for a in atoms_list])
     except:
+        print(f'Warning: unable to read energy from file {filename}.')
         return None
 
 

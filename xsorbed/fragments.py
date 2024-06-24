@@ -394,12 +394,12 @@ def get_diss_energies():
     energies_mol = []
     indices_mol = []
     for idx, energy in results_mol['energies'].items():
-        if energy is None: continue
+        #if energy is None: continue
         energies_mol.append(energy)
         indices_mol.append(idx)
     i_min = indices_mol[energies_mol.index(min(energies_mol))]
     if results_mol['relax_completed'][i_min] == False:
-        raise UserWarning("Warning! The most stable configuration for the whole molecule was not fully relaxed.")
+        print("Warning! The most stable configuration for the whole molecule was not fully relaxed.")
     fragments_data["mol"]["energy"] = min(energies_mol)
     fragments_data["mol"]["site"] = datafile['site'][i_min]
     print("Mol energy collected.")
@@ -419,12 +419,12 @@ def get_diss_energies():
         energies_frag = []
         indices_frag = []
         for idx, energy in results_frag['energies'].items():
-            if energy is None: continue
+            #if energy is None: continue
             energies_frag.append(energy)
             indices_frag.append(idx)
         i_min = indices_frag[energies_frag.index(min(energies_frag))]
         if results_frag['relax_completed'][i_min] == False:
-            raise UserWarning(f"Warning! The most stable configuration for {fragment_name} fragment was not fully relaxed.")
+            print(f"Warning! The most stable configuration for {fragment_name} fragment was not fully relaxed.")
         fragments_data[fragment_name]["energy"] = min(energies_frag)
         fragments_data[fragment_name]["site"] = datafile['site'][i_min]
         os.chdir(main_dir)
