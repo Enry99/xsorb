@@ -38,8 +38,12 @@ def plot_adsorption_sites(ALL : bool = False):
                 sort_atoms_by_z=settings.sort_atoms_by_z,
                 translate_slab_from_below_cell_bottom=settings.translate_slab)
 
-    slab.find_adsorption_sites(symm_reduce = 0 if ALL else settings.symm_reduce, 
-                               near_reduce = settings.near_reduce, 
+    import copy
+    sites_find_args = copy.deepcopy(settings.sites_find_args)
+    if ALL and 'symm_reduce' in sites_find_args: sites_find_args['symm_reduce'] = 0
+    
+    slab.find_adsorption_sites(crystal = not settings.amorphous_site_finding,
+                               **settings.sites_find_args,
                                selected_sites = None if ALL else settings.selected_sites,
                                save_image = True,
                                figname = 'adsorption_sites_all.png' if ALL else 'adsorption_sites.png',

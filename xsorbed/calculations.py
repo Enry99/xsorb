@@ -63,6 +63,7 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
 
     #Find adsorption sites and labels (site type and x,y coords.)
     adsites, adsites_labels = slab.find_adsorption_sites(
+        crystal = not settings.amorphous_site_finding,
         **settings.sites_find_args,
         selected_sites=settings.selected_sites,
         save_image=SAVEFIG,

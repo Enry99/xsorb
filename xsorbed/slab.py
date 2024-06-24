@@ -130,7 +130,14 @@ class Slab:
         return fixed_atoms_indices
 
 
-    def find_adsorption_sites(self, symm_reduce : float = 0.01, 
+    def find_adsorption_sites(self, crystal : bool = True, **kwargs):   
+        if crystal:
+            return self.find_adsorption_sites_crystal(**kwargs)
+        else:
+            return self.find_adsorption_sites_amorphous(**kwargs)
+
+
+    def find_adsorption_sites_crystal(self, symm_reduce : float = 0.01, 
                               near_reduce : float = 0.01, 
                               no_obtuse_hollow : bool = True, 
                               selected_sites : list = None,   
@@ -157,7 +164,7 @@ class Slab:
                                                  near_reduce=near_reduce, 
                                                  no_obtuse_hollow=no_obtuse_hollow)
         if selected_sites:
-            sel_adsites = [adsites['all'][i] for i in selected_sites]
+            sel_adsites = adsites['all'][selected_sites]
         else:
             sel_adsites = adsites['all']
 
@@ -202,9 +209,55 @@ class Slab:
         if VERBOSE: print('Adsorption sites found.')
 
         if(save_image): #save png to visualize the identified sites
-            save_adsites_image(sel_adsites, adsite_labels, self.slab_pymat, figname, VERBOSE)
+            save_adsites_image(adsites=sel_adsites, 
+                               adsite_labels=adsite_labels, 
+                               slab_pymat=self.slab_pymat, 
+                               figname=figname, 
+                               VERBOSE=VERBOSE)
 
         return sel_adsites, adsite_labels
+
+
+    def find_adsorption_sites_amorphous(self, **kwargs):
+        from pymatgen.analysis.local_env import CrystalNN
+        nn = CrystalNN()
+
+        if kwargs.get('VERBOSE'): print('Finding adsorption sites...')
+
+        surf_coords = [s.coords for s in self.asf.surface_sites]
+        surf_sites_indices = [i for i in range(len(self.asf.slab.sites)) if np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
+        import warnings
+        with warnings.catch_warnings(): #to suppress the warning
+            warnings.simplefilter("ignore")
+            cn_list = [nn.get_cn(self.asf.slab, idx) for idx in surf_sites_indices]
+
+        adsites = []
+        adsite_labels = []
+
+        max_cn = kwargs.get('max_cn', min(cn_list) + kwargs.get('max_cn_offset'))
+        for coords, cn, idx in zip(surf_coords, cn_list, surf_sites_indices):
+            if cn <= max_cn:
+                adsites.append(coords)
+                atom_species = self.asf.slab[idx].species_string
+                adsite_labels.append('{0} ontop_{1}(cn={2}),{3:.3f},{4:.3f},'.format(len(adsite_labels), atom_species, cn, *coords[:2]))
+
+        if kwargs['selected_sites']:
+            adsites = adsites[kwargs['selected_sites']]
+            adsite_labels = adsite_labels[kwargs['selected_sites']]
+
+        if kwargs.get('VERBOSE'): print('Adsorption sites found.')
+
+        if(kwargs.get('save_image')): #save png to visualize the identified sites
+            figname = 'adsorption_sites.png'
+            save_adsites_image(
+                crystal=False,
+                adsites=adsites, 
+                adsite_labels=adsite_labels, 
+                slab_pymat=self.slab_pymat, 
+                figname=figname, 
+                VERBOSE=kwargs.get('VERBOSE'))
+
+        return adsites, adsite_labels
 
 
     def generate_adsorption_structures(self, molecule : Atoms, 
@@ -327,6 +380,7 @@ def mol_bonded_to_slab(slab : Atoms, mol: Atoms):
 def save_adsites_image(adsites : list, 
                        adsite_labels : list,
                        slab_pymat : Structure,
+                       crystal : bool = True,
                        figname : str = 'adsorption_sites.png',
                        VERBOSE : bool = False):
         '''
@@ -357,15 +411,27 @@ def save_adsites_image(adsites : list,
         fontsize     = 2.0 * 25. / w
         mew          = 1.0 * 25. / w
 
+        if not crystal:
+            coord_nums = [int(label.split('(')[1].split(')')[0].split('=')[1]) for label in adsite_labels]
+            from matplotlib import cm
+            from matplotlib.colors import Normalize
+            cmap = cm.get_cmap('viridis_r')
+            norm = Normalize(vmin=min(coord_nums), vmax=max(coord_nums))
+
+
         sop = get_rot(slab_pymat)
-        adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites]
+        adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites]        
         for i, label, site_xy in zip(range(len(adsite_labels)), adsite_labels, adsites_xy):
-            if 'ontop' in label:
-                color = 'r'
-            elif 'bridge' in label:
-                color = 'g'
-            elif 'hollow' in label:
-                color = 'b'
+            if crystal:
+                if 'ontop' in label:
+                    color = 'r'
+                elif 'bridge' in label:
+                    color = 'g'
+                elif 'hollow' in label:
+                    color = 'b'
+            else:
+                color = cmap(norm(coord_nums[i]))
+                
             ax.plot(*site_xy, 
                     color=color, marker="x", 
                     markersize=crosses_size, 
@@ -378,8 +444,13 @@ def save_adsites_image(adsites : list,
                         fontsize=fontsize, 
                         path_effects=[PathEffects.withStroke(linewidth=0.25,foreground="w")], 
                         zorder=1000000) # zorder to ensure that the text is on top of the crosses
-                        
-        ax.set_title('r=ontop, g=bridge, b=hollow')
+                            
+        if crystal:
+            ax.set_title('r=ontop, g=bridge, b=hollow')
+        else:
+            ax.set_title('Adsites based on C.N.')
+            fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label='C.N.')
+        
         fig.savefig(figname, dpi=800, bbox_inches='tight')
 
         if VERBOSE: print("Image saved.")

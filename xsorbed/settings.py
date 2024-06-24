@@ -133,8 +133,11 @@ class Settings:
 
         #set non-specified flags to default.
         optional_structure_flags_list = {
+            'amorphous_site_finding'   : 'False',
             'symm_reduce'              : 0.01,
             'near_reduce'              : 0.01,
+            'max_cn'                   : None,
+            'max_cn_offset'            : 2,
             'surface_height'           : 0.9,
             'layers_height'            : 0.5,
             'selected_sites'           : ' ',
@@ -157,8 +160,6 @@ class Settings:
                 script_settings_dict['STRUCTURE'].update({flag : optional_structure_flags_list[flag]})                
 
         # initialize the class variables with dictionary values
-        self.symm_reduce            = float(script_settings_dict['STRUCTURE']['symm_reduce'])
-        self.near_reduce            = float(script_settings_dict['STRUCTURE']['near_reduce'])
         self.surface_height         = float(script_settings_dict['STRUCTURE']['surface_height'])
         self.layers_height          = float(script_settings_dict['STRUCTURE']['layers_height'])
         self.selected_sites         = np.array(script_settings_dict['STRUCTURE']['selected_sites'].split(), dtype=int).tolist()
@@ -201,12 +202,18 @@ class Settings:
         self.sort_atoms_by_z        = True if 'true' in script_settings_dict['STRUCTURE']['sort_atoms_by_z'].lower() else False #to allow also .true./.false.
         self.translate_slab         = True if 'true' in script_settings_dict['STRUCTURE']['translate_slab'].lower() else False
         self.mol_before_slab        = True if 'true' in script_settings_dict['STRUCTURE']['mol_before_slab'].lower() else False
+        self.amorphous_site_finding = True if 'true' in script_settings_dict['STRUCTURE']['amorphous_site_finding'].lower() else False
 
-        self.sites_find_args = {
-            'symm_reduce':self.symm_reduce, 
-            'near_reduce':self.near_reduce, 
-            'no_obtuse_hollow':True}
-
+        if not self.amorphous_site_finding:
+            self.sites_find_args = {
+                'symm_reduce': float(script_settings_dict['STRUCTURE']['symm_reduce']), 
+                'near_reduce': float(script_settings_dict['STRUCTURE']['near_reduce']), 
+                'no_obtuse_hollow':True}
+        else:
+            self.sites_find_args = {}
+            if script_settings_dict['STRUCTURE']['max_cn'] is not None:
+                self.sites_find_args.update({'max_cn': int(script_settings_dict['STRUCTURE']['max_cn'])})
+            self.sites_find_args.update({'max_cn_offset': int(script_settings_dict['STRUCTURE']['max_cn_offset'])})
         #import json
         #print(json.dumps(self.__dict__, indent=4))
 
