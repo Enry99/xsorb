@@ -392,7 +392,8 @@ def launch_screening(SAVEFIG : bool = False):
                 calc_type='SCREENING',
                 jobscript=settings.jobscript,
                 sbatch_command=settings.sbatch_command,
-                indices_list=written_indices)    
+                indices_list=written_indices,
+                jobname_prefix=settings.jobname_prefix)    
 
  
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, REGENERATE=False, BY_SITE = False):
@@ -435,4 +436,5 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
                 calc_type='RELAX',
                 jobscript=settings.jobscript,
                 sbatch_command=settings.sbatch_command,
-                indices_list=calculations_indices)   
+                indices_list=calculations_indices,
+                jobname_prefix=settings.jobname_prefix)     

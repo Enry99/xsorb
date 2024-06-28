@@ -99,6 +99,9 @@ class Settings:
         self.molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
         self.jobscript              = script_settings_dict['INPUT']['jobscript'][0]
         self.sbatch_command         = script_settings_dict['INPUT']['jobscript'][1]
+        if 'jobname_prefix' in script_settings_dict['INPUT']:
+            self.jobname_prefix     = script_settings_dict['INPUT']['jobname_prefix']
+        else: self.jobname_prefix = ''
         if 'screening_conv_thr' in script_settings_dict['INPUT']:
             self.screening_conv_thr = np.array(script_settings_dict['INPUT']['screening_conv_thr'].split(), dtype=float).tolist()
         else: self.screening_conv_thr = HYBRID_SCREENING_THRESHOLDS[program]

@@ -37,7 +37,7 @@ def main():
 
     #import statements##########################################################################
     #they are imported here since the import is quite slow, so the help can be shown immediately
-    from io_utils import write_results_to_file, restart_jobs, saveas
+    from io_utils import write_results_to_file, restart_jobs, scancel_jobs, saveas
     from calculations import generate, launch_screening, final_relax, regenerate_missing_sitelabels
     from postprocess import plot_adsorption_sites, config_images, view_config, relax_animations, plot_energy_evolution
     ############################################################################################
@@ -51,6 +51,9 @@ def main():
 
     elif(args.r):
         final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, required_indices=args.i, REGENERATE=args.regenerate, BY_SITE=args.by_site)
+
+    elif(args.scancel):
+        scancel_jobs()
 
     elif(args.restart):
         restart_jobs(calc_type = 'SCREENING' if args.restart == 's' else 'RELAX')

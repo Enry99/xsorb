@@ -9,7 +9,7 @@ Function definitions to read from pwo and launch scripts
 
 """
 
-import os, shutil
+import os, shutil, subprocess
 import numpy as np
 import pandas as pd
 from ase.io import read, write
@@ -308,7 +308,7 @@ def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices 
     return mol_bonded_to_slab(slab, mol)
 
 
-def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command : str, indices_list : list):
+def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command : str, indices_list : list, jobname_prefix : str = ''):
     '''
     Launch the calculations.
 
@@ -320,6 +320,8 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
     - indices_list: indices of the calculations
     '''
     main_dir = os.getcwd()
+
+    submitted_jobs = []
 
     for index in indices_list:
 
@@ -334,7 +336,7 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if "job-name" in line:
-                    lines[i] = f"{line.split('=')[0]}={'scr' if calc_type == 'SCREENING' else 'relax'}_{index}\n"
+                    lines[i] = f"{line.split('=')[0]}={jobname_prefix}_{'s' if calc_type == 'SCREENING' else 'r'}{index}\n"
                     break
         with open(jobscript_stdname, 'w') as f:       
             f.writelines(lines)
@@ -342,8 +344,13 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
 
         launch_string = f"{sbatch_command} {jobscript_stdname} {SBATCH_POSTFIX[calc_type][program].format(main_dir, index)}"
         if(TEST): print(launch_string)
-        else: os.system(launch_string)  #launches the jobscript in j_dir from j_dir
+        else: 
+            outstring = subprocess.getoutput(launch_string)  #launches the jobscript in j_dir from j_dir
+            submitted_jobs.append(outstring.split()[-1])
         os.chdir(main_dir) ####################
+
+    with open("submitted_jobs.txt", "a") as f:
+        f.write("\n".join(submitted_jobs)+'\n')
 
 
 def restart_jobs(calc_type : str):
@@ -374,6 +381,30 @@ def restart_jobs(calc_type : str):
         else: os.system(launch_string)  #launchs the jobscript in j_dir from j_dir 
 
         os.chdir(main_dir)
+
+
+def scancel_jobs():
+    '''
+    Cancel all the jobs in the submitted_jobs.txt file, if they are running. Works only for slurm.
+    '''
+    
+    if not os.path.isfile("submitted_jobs.txt"):
+        print("submitted_jobs.txt file not found. No jobs to cancel.")
+        return
+    
+    with open("submitted_jobs.txt", "r") as f: 
+        submitted_jobs = f.readlines()
+        submitted_job_ids = [job.strip() for job in submitted_jobs]
+
+    running_jobs = subprocess.getoutput("squeue --me").split("\n")[1:]
+    running_job_ids = [job.split()[0] for job in running_jobs]
+
+    for job in submitted_job_ids:
+        if job in running_job_ids:
+            print(f"Cancelling job {job}")
+            os.system(f"scancel {job}")
+
+    print("All jobs cancelled.")
 
 
 def saveas(calc_type : str, i_or_f : str, saveas_format : str):
