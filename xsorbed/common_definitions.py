@@ -14,6 +14,7 @@ relax_outdir                = 'relax_outdirs'
 jobscript_stdname           = 'jobscript' #standard name used in the copied version inside the outdirs
 custom_colors_filename      = "custom_colors.json"
 framgents_filename          = "fragments.json"
+preopt_ml_folder            = "preoptimization"
 
 
 ATOMIC_RADIUS_DEFAULT = 0.6

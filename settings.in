@@ -7,6 +7,7 @@
    jobname_prefix                = 'ads'                #prefix for the job names (max 3 letters)
    E_slab_mol                    = 0 0                  #slab and isolated molecule energies (in the default energy units of the DFT program, i.e. Ry for QE, eV for VASP).
    screening_conv_thr            = 5e-3 5e-2            #optional custom convergence treshold(s) for screening (2 values - energy and forces for QE, 1 value - energy OR force (EDIFFG) for VASP)
+   jobscript_ml                  = 'job_ml' sbatch
 /
 
 

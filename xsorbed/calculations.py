@@ -6,7 +6,7 @@ Main functions to generate the adsorption configurations and set up the calculat
 
 """
 
-from ase.io import read
+from ase.io import read, write
 import numpy as np
 import os, sys
 from operator import itemgetter
@@ -207,6 +207,42 @@ def write_inputs(settings : Settings,
     return written_indices
 
 
+def write_inputs_ml(settings : Settings, 
+                 all_mol_on_slab_configs_ase : list, 
+                 calc_indices : list,
+                 VERBOSE : bool = True):
+    '''
+    Writes the input files for all the adsorption configurations.
+
+
+    Args:
+    - settings: Settings object, containing the dft code parameters
+    - all_mol_on_slab_configs_ase: list of ASE atoms for all the adsorption configurations
+
+    Returns:
+    - written_indices: list of the indices of the configurations for which the input files have been written
+    '''
+    
+    if VERBOSE: print('Writing pre-optimization input files...')
+
+    written_indices = []
+
+    for i, atoms in zip(calc_indices, all_mol_on_slab_configs_ase):
+        
+        all_mol_on_slab_configs_ase.pbc = True #ensure that the periodic boundary conditions are set
+        
+        file_label = f'preopt_{i}'        
+    
+        j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{i}'
+        calc = Calculator(settings, file_label, atoms, j_dir) 
+        calc.write_input(atoms)
+        written_indices.append(i)
+
+    if VERBOSE: print('All input files written.') 
+
+    return written_indices
+
+
 def obtain_fullrelax_indices(settings : Settings,
                              n_configs: int = None, 
                              threshold : float = None, 
@@ -367,8 +403,45 @@ def generate(SAVEFIG=False):
                  OVERRIDE_SETTINGS=False,
                  INTERACTIVE=True)
 
-  
-def launch_screening(SAVEFIG : bool = False):
+
+def preopt_ml(SAVEFIG : bool = False):
+    
+    settings=Settings()
+
+
+    all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG, VERBOSE=True)
+
+    write_labels_csvfile(full_labels, labels_filename=labels_filename)
+
+
+    written_indices = write_inputs_ml(settings, 
+                                    all_mol_on_slab_configs_ase,
+                                    calc_indices=np.arange(len(all_mol_on_slab_configs_ase))
+                                    )
+
+    launch_jobs_ml(jobscript=settings.jobscript_ml,
+                sbatch_command=settings.sbatch_command_ml,
+                indices_list=written_indices,
+                jobname_prefix=settings.jobname_prefix)  
+
+
+def get_preopt_structures():
+    '''
+    Reads the preopt structures from the output files of the preopt calculations
+    '''
+    settings=Settings()
+
+    config_indices = _get_configurations_numbers()
+
+    all_mol_on_slab_configs_ase = []
+    for index in config_indices:
+        atoms = read(OUT_FILE_PATHS['PREOPT'].format(index))
+        all_mol_on_slab_configs_ase.append(atoms)
+
+    return all_mol_on_slab_configs_ase
+
+
+def launch_screening(SAVEFIG : bool = False, from_preopt : bool = False):
     '''
     Generates adsorption configurations, writes inputs and launches calculations for the preliminary screening.
 
@@ -378,9 +451,14 @@ def launch_screening(SAVEFIG : bool = False):
     
     settings=Settings()
 
-    all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG, VERBOSE=True)
+    if from_preopt:
+        all_mol_on_slab_configs_ase = get_preopt_structures()
 
-    write_labels_csvfile(full_labels, labels_filename=labels_filename)
+    else:
+        all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG, VERBOSE=True)
+
+        write_labels_csvfile(full_labels, labels_filename=labels_filename)
+
 
     written_indices = write_inputs(settings, 
                                     all_mol_on_slab_configs_ase,

@@ -58,6 +58,8 @@ class Settings:
 
         # check that the various flags are given in the correct format   ###################  
         script_settings_dict['INPUT']['jobscript'] = [x.strip("'") for x in script_settings_dict['INPUT']['jobscript'].split()]
+        if 'jobscript_ml' in script_settings_dict['INPUT']:
+            script_settings_dict['INPUT']['jobscript_ml'] = [x.strip("'") for x in script_settings_dict['INPUT']['jobscript_ml'].split()]
         script_settings_dict['STRUCTURE']['molecule_axis'] = [x.strip("'") for x in script_settings_dict['STRUCTURE']['molecule_axis'].split()]
 
         if script_settings_dict['STRUCTURE']['molecule_axis'][0] == 'atoms':
@@ -99,6 +101,8 @@ class Settings:
         self.molecule_filename      = script_settings_dict['INPUT']['molecule_filename']
         self.jobscript              = script_settings_dict['INPUT']['jobscript'][0]
         self.sbatch_command         = script_settings_dict['INPUT']['jobscript'][1]
+        self.jobscript_ml           = script_settings_dict['INPUT']['jobscript_ml'][0] if 'jobscript_ml' in script_settings_dict['INPUT'] else None
+        self.sbatch_command_ml      = script_settings_dict['INPUT']['jobscript_ml'][1] if 'jobscript_ml' in script_settings_dict['INPUT'] else None
         if 'jobname_prefix' in script_settings_dict['INPUT']:
             self.jobname_prefix     = script_settings_dict['INPUT']['jobname_prefix']
         else: self.jobname_prefix = ''
