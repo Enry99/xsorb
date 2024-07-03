@@ -336,7 +336,8 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if "job-name" in line:
-                    lines[i] = f"{line.split('=')[0]}={jobname_prefix}_{'s' if calc_type == 'SCREENING' else 'r'}{index}\n"
+                    prefix = jobname_prefix + ('_' if len(jobname_prefix) else '')
+                    lines[i] = f"{line.split('=')[0]}={prefix}{'s' if calc_type == 'SCREENING' else 'r'}{index}\n"
                     break
         with open(jobscript_stdname, 'w') as f:       
             f.writelines(lines)
@@ -346,6 +347,7 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
         if(TEST): print(launch_string)
         else: 
             outstring = subprocess.getoutput(launch_string)  #launches the jobscript in j_dir from j_dir
+            print(outstring)
             submitted_jobs.append(outstring.split()[-1])
         os.chdir(main_dir) ####################
 
