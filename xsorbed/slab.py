@@ -215,35 +215,88 @@ class Slab:
                                figname=figname, 
                                VERBOSE=VERBOSE)
 
-        return sel_adsites, adsite_labels
+        return sel_adsites, adsite_labels, None
 
 
     def find_adsorption_sites_amorphous(self, **kwargs):
-        from pymatgen.analysis.local_env import CrystalNN
-        nn = CrystalNN(weighted_cn=True)
 
         if kwargs.get('VERBOSE'): print('Finding adsorption sites...')
 
         surf_coords = [s.coords for s in self.asf.surface_sites]
         surf_sites_indices = [i for i in range(len(self.asf.slab.sites)) if np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
-        import warnings
-        with warnings.catch_warnings(): #to suppress the warning
-            warnings.simplefilter("ignore")
-            cn_list = [nn.get_cn(self.asf.slab, idx, use_weights=True) for idx in surf_sites_indices]
+
+        if kwargs.get('cn_method') == 'CrystalNN':
+            print('Using CrystalNN to find coordination numbers.')
+            from pymatgen.analysis.local_env import CrystalNN
+            nn = CrystalNN(weighted_cn=True)
+            import warnings
+            with warnings.catch_warnings(): #to suppress the warning
+                warnings.simplefilter("ignore")
+                cn_list = [nn.get_cn(self.asf.slab, idx, use_weights=True) for idx in surf_sites_indices]
+        
+        elif kwargs.get('cn_method') == 'MinimumDistanceNN':
+            print('Using MinimumDistanceNN to find coordination numbers.')
+            nn = MinimumDistanceNN(tol=0.2)
+            cn_list = [nn.get_cn(self.asf.slab, idx) for idx in surf_sites_indices]
+        
+        else: #standard coordination number (integer no. of nearest neighbours) with ase.neighborlist
+            print('Using ase.neighborlist to find coordination numbers.')
+            from ase.neighborlist import NeighborList, natural_cutoffs
+            cutoffs = natural_cutoffs(self.slab_ase, mult=1.1)
+            nl = NeighborList(cutoffs, skin=0, self_interaction=False, bothways=True)
+            nl.update(self.slab_ase)
+            cm = nl.get_connectivity_matrix()
+            cn_list = [cm[idx].count_nonzero() for idx in surf_sites_indices]
+
 
         adsites = []
         adsite_labels = []
+        adsites_indices = []
 
         max_cn = kwargs.get('max_cn', min(cn_list) + kwargs.get('max_cn_offset'))
         for coords, cn, idx in zip(surf_coords, cn_list, surf_sites_indices):
             if cn <= max_cn:
                 adsites.append(coords)
                 atom_species = self.asf.slab[idx].species_string
-                adsite_labels.append('{0} ontop_{1}(cn={2:.1f}),{3:.3f},{4:.3f},'.format(len(adsite_labels), atom_species, cn, *coords[:2]))
+                adsite_labels.append('{0} {1}(cn={2:.1f}),{3:.3f},{4:.3f},'.format(len(adsite_labels), atom_species, cn, *coords[:2]))
+                adsites_indices.append(idx)
 
-        if kwargs['selected_sites']:
+
+        if kwargs['selected_sites']: #possibility to select only the main sites, not the surrounding ones
             adsites = adsites[kwargs['selected_sites']]
             adsite_labels = adsite_labels[kwargs['selected_sites']]
+            adsites_indices = adsites_indices[kwargs['selected_sites']]
+        
+
+        connected_adsites = {}
+        all_connected_indices = []
+        main_sites_pairs = []
+        if kwargs.get('amorphous_surrounding_sites'):
+            nn = MinimumDistanceNN(tol=0.2)
+
+            for main_site, label, idx in zip(adsites, adsite_labels, adsites_indices):
+                nnsites = nn.get_nn_info(self.asf.slab, idx)
+                label_num = int(label.split()[0])
+                connected_adsites[label_num] = []
+                for nnsite in nnsites:
+                    nnindex = nnsite['site_index']
+                    if (nnindex in surf_sites_indices if 'surrounding_sites_deltaz' not in kwargs \
+                        else abs(main_site[2] - nnsite['site'].coords[2]) < kwargs['surrounding_sites_deltaz']):
+                        #print("site: ", f'{label_num}.{len(connected_adsites[label_num])}', "pos:", nnsite['site'].coords)
+                        atom_species = self.asf.slab[nnindex].species_string
+                        connected_adsites[label_num].append(
+                            {
+                            'position' : nnsite['site'].coords, 
+                            'index' : nnindex,
+                            'label' : '{0}.{1} {2},{3:.3f},{4:.3f},'.format(label_num, len(connected_adsites[label_num]), atom_species,  *nnsite['site'].coords[:2]),
+                            'duplicate_surrounding' : nnindex in all_connected_indices,
+                            'duplicate_main' : {nnindex, idx} in main_sites_pairs #check if already present in swapped order
+                            }
+                        )
+                        #print("duplicate main: ", {nnindex, idx} in main_sites_pairs)
+                        all_connected_indices.append(nnindex)
+                        if nnindex in adsites_indices:
+                            main_sites_pairs.append({idx, nnindex})
 
         if kwargs.get('VERBOSE'): print('Adsorption sites found.')
 
@@ -254,10 +307,11 @@ class Slab:
                 adsites=adsites, 
                 adsite_labels=adsite_labels, 
                 slab_pymat=self.slab_pymat, 
+                connected_adsites = connected_adsites,
                 figname=figname, 
                 VERBOSE=kwargs.get('VERBOSE'))
 
-        return adsites, adsite_labels
+        return adsites, adsite_labels, connected_adsites
 
 
     def generate_adsorption_structures(self, molecule : Atoms, 
@@ -266,7 +320,9 @@ class Slab:
                                        min_z_distance_from_surf : float,
                                        adsites_labels : list,
                                        rotation_label : str,
-                                       mol_before_slab = False):
+                                       connected_adsites : dict = None,
+                                       surrounding_exclude_main : bool = False,
+                                       mol_before_slab : bool = False):
         '''
         Returns the adsorption structures obtained by placing the molecule on all the adsites,
         ensuring that the molecule is not too close to the surface
@@ -284,25 +340,94 @@ class Slab:
         adsorption_structures = []
         full_labels = []
 
-        for coords, site_label in zip(adsites, adsites_labels):
-            mol = molecule.copy()
+        if not connected_adsites:
+            for coords, site_label in zip(adsites, adsites_labels):
+                mol = molecule.copy()
 
-            #place the molecule in the adsorption site, then translate it upwards by the target height
-            mol.translate(coords) 
-            mol.translate([0,0,z_distance_from_site])
-            final_deltaz = z_distance_from_site
+                #place the molecule in the adsorption site, then translate it upwards by the target height
+                mol.translate(coords) 
+                mol.translate([0,0,z_distance_from_site])
+                final_deltaz = z_distance_from_site
 
-            #Check for min_z_distance_from_surf and translate accordingly
-            dz = mindistance_deltaz(self.slab_ase, mol, min_z_distance_from_surf)
-            if dz:
-                mol.translate( [0, 0, dz] )
-                #print("The molecule was translated further by {0} to enforce minimum distance.".format(dz))
-                final_deltaz += dz
+                #Check for min_z_distance_from_surf and translate accordingly
+                dz = mindistance_deltaz(self.slab_ase, mol, min_z_distance_from_surf)
+                if dz:
+                    mol.translate( [0, 0, dz] )
+                    #print("The molecule was translated further by {0} to enforce minimum distance.".format(dz))
+                    final_deltaz += dz
+                    
+                struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
+                struct.cell = self.slab_ase.cell
+                adsorption_structures.append(struct)
+                full_labels.append(rotation_label+site_label+'{:.3f}'.format(final_deltaz))
+        
+        else:
+            yrot = int(float(rotation_label.split(',')[1]))
+            for main_site_num, main_site_coords, main_site_label in zip(range(len(adsites)), adsites, adsites_labels):
                 
-            struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
-            struct.cell = self.slab_ase.cell
-            adsorption_structures.append(struct)
-            full_labels.append(rotation_label+site_label+'{:.3f}'.format(final_deltaz))
+                # create the rotations for when the molecule is horizontal,
+                #orienting it towards the nearest neighbors
+                
+                if yrot != 90:
+                    for rel_ads in connected_adsites[main_site_num]:
+
+                        if surrounding_exclude_main and rel_ads['duplicate_main']:
+                            continue
+
+                        mol = molecule.copy()
+
+                        #rotate the molecule towards the surrounding site
+                        main_to_rel_axis = (rel_ads['position'] - main_site_coords)
+                        main_to_rel_axis[2] = 0 #project on xy plane
+                        mol.rotate('x', main_to_rel_axis)
+
+                        #place the molecule in the adsorption site, then translate it upwards by the target height
+                        mol.translate(main_site_coords) 
+                        mol.translate([0,0,z_distance_from_site])
+                        final_deltaz = z_distance_from_site
+
+                        #Check for min_z_distance_from_surf and translate accordingly
+                        dz = mindistance_deltaz(self.slab_ase, mol, min_z_distance_from_surf)
+                        if dz:
+                            mol.translate( [0, 0, dz] )
+                            #print("The molecule was translated further by {0} to enforce minimum distance.".format(dz))
+                            final_deltaz += dz
+                            
+                        struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
+                        struct.cell = self.slab_ase.cell
+                        adsorption_structures.append(struct)
+                        rotation_label = rotation_label.split(',')
+                        rotation_label[2] = 'to_'+rel_ads['label'].split()[0]
+                        rotation_label = ','.join(rotation_label)
+                        full_labels.append(rotation_label+main_site_label+'{:.3f}'.format(final_deltaz))
+                
+                else: # vertical molecule
+                    rel_ads_positions = [rel_ads['position'] for rel_ads in connected_adsites[main_site_num] \
+                                         if not rel_ads['duplicate_surrounding'] and not rel_ads['duplicate_main']]
+                    rel_ads_labels = [rel_ads['label'] for rel_ads in connected_adsites[main_site_num] \
+                                       if not rel_ads['duplicate_surrounding'] and not rel_ads['duplicate_main']]
+                    
+                    for coords, site_label in zip([adsites[main_site_num]]+rel_ads_positions, [adsites_labels[main_site_num]]+rel_ads_labels):
+                        mol = molecule.copy()
+
+                        #place the molecule in the adsorption site, then translate it upwards by the target height
+                        mol.translate(coords) 
+                        mol.translate([0,0,z_distance_from_site])
+                        final_deltaz = z_distance_from_site
+
+                        #Check for min_z_distance_from_surf and translate accordingly
+                        dz = mindistance_deltaz(self.slab_ase, mol, min_z_distance_from_surf)
+                        if dz:
+                            mol.translate( [0, 0, dz] )
+                            #print("The molecule was translated further by {0} to enforce minimum distance.".format(dz))
+                            final_deltaz += dz
+                            
+                        struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
+                        struct.cell = self.slab_ase.cell
+                        adsorption_structures.append(struct)
+                        full_labels.append(rotation_label+site_label+'{:.3f}'.format(final_deltaz))
+
+
 
         return adsorption_structures, full_labels
 
@@ -380,6 +505,7 @@ def mol_bonded_to_slab(slab : Atoms, mol: Atoms):
 def save_adsites_image(adsites : list, 
                        adsite_labels : list,
                        slab_pymat : Structure,
+                       connected_adsites : dict = None,
                        crystal : bool = True,
                        figname : str = 'adsorption_sites.png',
                        VERBOSE : bool = False):
@@ -401,7 +527,7 @@ def save_adsites_image(adsites : list,
         #ax.yaxis.set_tick_params(labelsize=5)
 
         #plot slab without the sites, using Pymatgen's function
-        plot_slab(slab_pymat, ax, adsorption_sites=False, repeat=3, window=0.6, decay=0.25)
+        plot_slab(slab_pymat, ax, adsorption_sites=False, repeat=3, window=0.7, decay=0.25)
 
 
         #plot the sites on the slab
@@ -412,16 +538,50 @@ def save_adsites_image(adsites : list,
         mew          = 1.0 * 25. / w
         marker='x'
 
+        sop = get_rot(slab_pymat)
+        adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites]         
+
         if not crystal:
+            
+            if connected_adsites:
+                for main_site_idx, related_adsites in connected_adsites.items():     
+                    for rel_ads in related_adsites:
+                        site_xy = sop.operate(rel_ads['position'])[:2]
+                        label = rel_ads['label'].split()[0]
+                        if rel_ads['duplicate_main']:
+                            label += '^'
+                        if rel_ads['duplicate_surrounding']:
+                            label += '*'
+
+                        main_site_xy = adsites_xy[main_site_idx]
+                        ax.plot([main_site_xy[0], site_xy[0]],
+                                [main_site_xy[1], site_xy[1]],
+                                '-ok', mfc='r', mec='r', 
+                                markersize=crosses_size/3, 
+                                linewidth=0.5,
+                                mew=mew, 
+                                zorder=300000) # zorder to ensure that all crosses are drawn on top
+                        ax.annotate(label , 
+                                    xy=site_xy, 
+                                    xytext=site_xy + np.array([0.2,0 if not rel_ads['duplicate_surrounding'] else 0.2]), 
+                                    fontsize=fontsize*0.8, 
+                                    path_effects=[PathEffects.withStroke(linewidth=0.3,foreground="w")], 
+                                    zorder=350000) # zorder to ensure that the text is on top of the crosses
+            
+            
             coord_nums = [float(label.split('(')[1].split(')')[0].split('=')[1]) for label in adsite_labels]
             from matplotlib import cm
             from matplotlib.colors import Normalize
             cmap = cm.get_cmap('viridis_r')
             norm = Normalize(vmin=min(coord_nums), vmax=max(coord_nums))
 
+            ax.set_title('Adsites based on C.N.')
+            fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label='C.N.')                        
 
-        sop = get_rot(slab_pymat)
-        adsites_xy = [sop.operate(ads_site)[:2].tolist() for ads_site in adsites]        
+        else:
+            ax.set_title('r=ontop, g=bridge, b=hollow')
+
+       
         for i, label, site_xy in zip(range(len(adsite_labels)), adsite_labels, adsites_xy):
             if crystal:
                 if 'ontop' in label:
@@ -449,12 +609,6 @@ def save_adsites_image(adsites : list,
                         fontsize=fontsize, 
                         path_effects=[PathEffects.withStroke(linewidth=0.3,foreground="w")], 
                         zorder=1000000) # zorder to ensure that the text is on top of the crosses
-                            
-        if crystal:
-            ax.set_title('r=ontop, g=bridge, b=hollow')
-        else:
-            ax.set_title('Adsites based on C.N.')
-            fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label='C.N.')
         
         fig.savefig(figname, dpi=800, bbox_inches='tight')
 

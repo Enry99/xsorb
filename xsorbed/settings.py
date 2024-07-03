@@ -134,8 +134,12 @@ class Settings:
         #set non-specified flags to default.
         optional_structure_flags_list = {
             'amorphous_site_finding'   : 'False',
+            'amorphous_surrounding_sites': 'False',
+            'surrounding_exclude_main' : 'False',
+            'surrounding_sites_deltaz' : None,
             'symm_reduce'              : 0.01,
             'near_reduce'              : 0.01,
+            'cn_method'                : 'plain',
             'max_cn'                   : None,
             'max_cn_offset'            : 2,
             'surface_height'           : 0.9,
@@ -214,6 +218,11 @@ class Settings:
             if script_settings_dict['STRUCTURE']['max_cn'] is not None:
                 self.sites_find_args.update({'max_cn': float(script_settings_dict['STRUCTURE']['max_cn'])})
             self.sites_find_args.update({'max_cn_offset': float(script_settings_dict['STRUCTURE']['max_cn_offset'])})
+            self.sites_find_args.update({'cn_method': script_settings_dict['STRUCTURE']['cn_method']})
+            self.sites_find_args.update({'amorphous_surrounding_sites': True if 'true' in script_settings_dict['STRUCTURE']['amorphous_surrounding_sites'].lower() else False})
+            self.sites_find_args.update({'surrounding_exclude_main': True if 'true' in script_settings_dict['STRUCTURE']['surrounding_exclude_main'].lower() else False})
+            if script_settings_dict['STRUCTURE']['surrounding_sites_deltaz'] is not None:
+                self.sites_find_args.update({'surrounding_sites_deltaz': float(script_settings_dict['STRUCTURE']['surrounding_sites_deltaz'])})
         #import json
         #print(json.dumps(self.__dict__, indent=4))
 

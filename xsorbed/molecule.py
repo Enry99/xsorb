@@ -72,7 +72,8 @@ class Molecule:
         if atom_index != -1:
             self.mol_ase.translate(-self.mol_ase.get_positions()[atom_index])
         else:
-            self.mol_ase.translate(-self.mol_ase.get_center_of_mass())
+            self.mol_ase.translate(-self.mol_ase.get_center_of_mass()) 
+            # alternative: center of positions (get_positions().mean(axis=0))
             
         #select atoms subset
         if atoms_subset:            
