@@ -240,9 +240,14 @@ class Slab:
             cn_list = [nn.get_cn(self.asf.slab, idx) for idx in surf_sites_indices]
         
         else: #standard coordination number (integer no. of nearest neighbours) with ase.neighborlist
-            print('Using ase.neighborlist to find coordination numbers.')
+            
+            print('Using ase.neighborlist {0}to find coordination numbers.'\
+                  .format('with fixed radius for all atoms ' if kwargs.get('cn_plain_fixed_radius') else ''))
             from ase.neighborlist import NeighborList, natural_cutoffs
-            cutoffs = natural_cutoffs(self.slab_ase, mult=1.1)
+            if kwargs.get('cn_plain_fixed_radius'):
+                cutoffs = [kwargs.get('cn_plain_fixed_radius')]*len(self.slab_ase)
+            else:
+                cutoffs = natural_cutoffs(self.slab_ase, mult=1.1)
             nl = NeighborList(cutoffs, skin=0, self_interaction=False, bothways=True)
             nl.update(self.slab_ase)
             cm = nl.get_connectivity_matrix()

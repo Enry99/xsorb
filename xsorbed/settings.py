@@ -140,6 +140,7 @@ class Settings:
             'symm_reduce'              : 0.01,
             'near_reduce'              : 0.01,
             'cn_method'                : 'plain',
+            'cn_plain_fixed_radius'    : None,
             'max_cn'                   : None,
             'max_cn_offset'            : 2,
             'surface_height'           : 0.9,
@@ -223,6 +224,8 @@ class Settings:
             self.sites_find_args.update({'surrounding_exclude_main': True if 'true' in script_settings_dict['STRUCTURE']['surrounding_exclude_main'].lower() else False})
             if script_settings_dict['STRUCTURE']['surrounding_sites_deltaz'] is not None:
                 self.sites_find_args.update({'surrounding_sites_deltaz': float(script_settings_dict['STRUCTURE']['surrounding_sites_deltaz'])})
+            if script_settings_dict['STRUCTURE']['cn_plain_fixed_radius'] is not None:
+                self.sites_find_args.update({'cn_plain_fixed_radius': float(script_settings_dict['STRUCTURE']['cn_plain_fixed_radius'])})
         #import json
         #print(json.dumps(self.__dict__, indent=4))
 

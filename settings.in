@@ -17,6 +17,7 @@
    # surrounding_sites_deltaz      = 1.5
    # surrounding_exclude_main      = True
    # cn_method                     = 'MinimumDistanceNN'       #method for finding coordination numbers: 'plain' (default, produces integer values), MinimumDistanceNN (Pymatgen, integer values), CrystalNN (Pymatgen)
+   # cn_plain_fixed_radius         = 1.5            #fixed radius for the plain coordination number method (half of the max distance between two atoms to be considered nearest neighbors)
    # max_cn                        = 8
    # max_cn_offset                 = 1 
    # surface_height                = 0.9             #delta_z from topmost atom defining the surface atoms for finding adsorption sites
