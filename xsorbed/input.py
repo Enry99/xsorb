@@ -9,7 +9,7 @@ and return them as two dictionaries (script settings and dft program settings)
 
 """
 
-from dftcode_specific import get_dftprogram_settings, SUPPORTED_PROGRAMS
+from xsorbed.dftcode_specific import get_dftprogram_settings, SUPPORTED_PROGRAMS
 
 
 def _is_number(s : str):

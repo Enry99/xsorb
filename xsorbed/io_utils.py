@@ -19,7 +19,7 @@ from xsorbed.slab import Slab, mol_bonded_to_slab
 from xsorbed.molecule import Molecule
 from xsorbed.common_definitions import *
 
-import ase_custom
+from xsorbed import ase_custom
 
 TEST = False #do not actually launch the jobs, simply prints the command
 
@@ -363,7 +363,7 @@ def restart_jobs(calc_type : str):
     - calc_type: 'SCREENING' or 'RELAX'
     '''
 
-    from settings import Settings
+    from xsorbed.settings import Settings
     settings = Settings(read_energies=False)
 
     existing_indices = _get_actually_present_outputs(settings.program, calc_type)
