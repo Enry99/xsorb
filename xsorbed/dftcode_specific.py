@@ -24,13 +24,15 @@ HYBRID_SCREENING_THRESHOLDS = {
 
 UNITS_TO_EV_FACTOR = {
     'VASP' : 1,
-    'ESPRESSO': create_units('2006')['Rydberg']
+    'ESPRESSO': create_units('2006')['Rydberg'],
+    'ML': 1
 }
 
 OPTIMIZATION_COMPLETED_STRINGS = {
         #'VASP' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
         'VASP' : 'finalpos', #in vasprun.xml
-        'ESPRESSO': 'Begin final coordinates'
+        'ESPRESSO': 'Begin final coordinates',
+        'ML': 'Optimization completed.'
 }
 
 
@@ -54,7 +56,9 @@ OUT_FILE_PATHS = {
     'RELAX': {
         'VASP': relax_outdir+'/{0}/vasprun.xml',
         'ESPRESSO': 'relax_{0}.pwo',
-    }
+    },
+    
+    'PREOPT': preopt_outdir+'/{0}/preopt_{0}.traj'
 }
 
 IN_FILE_PATHS = {
@@ -66,7 +70,23 @@ IN_FILE_PATHS = {
     'RELAX': {
         'VASP': relax_outdir+'/{0}/POSCAR',
         'ESPRESSO': 'relax_{0}.pwi',
-    }
+    },
+
+    'PREOPT': preopt_outdir+'/{0}/preopt_{0}.xyz'
+}
+
+LOG_FILE_PATHS = {
+    'SCREENING': {
+        'VASP': screening_outdir+'/{0}/vasprun.xml',
+        'ESPRESSO': 'screening_{0}.pwo',
+    },
+
+    'RELAX': {
+        'VASP': relax_outdir+'/{0}/vasprun.xml',
+        'ESPRESSO': 'relax_{0}.pwo',
+    },
+
+    'PREOPT': preopt_outdir+'/{0}/preopt_{0}.log'
 }
 
 SBATCH_POSTFIX = {
@@ -78,7 +98,9 @@ SBATCH_POSTFIX = {
     'RELAX': {
         'VASP': '',
         'ESPRESSO': '{0}/relax_{1}.pwi {0}/relax_{1}.pwo',
-    }
+    },
+
+    'ML': '{0}/preopt_{1}.xyz'
 }
 
 

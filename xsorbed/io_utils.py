@@ -353,6 +353,52 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
         f.write("\n".join(submitted_jobs)+'\n')
 
 
+def launch_jobs_ml(jobscript_ml : str, sbatch_command : str, indices_list : list, jobname_prefix : str = ''):
+    '''
+    Launch the calculations.
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - jobscript: path of the jobscript file
+    - sbatch_command: command to submit the jobscript (in Slurm it is sbatch)
+    - indices_list: indices of the calculations
+    '''
+    main_dir = os.getcwd()
+    
+    import pathlib
+    xsorb_dir = pathlib.Path(__file__).parent.resolve()
+
+    submitted_jobs = []
+
+    for index in indices_list:
+
+        j_dir = preopt_outdir+'/{0}'.format(index)
+        shutil.copyfile(jobscript_ml, f'{j_dir}/{jobscript_stdname}')
+        
+        #change job title (only for slumr jobscripts)
+        with open(f'{j_dir}/{jobscript_stdname}', 'r') as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                if "job-name" in line:
+                    lines[i] = f"{line.split('=')[0]}={jobname_prefix}_{'pre'}{index}\n"
+                    break
+        with open(f'{j_dir}/{jobscript_stdname}', 'w') as f:       
+            f.writelines(lines)
+
+        launch_string = f"{sbatch_command} {jobscript_stdname} {xsorb_dir}/ml_opt.py \
+            {SBATCH_POSTFIX['PREOPT'].format(preopt_outdir, index)}"
+        if(TEST): print(launch_string)
+        else: 
+            outstring = subprocess.getoutput(launch_string)
+            submitted_jobs.append(outstring.split()[-1])
+
+    with open("submitted_jobs.txt", "a") as f:
+        f.write("\n".join(submitted_jobs)+'\n')
+
+
+
+
 def restart_jobs(calc_type : str):
     '''
     Restart the uncompleted calculations

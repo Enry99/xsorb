@@ -14,9 +14,9 @@ from operator import itemgetter
 from ase.constraints import FixCartesian
 from xsorbed.slab import Slab
 from xsorbed.molecule import Molecule
-from xsorbed.io_utils import launch_jobs, get_calculations_results, _get_configurations_numbers
+from xsorbed.io_utils import launch_jobs, launch_jobs_ml, get_calculations_results, _get_configurations_numbers
 from xsorbed.settings import Settings
-from xsorbed.dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS
+from xsorbed.dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS, IN_FILE_PATHS
 from xsorbed.common_definitions import *
 
 from xsorbed import ase_custom
@@ -227,15 +227,12 @@ def write_inputs_ml(settings : Settings,
 
     written_indices = []
 
+    os.makedirs(preopt_outdir, exist_ok=True)
+
     for i, atoms in zip(calc_indices, all_mol_on_slab_configs_ase):
         
-        all_mol_on_slab_configs_ase.pbc = True #ensure that the periodic boundary conditions are set
-        
-        file_label = f'preopt_{i}'        
-    
-        j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{i}'
-        calc = Calculator(settings, file_label, atoms, j_dir) 
-        calc.write_input(atoms)
+        atoms.pbc = True #ensure that the periodic boundary conditions are set
+        write(IN_FILE_PATHS['PREOPT'].format(i), atoms)
         written_indices.append(i)
 
     if VERBOSE: print('All input files written.') 
@@ -429,7 +426,7 @@ def get_preopt_structures():
     '''
     Reads the preopt structures from the output files of the preopt calculations
     '''
-    settings=Settings()
+    #settings=Settings()
 
     config_indices = _get_configurations_numbers()
 
