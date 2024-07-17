@@ -157,7 +157,8 @@ class Settings:
             'fix_mol_xyz'              : '0 0 1',
             'mol_before_slab'          : 'False',
             'sort_atoms_by_z'          : 'True',
-            'translate_slab'           : 'True'
+            'translate_slab'           : 'True',
+            'fix_bondlengths_preopt'   : 'False',
         }
         for flag in optional_structure_flags_list:
             if flag not in script_settings_dict['STRUCTURE']:
@@ -208,6 +209,8 @@ class Settings:
         self.sort_atoms_by_z        = True if 'true' in script_settings_dict['STRUCTURE']['sort_atoms_by_z'].lower() else False #to allow also .true./.false.
         self.translate_slab         = True if 'true' in script_settings_dict['STRUCTURE']['translate_slab'].lower() else False
         self.mol_before_slab        = True if 'true' in script_settings_dict['STRUCTURE']['mol_before_slab'].lower() else False
+        self.fix_bondlengths_preopt = True if 'true' in script_settings_dict['STRUCTURE']['fix_bondlengths_preopt'].lower() else False
+        
 
         self.sites_find_args = {
             'symm_reduce':self.symm_reduce, 

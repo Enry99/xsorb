@@ -58,7 +58,9 @@ OUT_FILE_PATHS = {
         'ESPRESSO': 'relax_{0}.pwo',
     },
     
-    'PREOPT': preopt_outdir+'/{0}/preopt_{0}.traj'
+    'PREOPT': {
+        'ML': preopt_outdir+'/{0}/preopt_{0}.traj'
+    }
 }
 
 IN_FILE_PATHS = {
@@ -72,7 +74,9 @@ IN_FILE_PATHS = {
         'ESPRESSO': 'relax_{0}.pwi',
     },
 
-    'PREOPT': preopt_outdir+'/{0}/preopt_{0}.xyz'
+    'PREOPT': {
+        'ML': preopt_outdir+'/{0}/preopt_{0}.xyz'
+    }
 }
 
 LOG_FILE_PATHS = {
@@ -86,7 +90,9 @@ LOG_FILE_PATHS = {
         'ESPRESSO': 'relax_{0}.pwo',
     },
 
-    'PREOPT': preopt_outdir+'/{0}/preopt_{0}.log'
+    'PREOPT': {
+        'ML' : preopt_outdir+'/{0}/preopt_{0}.log'
+    }
 }
 
 SBATCH_POSTFIX = {
@@ -100,18 +106,25 @@ SBATCH_POSTFIX = {
         'ESPRESSO': '{0}/relax_{1}.pwi {0}/relax_{1}.pwo',
     },
 
-    'ML': '{0}/preopt_{1}.xyz'
 }
 
 
 FRAGMENTS_IN_FILE_PATHS = {
     'VASP': 'fragments/{0}/POSCAR',
-    'ESPRESSO': 'fragments/{0}/{0}.pwi'
+    'ESPRESSO': 'fragments/{0}/{0}.pwi',
+    'ML': 'fragments/{0}/{0}_ml.xyz'
 }
 
 FRAGMENTS_OUT_FILE_PATHS = {
     'VASP': 'fragments/{0}/vasprun.xml',
-    'ESPRESSO': 'fragments/{0}/{0}.pwo'
+    'ESPRESSO': 'fragments/{0}/{0}.pwo',
+    'ML': 'fragments/{0}/{0}_ml.traj'
+}
+
+FRAGMENTS_LOG_FILE_PATHS = {
+    'VASP': 'fragments/{0}/vasprun.xml',
+    'ESPRESSO': 'fragments/{0}/{0}.pwo',
+    'ML': 'fragments/{0}/{0}_ml.log'
 }
 
 SBATCH_POSTFIX_FRAGS = {

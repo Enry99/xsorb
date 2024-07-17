@@ -53,7 +53,7 @@ def main():
         launch_screening(SAVEFIG=args.save_figs, from_preopt=args.from_preopt)
 
     elif(args.r):
-        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, required_indices=args.i, REGENERATE=args.regenerate, BY_SITE=args.by_site)
+        final_relax(n_configs=args.n, threshold=args.t, exclude=args.exclude, required_indices=args.i, from_preopt=args.from_preopt,REGENERATE=args.regenerate, BY_SITE=args.by_site)
 
     elif(args.scancel):
         scancel_jobs()
@@ -69,6 +69,9 @@ def main():
     #energies
     elif(args.e):
         write_results_to_file(TXT=args.txt)
+
+    elif(args.plot_energies_pre):
+        plot_energy_evolution(calc_type = 'PREOPT')
     
     elif(args.plot_energies_scr):
         plot_energy_evolution(calc_type = 'SCREENING')
@@ -80,6 +83,12 @@ def main():
     #visualization
     elif(args.sites or args.sites_all):
         plot_adsorption_sites(ALL = args.sites_all)
+
+    elif(args.preopt_images):
+        config_images(calc_type='PREOPT', i_or_f = args.preopt_images[0],
+                      rotations=args.rotation, povray=args.povray, 
+                      width_res=args.width_res, depth_cueing=args.depth_cueing, 
+                      center_molecule=args.center_mol, cut_vacuum=args.cut_vacuum)
 
     elif(args.screening_images):
         config_images(calc_type='SCREENING', i_or_f = args.screening_images[0],
@@ -103,7 +112,7 @@ def main():
                          depth_cueing=args.depth_cueing, cut_vacuum=args.cut_vacuum)
 
     elif(args.view):
-        view_config('SCREENING' if args.view[0] == 's' else 'RELAX', index=int(args.view[1]), in_or_out = args.view[2])
+        view_config({'s': 'SCREENING', 'r': 'RELAX', 'p': 'PREOPT'}[args.view[0]], index=int(args.view[1]), in_or_out = args.view[2])
 
     elif(args.savefiles is not None):
         saveas(calc_type=args.savefiles[1],  i_or_f = args.savefiles[2], saveas_format=args.savefiles[0])

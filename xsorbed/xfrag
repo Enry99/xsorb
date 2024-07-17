@@ -45,11 +45,11 @@ def main():
     elif(args.g):
         setup_fragments_screening(RUN=False)
 
-    elif(args.s is not None):
-        setup_fragments_screening(RUN=True)
+    elif(args.s or args.preopt):
+        setup_fragments_screening(RUN=True, FROM_PREOPT=args.from_preopt, ML=args.preopt)
 
     elif(args.r):
-        final_relax_fragments(n_configs=args.n, threshold=args.t, BY_SITE=args.by_site)
+        final_relax_fragments(n_configs=args.n, threshold=args.t, BY_SITE=args.by_site, FROM_PREOPT=args.from_preopt)
 
     elif(args.restart):
         restart_jobs_fragments(calc_type = 'SCREENING' if args.restart == 's' else 'RELAX')
@@ -58,6 +58,8 @@ def main():
     #energies
     elif(args.deltae):
         get_diss_energies()
+    elif(args.deltaeml):
+        get_diss_energies(ML=True)
 
 
 if __name__ == '__main__':
