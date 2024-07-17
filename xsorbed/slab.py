@@ -166,7 +166,7 @@ class Slab:
                                                  near_reduce=near_reduce, 
                                                  no_obtuse_hollow=no_obtuse_hollow)
         if selected_sites:
-            sel_adsites = adsites['all'][selected_sites]
+            sel_adsites = [adsites['all'][i] for i in selected_sites]
         else:
             sel_adsites = adsites['all']
 
