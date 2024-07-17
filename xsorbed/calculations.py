@@ -62,7 +62,8 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
 
 
     #Find adsorption sites and labels (site type and x,y coords.)
-    adsites, adsites_labels = slab.find_adsorption_sites(
+    adsites, adsites_labels, connected_adsites = slab.find_adsorption_sites(
+        crystal = not settings.amorphous_site_finding,
         **settings.sites_find_args,
         selected_sites=settings.selected_sites,
         save_image=SAVEFIG,
@@ -82,7 +83,7 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
     
     # Move possible additional rotations to the end, to keep the already present calculations untouched
     # BEWARE: removing a rotation breaks the already present indices, possible future TODO: use a dictionary to keep track of the indices
-    if os.path.isfile(labels_filename):    
+    if os.path.isfile(labels_filename) and not settings.sites_find_args.get("amorphous_surrounding_sites"):    
         previous_labels = np.genfromtxt(labels_filename, delimiter=',', names=True)
         previous_rotations = np.unique([x.tolist()[1:4] for x in previous_labels], axis=0)
         new_rotations = [list(map(float, l.split(',')[:-1])) for l in rotations_labels]
@@ -111,6 +112,8 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
                                                 min_z_distance_from_surf=settings.screening_min_distance,
                                                 adsites_labels=adsites_labels,
                                                 rotation_label=rot_label,
+                                                connected_adsites=connected_adsites,
+                                                surrounding_exclude_main=settings.sites_find_args.get("surrounding_exclude_main"),
                                                 mol_before_slab=settings.mol_before_slab) 
         all_mol_on_slab_configs_ase += structures
         full_labels += labels
