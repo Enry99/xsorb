@@ -34,7 +34,7 @@ class Molecule:
         - atoms_subset: indices of the atoms to include. Only removes atom NOT in this list, does not check
         if the atoms in the list actually exist in the molecule
         - break_bond_indices: indices of the two atoms of the bond to be broken. The fragment containing the first atom will be kept.
-        - fixed_indices_mol: list of specific atoms to be fixed 
+        - fixed_indices_mol: list of specific atoms to be fixed (-1 : fix all)
         (indices start from 0, with the ordering of the atoms in the input file)
         - fix_mol_xyz: which coordinates to fix for the fixed atoms, e.g. [True, True, False] = fix motion in x,y, free to move along z.
     '''
@@ -63,6 +63,7 @@ class Molecule:
 
         #SET CONSTRAINTS
         if fixed_indices_mol:
+            if -1 in fixed_indices_mol: fixed_indices_mol = list(range(len(self.mol_ase)))
             c = [FixCartesian(idx, mask=[not x for x in fix_mol_xyz]) for idx in fixed_indices_mol]  #we need to negate: in qe 0 = fix, here 1(true)=fix
             self.mol_ase.set_constraint(c)
         else: self.mol_ase.set_constraint() #clean possible constraints read from file

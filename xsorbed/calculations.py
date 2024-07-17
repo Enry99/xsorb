@@ -6,7 +6,7 @@ Main functions to generate the adsorption configurations and set up the calculat
 
 """
 
-from ase.io import read
+from ase.io import read, write
 import numpy as np
 import os, sys
 from operator import itemgetter
@@ -14,9 +14,9 @@ from operator import itemgetter
 from ase.constraints import FixCartesian
 from xsorbed.slab import Slab
 from xsorbed.molecule import Molecule
-from xsorbed.io_utils import launch_jobs, get_calculations_results, _get_configurations_numbers
+from xsorbed.io_utils import launch_jobs, launch_jobs_ml, get_calculations_results, get_calculations_results_ml, _get_configurations_numbers
 from xsorbed.settings import Settings
-from xsorbed.dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS
+from xsorbed.dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS, IN_FILE_PATHS
 from xsorbed.common_definitions import *
 
 from xsorbed import ase_custom
@@ -117,7 +117,7 @@ def adsorption_configurations(settings : Settings, SAVEFIG : bool = False, VERBO
 
     if VERBOSE: print('All slab+adsorbate cells generated.')
 
-    return all_mol_on_slab_configs_ase, full_labels
+    return all_mol_on_slab_configs_ase, full_labels, slab.slab_ase, mol.mol_ase
 
 
 def write_labels_csvfile(full_labels : list, labels_filename : str):
@@ -141,7 +141,7 @@ def regenerate_missing_sitelabels():
     
     settings=Settings()
     
-    _, full_labels = adsorption_configurations(settings, SAVEFIG=False, VERBOSE=True)
+    _, full_labels, _, _ = adsorption_configurations(settings, SAVEFIG=False, VERBOSE=True)
 
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
@@ -207,11 +207,55 @@ def write_inputs(settings : Settings,
     return written_indices
 
 
+def write_inputs_ml(settings : Settings, 
+                 all_mol_on_slab_configs_ase : list, 
+                 calc_indices : list,
+                 VERBOSE : bool = True):
+    '''
+    Writes the input files for all the adsorption configurations.
+
+
+    Args:
+    - settings: Settings object, containing the dft code parameters
+    - all_mol_on_slab_configs_ase: list of ASE atoms for all the adsorption configurations
+
+    Returns:
+    - written_indices: list of the indices of the configurations for which the input files have been written
+    '''
+    
+    if VERBOSE: print('Writing pre-optimization input files...')
+
+    written_indices = []
+
+    os.makedirs(preopt_outdir, exist_ok=True)
+
+    for i, atoms in zip(calc_indices, all_mol_on_slab_configs_ase):
+        
+        os.makedirs(f'{preopt_outdir}/{i}', exist_ok=True)
+        atoms.pbc = True #ensure that the periodic boundary conditions are set
+        write(IN_FILE_PATHS['PREOPT']['ML'].format(i), atoms)
+        written_indices.append(i)
+
+    if VERBOSE: print('All input files written.') 
+
+    return written_indices
+
+
+def write_slab_mol_ml(slab, mol):
+    os.makedirs(preopt_outdir, exist_ok=True)
+    os.makedirs(preopt_outdir+'/slab', exist_ok=True)
+    os.makedirs(preopt_outdir+'/mol', exist_ok=True)
+
+    write(preopt_outdir+'/slab/slab.xyz', slab)
+    write(preopt_outdir+'/mol/mol.xyz', mol)
+
+
 def obtain_fullrelax_indices(settings : Settings,
                              n_configs: int = None, 
                              threshold : float = None, 
                              exclude : list= None, 
-                             BY_SITE = False):
+                             BY_SITE = False,
+                             from_preopt : bool = False):
     '''
     Returns a list with the indices of the configurations for the final relaxation,
     chosen according to the given parameters
@@ -226,7 +270,10 @@ def obtain_fullrelax_indices(settings : Settings,
     
         
     print('Collecting energies from screening...')
-    screening_results = get_calculations_results(program=settings.program, calc_type='SCREENING')
+    if from_preopt:
+        screening_results = get_calculations_results_ml()
+    else:
+        screening_results = get_calculations_results(program=settings.program, calc_type='SCREENING')
     print('Screening energies collected.')
     
     
@@ -234,8 +281,8 @@ def obtain_fullrelax_indices(settings : Settings,
     if False in screening_results['relax_completed'].values() \
         or len(screening_results['relax_completed'].values()) < len(_get_configurations_numbers()):
         
-        print('Not all screening calculations have provided a final energy. \
-                Those for which no output exists will be excluded, while for those not completed the last coordinates will be used.')
+        print('Not all screening calculations have provided a final energy." \
+                "Those for which no output exists will be excluded, while for those not completed the last coordinates will be used.')
         while True:
             answer = input('Continue anyway with those available? ("y" = yes, "n" = no (quit)): ')
             if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
@@ -291,7 +338,7 @@ def obtain_fullrelax_indices(settings : Settings,
     return calculations_indices
 
 
-def obtain_fullrelax_structures(settings : Settings, calculations_indices : list, REGENERATE : bool = False):
+def obtain_fullrelax_structures(settings : Settings, calculations_indices : list, REGENERATE : bool = False, from_preopt : bool = False):
     '''
     Returns a list with the adsorption configurations for the full relax, either reading the final coordinates
     of the screening, or re-generating them from scratch according to settings.in
@@ -302,8 +349,11 @@ def obtain_fullrelax_structures(settings : Settings, calculations_indices : list
     - REGENERATE: re-generate the configurations from scratch, starting from isolated slab and molecule. Can be used to change the initial distance
     and repeat the relax from the beginning
     ''' 
-    if(REGENERATE):
-        all_mol_on_slab_configs_ase, _ = adsorption_configurations(settings=settings)
+
+    all_mol_on_slab_configs_ase, _, _, _ = adsorption_configurations(settings=settings)
+
+    if REGENERATE:
+        return all_mol_on_slab_configs_ase
     else:
         #Read slab and molecule for constraints
         #Slab import from file
@@ -324,9 +374,9 @@ def obtain_fullrelax_structures(settings : Settings, calculations_indices : list
                     fixed_indices_mol=settings.fixed_indices_mol, 
                     fix_mol_xyz=settings.fix_mol_xyz)        
         
-        all_mol_on_slab_configs_ase = []
+        new_all_mol_on_slab_configs_ase = []
         for index in calculations_indices:
-            atoms = read(OUT_FILE_PATHS['SCREENING'][settings.program].format(index))
+            atoms = read(OUT_FILE_PATHS['SCREENING' if not from_preopt else 'PREOPT'][settings.program if not from_preopt else 'ML'].format(index))
             #set constraints from mol and slab if when we are reading the whole pre-relaxed structure
             
             if settings.mol_before_slab:
@@ -337,10 +387,12 @@ def obtain_fullrelax_structures(settings : Settings, calculations_indices : list
                 c = [constraint for constraint in slab.slab_ase.constraints] + \
                     [FixCartesian(constraint.a + slab.natoms, ~constraint.mask) for constraint in mol.mol_ase.constraints]              
             
-            atoms.set_constraint(c)
-            all_mol_on_slab_configs_ase.append(atoms)
+            origatoms = all_mol_on_slab_configs_ase[index]
+            origatoms.set_constraint(c)
+            origatoms.positions = atoms.positions
+            new_all_mol_on_slab_configs_ase.append(origatoms)
 
-    return all_mol_on_slab_configs_ase
+        return new_all_mol_on_slab_configs_ase
 
  
 def generate(SAVEFIG=False):
@@ -354,7 +406,7 @@ def generate(SAVEFIG=False):
     
     settings=Settings(read_energies=False)
 
-    all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG)
+    all_mol_on_slab_configs_ase, full_labels, _, _ = adsorption_configurations(settings, SAVEFIG)
 
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
@@ -367,8 +419,57 @@ def generate(SAVEFIG=False):
                  OVERRIDE_SETTINGS=False,
                  INTERACTIVE=True)
 
-  
-def launch_screening(SAVEFIG : bool = False):
+
+def preopt_ml(SAVEFIG : bool = False):
+    
+    settings=Settings()
+
+
+    all_mol_on_slab_configs_ase, full_labels, slab, mol = adsorption_configurations(settings, SAVEFIG, VERBOSE=True)
+
+    write_labels_csvfile(full_labels, labels_filename=labels_filename)
+
+    write_slab_mol_ml(slab=slab, mol=mol)
+
+    written_indices = write_inputs_ml(settings, 
+                                    all_mol_on_slab_configs_ase,
+                                    calc_indices=np.arange(len(all_mol_on_slab_configs_ase))
+                                    )
+
+    #slab and molecule
+    launch_jobs_ml(jobscript_ml=settings.jobscript_ml,
+                   sbatch_command=settings.sbatch_command_ml,
+                    explicit_labels=['slab', 'mol'],
+                    fix_bondlengths=settings.fix_bondlengths_preopt,
+                    slab_indices=[0 + settings.mol_before_slab * len(mol), len(slab) + settings.mol_before_slab * len(mol)],
+                    jobname_prefix=settings.jobname_prefix)
+
+    #adsorption structures
+    launch_jobs_ml(jobscript_ml=settings.jobscript_ml,
+                sbatch_command=settings.sbatch_command_ml,
+                indices_list=written_indices,
+                fix_bondlengths=settings.fix_bondlengths_preopt,
+                slab_indices=[0 + settings.mol_before_slab * len(mol), len(slab) + settings.mol_before_slab * len(mol)],
+                jobname_prefix=settings.jobname_prefix)  
+
+
+def get_preopt_structures():
+    '''
+    Reads the preopt structures from the output files of the preopt calculations
+    '''
+    #settings=Settings()
+
+    config_indices = _get_configurations_numbers()
+
+    all_mol_on_slab_configs_ase = []
+    for index in config_indices:
+        atoms = read(OUT_FILE_PATHS['PREOPT']['ML'].format(index))
+        all_mol_on_slab_configs_ase.append(atoms)
+
+    return all_mol_on_slab_configs_ase
+
+
+def launch_screening(SAVEFIG : bool = False, from_preopt : bool = False):
     '''
     Generates adsorption configurations, writes inputs and launches calculations for the preliminary screening.
 
@@ -378,9 +479,15 @@ def launch_screening(SAVEFIG : bool = False):
     
     settings=Settings()
 
-    all_mol_on_slab_configs_ase, full_labels = adsorption_configurations(settings, SAVEFIG, VERBOSE=True)
+    all_mol_on_slab_configs_ase, full_labels, _, _ = adsorption_configurations(settings, SAVEFIG, VERBOSE=True)
 
-    write_labels_csvfile(full_labels, labels_filename=labels_filename)
+    if from_preopt:
+        preopt_structures = get_preopt_structures()
+        for i, atoms in enumerate(preopt_structures):
+            all_mol_on_slab_configs_ase[i].positions = atoms.positions
+    else:
+        write_labels_csvfile(full_labels, labels_filename=labels_filename)
+
 
     written_indices = write_inputs(settings, 
                                     all_mol_on_slab_configs_ase,
@@ -396,7 +503,7 @@ def launch_screening(SAVEFIG : bool = False):
                 jobname_prefix=settings.jobname_prefix)    
 
  
-def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, REGENERATE=False, BY_SITE = False):
+def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, from_preopt : bool = False, REGENERATE=False, BY_SITE = False):
     '''
     Reads/generates adsorption configurations, writes inputs and launches calculations for the final relax.
 
@@ -421,9 +528,10 @@ def final_relax(n_configs: int = None, threshold : float = None, exclude : list=
                                                         n_configs=n_configs, 
                                                         threshold=threshold, 
                                                         exclude=exclude, 
-                                                        BY_SITE=BY_SITE)
+                                                        BY_SITE=BY_SITE,
+                                                        from_preopt=from_preopt)
 
-    all_mol_on_slab_configs_ase = obtain_fullrelax_structures(settings, calculations_indices, REGENERATE)
+    all_mol_on_slab_configs_ase = obtain_fullrelax_structures(settings, calculations_indices, REGENERATE, from_preopt=from_preopt)
 
 
     write_inputs(settings, 

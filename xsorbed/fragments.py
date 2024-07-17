@@ -15,12 +15,13 @@ import numpy as np
 import pandas as pd
 from xsorbed.settings import Settings
 from xsorbed.molecule import Molecule
-from xsorbed.calculations import launch_screening, final_relax
-from xsorbed.io_utils import get_calculations_results, restart_jobs
+from xsorbed.calculations import launch_screening, final_relax, preopt_ml
+from xsorbed.io_utils import get_calculations_results, get_calculations_results_ml, restart_jobs
 from xsorbed.common_definitions import *
-from xsorbed.dftcode_specific import FRAGMENTS_OUT_FILE_PATHS, FRAGMENTS_IN_FILE_PATHS, SBATCH_POSTFIX_FRAGS, \
+from xsorbed.dftcode_specific import FRAGMENTS_OUT_FILE_PATHS, FRAGMENTS_IN_FILE_PATHS, FRAGMENTS_LOG_FILE_PATHS, SBATCH_POSTFIX_FRAGS, \
     override_settings_isolated_fragment, override_settings_adsorbed_fragment, Calculator
 from xsorbed import ase_custom
+from ase.io import write
 
 
 TEST = False   #set to true for testing: prints sbatch command instead of actually launching jobs for the isolated fragments
@@ -85,6 +86,7 @@ def generate_all_isolated_fragments(settings : Settings, fragments_dict : dict, 
 def write_fragments_inputs(settings : Settings, 
                            fragments_dict : dict, 
                            molecules : list,
+                           ML : bool = False,
                            OVERRIDE_SETTINGS : bool = True, 
                            INTERACTIVE : bool = True):
     """
@@ -112,7 +114,7 @@ def write_fragments_inputs(settings : Settings,
         os.makedirs(outdir, exist_ok=True)
 
         if INTERACTIVE:
-            if os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program].format(fragment_name)): 
+            if os.path.exists(FRAGMENTS_OUT_FILE_PATHS[settings.program if not ML else 'ML'].format(fragment_name)): 
                 print(f'{fragment_name} output file already present, possibly from a running calculation. You can decide to re-calculate it or skip it.')        
                 while True:
                     answer = input('Re-calculate? ("y" = yes, "n" = no): ')
@@ -121,7 +123,7 @@ def write_fragments_inputs(settings : Settings,
                     else: print('Value not recognized. Try again.')
                 if 'n' in answer: continue
 
-            if os.path.exists(FRAGMENTS_IN_FILE_PATHS[settings.program].format(fragment_name)):
+            if os.path.exists(FRAGMENTS_IN_FILE_PATHS[settings.program if not ML else 'ML'].format(fragment_name)):
                 print(f'{fragment_name} input file already present.')
                 while True:
                     answer = input('Overwrite? ("y" = yes, "n" = no): ')
@@ -142,8 +144,11 @@ def write_fragments_inputs(settings : Settings,
             override_settings_isolated_fragment(newsettings, molecule.natoms, manual_dft_override)
         
         os.chdir(outdir)
-        calc = Calculator(newsettings, fragment_name, molecule.mol_ase, '.') 
-        calc.write_input(molecule.mol_ase)
+        if not ML:
+            calc = Calculator(newsettings, fragment_name, molecule.mol_ase, '.') 
+            calc.write_input(molecule.mol_ase)
+        else: 
+            write(f'{fragment_name}.xyz', molecule.mol_ase)
         os.chdir(main_dir)
 
         frag_list.append(fragment_name)
@@ -190,7 +195,7 @@ def launch_fragments_jobs(program : str, jobscript : str, sbatch_command : str, 
         os.chdir(main_dir) ####################
 
 
-def isolated_fragments(RUN=False):
+def isolated_fragments(RUN=False, ML : bool = False):
     """
     Generate isolated fragments and launch fragment jobs.
 
@@ -202,6 +207,9 @@ def isolated_fragments(RUN=False):
         fragments_dict = json.load(f)
 
     settings = Settings()
+    if ML:
+        settings.program = 'ML'
+        settings.jobscript = settings.jobscript_ml
 
     molecules = generate_all_isolated_fragments(settings, fragments_dict, VERBOSE=True)
 
@@ -273,7 +281,7 @@ def edit_fragment_settings(lines : list,
     return settings_lines_frag
 
 
-def setup_fragments_screening(RUN = False):
+def setup_fragments_screening(RUN = False, FROM_PREOPT=False, ML=False):
     
     with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
@@ -290,6 +298,8 @@ def setup_fragments_screening(RUN = False):
         os.makedirs(outdir, exist_ok=True)
 
         shutil.copyfile(settings.jobscript, f'{outdir}/{jobscript_stdname}')
+        if ML:
+            shutil.copyfile(settings.jobscript_ml, f'{outdir}/{jobscript_stdname}_ml')
 
         frag_initial = generate_isolated_fragment(settings, fragment_dict)
         
@@ -303,48 +313,53 @@ def setup_fragments_screening(RUN = False):
 
 
         #only edit settings.in if not already present. This allows to fine-tune some parameters for specific fragments after -g, before -s
-        answer = 'yes'
-        if os.path.exists(f'{outdir}/settings.in'):
-            print(f'{outdir}/settings.in already present.')
-            while True:
-                answer = input('Overwrite? ("y" = yes, "n" = no): ')
-                if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
-                    break
-                else: print('Value not recognized. Try again.')
-   
-        if 'y' in answer:
-            with open('settings.in', 'r') as f:
-                settings_lines = f.readlines() 
-            settings_dict = dict(jobscript=f'{jobscript_stdname} {settings.sbatch_command}',
-                                slab_filename=os.path.abspath(settings.slab_filename),
-                                molecule_filename=os.path.abspath(fragment_filename),
-                                selected_atom_index=frag_initial.reference_atom_index,
-                                x_rot_angles=fragment_dict.get("x_rot_angles", None),
-                                y_rot_angles=fragment_dict.get("y_rot_angles", None),
-                                z_rot_angles=fragment_dict.get("z_rot_angles", None),
-                                vertical_angles=fragment_dict.get("vertical_angles", None),
-                                screening_atom_distance=fragment_dict.get("screening_atom_distance", None),
-                                screening_min_distance=fragment_dict.get("screening_min_distance", None),
-                                relax_atom_distance=fragment_dict.get("relax_atom_distance", None),
-                                relax_min_distance=fragment_dict.get("relax_min_distance", None),
-                                fixed_indices_mol=frag_initial.constrained_indices,
-                                fix_mol_xyz=fragment_dict.get("fix_mol_xyz", None),
+        if not FROM_PREOPT:
+            answer = 'yes'
+            if os.path.exists(f'{outdir}/settings.in'):
+                print(f'{outdir}/settings.in already present.')
+                while True:
+                    answer = input('Overwrite? ("y" = yes, "n" = no): ')
+                    if answer == 'yes' or answer == 'y' or answer == 'no' or answer == 'n': 
+                        break
+                    else: print('Value not recognized. Try again.')
+    
+            if 'y' in answer:
+                with open('settings.in', 'r') as f:
+                    settings_lines = f.readlines() 
+                settings_dict = dict(jobscript=f'{jobscript_stdname} {settings.sbatch_command}',
+                                    slab_filename=os.path.abspath(settings.slab_filename),
+                                    molecule_filename=os.path.abspath(fragment_filename),
+                                    jobname_prefix=fragment_name,
+                                    selected_atom_index=frag_initial.reference_atom_index,
+                                    x_rot_angles=fragment_dict.get("x_rot_angles", None),
+                                    y_rot_angles=fragment_dict.get("y_rot_angles", None),
+                                    z_rot_angles=fragment_dict.get("z_rot_angles", None),
+                                    vertical_angles=fragment_dict.get("vertical_angles", None),
+                                    screening_atom_distance=fragment_dict.get("screening_atom_distance", None),
+                                    screening_min_distance=fragment_dict.get("screening_min_distance", None),
+                                    relax_atom_distance=fragment_dict.get("relax_atom_distance", None),
+                                    relax_min_distance=fragment_dict.get("relax_min_distance", None),
+                                    fixed_indices_mol=frag_initial.constrained_indices,
+                                    fix_mol_xyz=fragment_dict.get("fix_mol_xyz", None),
 
-                                dft_settings_override=fragment_dict.get("dft_settings_override", None)
-                                )
-            settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict, program=settings.program)  
-            with open(f'{outdir}/settings.in', 'w') as f:
-                f.writelines(settings_lines)
+                                    dft_settings_override=fragment_dict.get("dft_settings_override", None)
+                                    )
+                if ML: settings_dict.update(jobscript_ml=f'{jobscript_stdname}_ml {settings.sbatch_command_ml}')
+                settings_lines = edit_fragment_settings(lines=settings_lines, settings_dict=settings_dict, program=settings.program)  
+                with open(f'{outdir}/settings.in', 'w') as f:
+                    f.writelines(settings_lines)
 
 
         os.chdir(outdir)
-        if RUN: launch_screening()
+        if RUN: 
+            if not ML: launch_screening(from_preopt=FROM_PREOPT)
+            else: preopt_ml()
         os.chdir(main_dir)
 
     #print(json.dumps(fragments_dict, indent=3))
 
 
-def final_relax_fragments(n_configs, threshold, BY_SITE):
+def final_relax_fragments(n_configs, threshold, BY_SITE, FROM_PREOPT=False):
 
     with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
@@ -358,7 +373,7 @@ def final_relax_fragments(n_configs, threshold, BY_SITE):
 
         outdir = f'fragments/{fragment_name}'
         os.chdir(outdir)
-        final_relax(n_configs=n_configs, threshold=threshold, BY_SITE=BY_SITE)
+        final_relax(n_configs=n_configs, threshold=threshold, BY_SITE=BY_SITE, from_preopt=FROM_PREOPT)
         os.chdir(main_dir)
         
 
@@ -380,7 +395,7 @@ def restart_jobs_fragments(calc_type : str):
         os.chdir(main_dir)
 
 
-def get_diss_energies():
+def get_diss_energies(ML: bool = False):
 
     with open(framgents_filename, "r") as f:
         fragments_dict = json.load(f)
@@ -390,7 +405,10 @@ def get_diss_energies():
 
     datafile = pd.read_csv(labels_filename, index_col=0)
     settings = Settings(VERBOSE=False)
-    results_mol = get_calculations_results(settings.program, 'RELAX', [0,0])
+    if ML:
+        results_mol, eslab, emol = get_calculations_results_ml(subtract_eslabmol=False, return_separately_eslabmol=True)
+    else:
+        results_mol = get_calculations_results(settings.program, 'RELAX', [0,0])
     energies_mol = []
     indices_mol = []
     for idx, energy in results_mol['energies'].items():
@@ -415,7 +433,10 @@ def get_diss_energies():
         outdir = f'fragments/{fragment_name}'
         os.chdir(outdir)
         datafile = pd.read_csv(labels_filename, index_col=0)
-        results_frag = get_calculations_results(settings.program, 'RELAX', [0,0])
+        if ML:
+            results_frag = get_calculations_results_ml(subtract_eslabmol=False)
+        else:
+            results_frag = get_calculations_results(settings.program, 'RELAX', [0,0])
         energies_frag = []
         indices_frag = []
         for idx, energy in results_frag['energies'].items():
@@ -439,15 +460,16 @@ def get_diss_energies():
         initial_fragment_name = combination[0]
         dissoc_products_total_ads_en = sum([ fragments_data[frag]["energy"] for frag in products_names])
         initial_fragment_energy = fragments_data[ initial_fragment_name ]["energy"]
-        diss_en = dissoc_products_total_ads_en - initial_fragment_energy - settings.E_slab_mol[0] * (len(combination[1]) - 1)
+        diss_en = dissoc_products_total_ads_en - initial_fragment_energy - (eslab if ML else settings.E_slab_mol[0]) * (len(combination[1]) - 1)
 
         fragments_names = '{0}({1}) -> '.format(initial_fragment_name, fragments_data[initial_fragment_name]["site"]).format()    \
             +' + '.join([ '{0}({1})'.format(frag, fragments_data[frag]["site"]) for frag in products_names])
 
         text.append('{:70}{:+.3f}\n'.format(fragments_names, diss_en))
 
-    with open('DISSOCIATION.txt', 'w') as f:
+    diss_outfile = f'DISSOCIATION{"_ml" if ML else ""}.txt'
+    with open(diss_outfile, 'w') as f:
         f.write( '{0:70}{1}'.format("Fragments(most stable site)", "dissociation energy(eV)\n"))
         f.writelines( text )
 
-    print(f"Dissociation results written to {'DISSOCIATION.txt'}")
+    print(f"Dissociation results written to {diss_outfile}")

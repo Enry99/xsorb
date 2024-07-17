@@ -40,7 +40,7 @@ class Slab:
         used by Pymatgen to find adsorption sites (it is the 'height' parameter of Pymatgen's AdsorbateSiteFinder)
         - fixed_layers_slab: list of layers of the slab to be fixed 
         (counting starts from the bottom, beginning with 0)
-        - fixed_indices_slab: list of specific atoms to be fixed 
+        - fixed_indices_slab: list of specific atoms to be fixed (-1: fix all)
         (indices start from 0, with the ordering of the atoms in the input file)
         - fix_slab_xyz: which coordinates to fix for the fixed atoms, e.g. [True, True, False] = fix motion in x,y, free to move along z.
         - sort_atoms_by_z: sort the atoms of the slab according to their z coordinate, in reverse order (from higher to lower)
@@ -70,6 +70,8 @@ class Slab:
         if(fixed_layers_slab): # identify the atoms belonging to the various layers
             fixed_atoms_indices = self._find_atom_indices_fixed_layers(layers_threshold, fixed_layers_slab)
         elif(fixed_indices_slab):
+            if -1 in fixed_indices_slab: #fix all atoms
+                fixed_atoms_indices = list(range(self.natoms))
             fixed_atoms_indices = fixed_indices_slab
 
         c = [FixCartesian(atom_index, mask=[not x for x in fix_slab_xyz]) for atom_index in fixed_atoms_indices]  #we need to negate: in qe 0 = fix, here 1(true)=fix

@@ -24,13 +24,15 @@ HYBRID_SCREENING_THRESHOLDS = {
 
 UNITS_TO_EV_FACTOR = {
     'VASP' : 1,
-    'ESPRESSO': create_units('2006')['Rydberg']
+    'ESPRESSO': create_units('2006')['Rydberg'],
+    'ML': 1
 }
 
 OPTIMIZATION_COMPLETED_STRINGS = {
         #'VASP' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
         'VASP' : 'finalpos', #in vasprun.xml
-        'ESPRESSO': 'Begin final coordinates'
+        'ESPRESSO': 'Begin final coordinates',
+        'ML': 'Optimization completed.'
 }
 
 
@@ -54,6 +56,10 @@ OUT_FILE_PATHS = {
     'RELAX': {
         'VASP': relax_outdir+'/{0}/vasprun.xml',
         'ESPRESSO': 'relax_{0}.pwo',
+    },
+    
+    'PREOPT': {
+        'ML': preopt_outdir+'/{0}/preopt_{0}.traj'
     }
 }
 
@@ -66,6 +72,26 @@ IN_FILE_PATHS = {
     'RELAX': {
         'VASP': relax_outdir+'/{0}/POSCAR',
         'ESPRESSO': 'relax_{0}.pwi',
+    },
+
+    'PREOPT': {
+        'ML': preopt_outdir+'/{0}/preopt_{0}.xyz'
+    }
+}
+
+LOG_FILE_PATHS = {
+    'SCREENING': {
+        'VASP': screening_outdir+'/{0}/vasprun.xml',
+        'ESPRESSO': 'screening_{0}.pwo',
+    },
+
+    'RELAX': {
+        'VASP': relax_outdir+'/{0}/vasprun.xml',
+        'ESPRESSO': 'relax_{0}.pwo',
+    },
+
+    'PREOPT': {
+        'ML' : preopt_outdir+'/{0}/preopt_{0}.log'
     }
 }
 
@@ -78,18 +104,27 @@ SBATCH_POSTFIX = {
     'RELAX': {
         'VASP': '',
         'ESPRESSO': '{0}/relax_{1}.pwi {0}/relax_{1}.pwo',
-    }
+    },
+
 }
 
 
 FRAGMENTS_IN_FILE_PATHS = {
     'VASP': 'fragments/{0}/POSCAR',
-    'ESPRESSO': 'fragments/{0}/{0}.pwi'
+    'ESPRESSO': 'fragments/{0}/{0}.pwi',
+    'ML': 'fragments/{0}/{0}_ml.xyz'
 }
 
 FRAGMENTS_OUT_FILE_PATHS = {
     'VASP': 'fragments/{0}/vasprun.xml',
-    'ESPRESSO': 'fragments/{0}/{0}.pwo'
+    'ESPRESSO': 'fragments/{0}/{0}.pwo',
+    'ML': 'fragments/{0}/{0}_ml.traj'
+}
+
+FRAGMENTS_LOG_FILE_PATHS = {
+    'VASP': 'fragments/{0}/vasprun.xml',
+    'ESPRESSO': 'fragments/{0}/{0}.pwo',
+    'ML': 'fragments/{0}/{0}_ml.log'
 }
 
 SBATCH_POSTFIX_FRAGS = {

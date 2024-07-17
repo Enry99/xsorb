@@ -17,7 +17,7 @@ from ase.io import read, write
 from xsorbed.slab import Slab
 from xsorbed.molecule import Molecule
 from xsorbed.settings import Settings
-from xsorbed.io_utils import get_calculations_results, _get_configurations_numbers
+from xsorbed.io_utils import get_calculations_results, _get_configurations_numbers, get_calculations_results_ml
 from xsorbed.dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
 from xsorbed.common_definitions import *
 
@@ -64,9 +64,15 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
 
     elif i_or_f == 'f': #read from output file
 
-        results = get_calculations_results(settings.program, calc_type, settings.E_slab_mol)
+        if calc_type=='PREOPT':
+            results = get_calculations_results_ml()
+        else:
+            results = get_calculations_results(settings.program, calc_type, settings.E_slab_mol)
         calc_indices = [key for key, val in results['energies'].items() if val is not None]
-        configs = [read(OUT_FILE_PATHS[calc_type][settings.program].format(i), index=index) for i in calc_indices]
+        if calc_type=='PREOPT':
+            configs = [read(OUT_FILE_PATHS[calc_type]['ML'].format(i), index=index) for i in calc_indices]
+        else:
+            configs = [read(OUT_FILE_PATHS[calc_type][settings.program].format(i), index=index) for i in calc_indices]
 
     
     #read slab and mol 
@@ -296,7 +302,10 @@ def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, po
         axes[i].imshow(img)
         axes[i].axis('equal') #ensures all images are in identical rectangular boxes, rescaling the size of the image if necessary
         energy = results['energies'][calc_index]
-        status = '**' if results['scf_nonconverged'][calc_index] else '*' if not results['relax_completed'][calc_index] else ''
+        if calc_type == 'PREOPT':
+            status = '*' if not results['relax_completed'][calc_index] else ''
+        else:
+            status = '**' if results['scf_nonconverged'][calc_index] else '*' if not results['relax_completed'][calc_index] else ''
         axes[i].set_title(f'{energy:.2f}{status} eV', fontsize = 5, pad=1, color='red' if i == imin else 'black')
         #rect = plt.patches.Rectangle((0.0, 0.93), 0.08, 0.07, transform=axes[i].transAxes, facecolor='white', edgecolor='black', linewidth=0.5)
         #axes[i].add_artist(rect)
@@ -413,7 +422,7 @@ def view_config(calc_type : str, index : int, in_or_out : str):
     View the selected config with ASE viewer
 
     Args:
-    - calc_type: 'SCREENING' or 'RELAX'
+    - calc_type: 'SCREENING' or 'RELAX' or 'PREOPT'
     - in_or_out: read from input or from output
     - index: index of the configuration
     '''
@@ -427,7 +436,7 @@ def view_config(calc_type : str, index : int, in_or_out : str):
     else:
         raise ValueError(f'in or out not recognized. You provided {in_or_out}.')
 
-    file = FILE_PATHS[calc_type][settings.program].format(index)
+    file = FILE_PATHS[calc_type][settings.program if calc_type!='PREOPT' else 'ML'].format(index)
 
     try:
         import xsorbed.ase_custom #to make sure that read is correctly monkey-patched
@@ -448,7 +457,10 @@ def relax_animations(calc_type : str,
     if width_res is None and povray: width_res = 500
     
 
-    if calc_type == 'SCREENING':
+    if calc_type == 'PREOPT':
+        configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
+            CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images('PREOPT', read_evolution=True)
+    elif calc_type == 'SCREENING':
         configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
             CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images('SCREENING', read_evolution=True)
     else: #screening + relax
@@ -483,7 +495,7 @@ def relax_animations(calc_type : str,
     print('Generating animation(s)...')
 
     
-    savedir = f'relax_{images_dirname}'
+    savedir = f'relax_{images_dirname}' if calc_type != 'PREOPT' else f'preopt_{images_dirname}'
     os.makedirs(savedir, exist_ok=True)
 
    
@@ -549,13 +561,17 @@ def plot_energy_evolution(calc_type : str):
     
     settings = Settings()
 
-    results = get_calculations_results(program=settings.program, 
+    if calc_type == 'PREOPT':
+        results = get_calculations_results_ml(
+                                        full_evolution=True)
+    else:
+        results = get_calculations_results(program=settings.program, 
                                         calc_type=calc_type,
                                         E_slab_mol=settings.E_slab_mol,
                                         full_evolution=True)
 
     
-    if 0 not in settings.E_slab_mol:
+    if 0 not in settings.E_slab_mol and calc_type != 'PREOPT':
         plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
     for i_config, energy_array in results['energies'].items():
         if energy_array is not None and len(energy_array) > 0:
@@ -563,7 +579,7 @@ def plot_energy_evolution(calc_type : str):
             #completion status of the calculations
             if results['relax_completed'][i_config]:
                 status = ''
-            elif results['scf_nonconverged'][i_config]:
+            elif calc_type != 'PREOPT' and results['scf_nonconverged'][i_config]:
                 status = '**'
             else: 
                 status = '*' #relax not completed, but scf converged
@@ -584,7 +600,7 @@ def plot_energy_evolution(calc_type : str):
     plt.grid(linestyle='dotted')
     plt.legend(title="Config, energy", 
                ncols=np.ceil(len([x for x in results['energies'].values() if x is not None])/10), 
-               prop={'size': 6  if calc_type == 'SCREENING' else 8})
+               prop={'size': 6  if (calc_type == 'SCREENING' or calc_type=='PREOPT') else 8})
     energy_plot_filename = f'{calc_type.lower()}_energies.png'
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
     print(f'Plot saved in {energy_plot_filename}')

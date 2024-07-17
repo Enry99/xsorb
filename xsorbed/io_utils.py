@@ -13,7 +13,7 @@ import os, shutil, subprocess
 import numpy as np
 import pandas as pd
 from ase.io import read, write
-from xsorbed.dftcode_specific import edit_files_for_restart, OPTIMIZATION_COMPLETED_STRINGS, SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, SBATCH_POSTFIX
+from xsorbed.dftcode_specific import edit_files_for_restart, OPTIMIZATION_COMPLETED_STRINGS, SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS, SBATCH_POSTFIX
 from xsorbed.settings import Settings
 from xsorbed.slab import Slab, mol_bonded_to_slab
 from xsorbed.molecule import Molecule
@@ -38,7 +38,7 @@ def optimization_completed(program : str, calc_type : str, i_calc : int):
     True or False
     '''
 
-    filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
+    filename = LOG_FILE_PATHS[calc_type][program].format(i_calc)
     searchfor = OPTIMIZATION_COMPLETED_STRINGS[program]
     
     with open(filename, 'r') as f:
@@ -137,7 +137,25 @@ def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bo
         return None
 
 
-def get_calculations_results(program : str, calc_type : str, E_slab_mol : list = [0,0], full_evolution : bool = False, VERBOSE : bool =True):
+def get_energy_ml(filename : str, full_evolution : bool = False):
+
+    try:
+        if not full_evolution:
+            atoms = read(filename)
+            return atoms.get_potential_energy()
+        else:
+            atoms_list = read(filename, index=':')
+            return np.array([a.get_potential_energy() for a in atoms_list])
+    except:
+        print(f'Warning: unable to read energy from file {filename}.')
+        return None    
+
+
+def get_calculations_results(program : str, 
+                             calc_type : str, 
+                             E_slab_mol : list = [0,0], 
+                             full_evolution : bool = False, 
+                             VERBOSE : bool =True):
     '''
     Returns a dictionary in the format
 
@@ -184,6 +202,59 @@ def get_calculations_results(program : str, calc_type : str, E_slab_mol : list =
     return results
 
 
+def get_calculations_results_ml(full_evolution : bool = False, subtract_eslabmol : bool = True, return_separately_eslabmol : bool = False):
+    '''
+    Returns a dictionary in the format
+
+    {
+        'energies': {1: -1200, 2: -1300},
+        'relax_completed': {1: True, 2: False},
+    }
+
+    The calculations with no output file are not included in the dictionary
+
+    Args:
+    - full_evolution: if True, each config in 'energies' will contain an array with the energies during relaxation
+    - VERBOSE: give warning messages for noncompleted calculations
+    '''
+
+    results = {'energies': {}, 'relax_completed': {}}
+
+    indices = _get_configurations_numbers()
+
+
+    # extract e_slab and e_mol
+
+    if subtract_eslabmol or return_separately_eslabmol:
+        try:
+            eslab = get_energy_ml(preopt_outdir+'/slab/slab.traj')
+            emol = get_energy_ml(preopt_outdir+'/mol/mol.traj')
+            E_slab_mol = [eslab, emol]
+        except:
+            eslab = None
+            emol = None
+            print('Warning: unable to read slab/molecule energies from preopt files. Total energies will be displayed.')
+
+    for index in indices:
+        if not os.path.isfile(OUT_FILE_PATHS['PREOPT']['ML'].format(index)):
+            continue #skip if file does not exist yet
+            
+        energy = get_energy_ml(OUT_FILE_PATHS['PREOPT']['ML'].format(index), full_evolution)
+
+        if energy is not None and subtract_eslabmol and E_slab_mol[0]:
+            energy -= (E_slab_mol[0]+E_slab_mol[1])
+        relax_completed = optimization_completed('ML', 'PREOPT', index)
+
+        results['energies'].update({index : energy})
+        results['relax_completed'].update({index : relax_completed})
+    
+    if return_separately_eslabmol:
+        return results, eslab, emol
+    else:
+        return results
+
+
+
 def write_results_to_file(TXT=False):
     '''
     Function to write the calculations results to a csv file.
@@ -199,6 +270,33 @@ def write_results_to_file(TXT=False):
     settings = Settings()
 
     datafile = pd.read_csv(labels_filename, index_col=0)
+
+
+    if os.path.isdir(preopt_outdir): #for preopt
+            preopt_results = \
+                get_calculations_results_ml()
+                
+            column_name = 'Eads_pre(eV)'
+
+            column_data = []
+            for i in datafile.index: #if the file exists, and so the energy might be present, or it might be None
+                if i in preopt_results['energies']:
+                    if preopt_results['energies'][i] is None:
+                        print(f'Config. {i} has no energy. It will be skipped.')
+                        column_data.append(None)
+                        continue
+                    
+                    column_data.append(preopt_results['energies'][i] )
+
+                    if not preopt_results['relax_completed'][i]:
+                        print(f'Warning! {i} relaxation has not reached final configuration. The energy will be marked with a *')
+                        column_data[-1] = f'{column_data[-1]:.3f}*'
+
+                else: #if the file does not exist
+                    column_data.append(None)
+
+            datafile[column_name] = column_data
+
 
     if os.path.isdir(screening_outdir): #for screening
         screening_results = \
@@ -269,9 +367,15 @@ def write_results_to_file(TXT=False):
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
             bonding_status.append('Yes' if status else 'No')
-        elif i in screening_results['energies'] and screening_results['energies'][i]:
+        elif os.path.isdir(screening_outdir) and i in screening_results['energies'] and screening_results['energies'][i]:
             status = check_bond_status(settings.program, 
                                                     calc_type='SCREENING', 
+                                                    i_calc=i, 
+                                                    mol_indices=mol_indices)
+            bonding_status.append('Yes' if status else 'No')
+        elif os.path.isdir(preopt_outdir) and i in preopt_results['energies'] and preopt_results['energies'][i]:
+            status = check_bond_status('ML', 
+                                                    calc_type='PREOPT', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
             bonding_status.append('Yes' if status else 'No')
@@ -353,6 +457,96 @@ def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command 
 
     with open("submitted_jobs.txt", "a") as f:
         f.write("\n".join(submitted_jobs)+'\n')
+
+
+def launch_jobs_ml(jobscript_ml : str, 
+                   sbatch_command : str, 
+                   indices_list : list = None, 
+                   explicit_labels : list | str = None, 
+                   fix_bondlengths : bool = False,
+                   slab_indices : list = None,
+                   jobname_prefix : str = ''):
+    '''
+    Launch the calculations.
+
+    Args:
+    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - calc_type: 'SCREENING' or 'RELAX'
+    - jobscript: path of the jobscript file
+    - sbatch_command: command to submit the jobscript (in Slurm it is sbatch)
+    - indices_list: indices of the calculations
+    '''
+    main_dir = os.getcwd()
+    
+    import pathlib
+    xsorb_dir = pathlib.Path(__file__).parent.resolve()
+
+    submitted_jobs = []
+
+    if explicit_labels:
+        if type(explicit_labels) == str:
+            explicit_labels = [explicit_labels]
+        for label in explicit_labels:
+            j_dir = preopt_outdir+'/{0}'.format(label)
+            shutil.copyfile(jobscript_ml, f'{j_dir}/{jobscript_stdname}')
+            
+            #change job title (only for slumr jobscripts)
+            with open(f'{j_dir}/{jobscript_stdname}', 'r') as f:
+                lines = f.readlines()
+                for i, line in enumerate(lines):
+                    if "job-name" in line:
+                        lines[i] = f"{line.split('=')[0]}={jobname_prefix}_{'pre'}{label}\n"
+                        break
+            with open(f'{j_dir}/{jobscript_stdname}', 'w') as f:       
+                f.writelines(lines)
+
+            os.chdir(j_dir)
+            in_file = label+'.xyz'
+            out_file = label+'.traj'
+            log_file = label+'.log'
+            launch_string = f"{sbatch_command} {jobscript_stdname} {xsorb_dir}/ml_opt.py {in_file} {out_file} {log_file} {main_dir} \
+                {'fix' if fix_bondlengths else 'nofix'} {slab_indices[0]} {slab_indices[1]}"
+            if(TEST): print(launch_string)
+            else: 
+                outstring = subprocess.getoutput(launch_string)
+                print(outstring)
+                submitted_jobs.append(outstring.split()[-1])
+            os.chdir(main_dir)
+    else:
+
+        for index in indices_list:
+
+            j_dir = preopt_outdir+'/{0}'.format(index)
+            shutil.copyfile(jobscript_ml, f'{j_dir}/{jobscript_stdname}')
+            
+            #change job title (only for slumr jobscripts)
+            with open(f'{j_dir}/{jobscript_stdname}', 'r') as f:
+                lines = f.readlines()
+                for i, line in enumerate(lines):
+                    if "job-name" in line:
+                        prefix = jobname_prefix + ('_' if len(jobname_prefix) else '')
+                        lines[i] = f"{line.split('=')[0]}={prefix}{'p'}{index}\n"
+                        break
+            with open(f'{j_dir}/{jobscript_stdname}', 'w') as f:       
+                f.writelines(lines)
+
+            os.chdir(j_dir)
+            in_file = os.path.basename(IN_FILE_PATHS['PREOPT']['ML'].format(index))
+            out_file = os.path.basename(OUT_FILE_PATHS['PREOPT']['ML'].format(index))
+            log_file = os.path.basename(LOG_FILE_PATHS['PREOPT']['ML'].format(index))
+            launch_string = f"{sbatch_command} {jobscript_stdname} {xsorb_dir}/ml_opt.py {in_file} {out_file} {log_file} {main_dir} \
+                {'fix' if fix_bondlengths else 'nofix'} {slab_indices[0]} {slab_indices[1]}"
+            if(TEST): print(launch_string)
+            else: 
+                outstring = subprocess.getoutput(launch_string)
+                print(outstring)
+                submitted_jobs.append(outstring.split()[-1])
+            os.chdir(main_dir)
+
+    with open("submitted_jobs.txt", "a") as f:
+        f.write("\n".join(submitted_jobs)+'\n')
+
+
 
 
 def restart_jobs(calc_type : str):
