@@ -167,6 +167,7 @@ class Settings:
             'sort_atoms_by_z'          : 'True',
             'translate_slab'           : 'True',
             'fix_bondlengths_preopt'   : 'False',
+            'fix_slab_preopt'          : 'False',
         }
         for flag in optional_structure_flags_list:
             if flag not in script_settings_dict['STRUCTURE']:
@@ -217,6 +218,7 @@ class Settings:
         self.mol_before_slab        = True if 'true' in script_settings_dict['STRUCTURE']['mol_before_slab'].lower() else False
         self.amorphous_site_finding = True if 'true' in script_settings_dict['STRUCTURE']['amorphous_site_finding'].lower() else False
         self.fix_bondlengths_preopt = True if 'true' in script_settings_dict['STRUCTURE']['fix_bondlengths_preopt'].lower() else False
+        self.fix_slab_preopt        = True if 'true' in script_settings_dict['STRUCTURE']['fix_slab_preopt'].lower() else False
         
 
         if not self.amorphous_site_finding:

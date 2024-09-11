@@ -220,7 +220,7 @@ def get_decorated_structures(configs : list,
                 mol = config_j[mol_atoms_indices]
                 slab = config_j[slab_atoms_indices]
                 if cut_vacuum: 
-                    slab.cell[2][2] = np.max([atom.z for atom in config]) + cut_height
+                    slab.cell[2][2] = np.max(config_j.positions[:,2]) + cut_height
                     if not center_molecule: first_frame = False
                 Nslab = len(slab)
 
@@ -228,7 +228,7 @@ def get_decorated_structures(configs : list,
                     #use the same translation for all frame, to avoid jumps
                     if first_frame:
                         _, _, mol_center = get_centered_mol_and_slab(mol, slab)
-                        cell_center = config.cell[:][0]/2 + config.cell[:][1]/2  #a1/2 + a2/2
+                        cell_center = config_j.cell[:][0]/2 + config_j.cell[:][1]/2  #a1/2 + a2/2
                         first_frame = False
 
                     mol.translate(cell_center - mol_center)

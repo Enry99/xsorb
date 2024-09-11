@@ -13,9 +13,10 @@ import os, shutil, subprocess
 import numpy as np
 import pandas as pd
 from ase.io import read, write
+from ase.calculators.calculator import PropertyNotImplementedError
 from xsorbed.dftcode_specific import edit_files_for_restart, OPTIMIZATION_COMPLETED_STRINGS, SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS, SBATCH_POSTFIX
 from xsorbed.settings import Settings
-from xsorbed.slab import Slab, mol_bonded_to_slab
+from xsorbed.slab import Slab, slab_mol_bonds
 from xsorbed.molecule import Molecule
 from xsorbed.common_definitions import *
 
@@ -112,7 +113,7 @@ def _get_actually_present_outputs(program : str, calc_type : str):
     return existing_indices
 
 
-def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bool = False):
+def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bool = False, VERBOSE : bool = True):
     '''
     Returns the TOTAL energy for a given configuration, or None if not available
 
@@ -125,17 +126,24 @@ def get_energy(program : str, calc_type : str, i_calc : int, full_evolution : bo
     
     filename = OUT_FILE_PATHS[calc_type][program].format(i_calc)
 
-    try:
-        if not full_evolution:
-            atoms = read(filename)
-            return atoms.get_potential_energy()
-        else:
-            atoms_list = read(filename, index=':')
-            return np.array([a.get_potential_energy() for a in atoms_list])
-    except:
-        print(f'Warning: unable to read energy from file {filename}.')
-        return None
+    traj = read(filename, index=':')
+    energies = []
+    
+    for atoms in traj:
+        try:
+            energy = atoms.get_potential_energy()
+        except PropertyNotImplementedError as e:
+            #if VERBOSE: print(f'Warning: unable to read last energy value from file {filename}.')
+            continue
+        energies.append(energy)    
 
+    if len(energies) == 0:
+        if VERBOSE: print(f'Warning: unable to read ANY energy from file {filename}.')
+        return None
+    elif full_evolution:
+        return np.array(energies)
+    else:
+        return energies[-1]
 
 def get_energy_ml(filename : str, full_evolution : bool = False):
 
@@ -183,7 +191,7 @@ def get_calculations_results(program : str,
         if not os.path.isfile(OUT_FILE_PATHS[calc_type][program].format(index)):
             continue #skip if file does not exist yet
             
-        energy = get_energy(program, calc_type, index, full_evolution)
+        energy = get_energy(program, calc_type, index, full_evolution, VERBOSE=VERBOSE)
 
 
         if energy is not None:
@@ -300,7 +308,7 @@ def write_results_to_file(TXT=False):
 
     if os.path.isdir(screening_outdir): #for screening
         screening_results = \
-            get_calculations_results(program=settings.program, calc_type='SCREENING', E_slab_mol=settings.E_slab_mol)
+            get_calculations_results(program=settings.program, calc_type='SCREENING', E_slab_mol=settings.E_slab_mol, VERBOSE=False)
               
         column_name = 'Eads_scr(eV)' if 0 not in settings.E_slab_mol else 'Etot_scr(eV)'
 
@@ -315,9 +323,9 @@ def write_results_to_file(TXT=False):
                 column_data.append(screening_results['energies'][i] )
 
                 if screening_results['scf_nonconverged'][i]:
-                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep. The energy will be marked with **')
+                    print(f'Warning! {i} failed to reach SCF convergence in the last ionic step. The energy will be marked with **')
                     column_data[-1] = f'{column_data[-1]:.3f}**'
-                if not screening_results['relax_completed'][i]:
+                elif not screening_results['relax_completed'][i]:
                     print(f'Warning! {i} relaxation has not reached final configuration. The energy will be marked with a *')
                     column_data[-1] = f'{column_data[-1]:.3f}*'
 
@@ -329,7 +337,7 @@ def write_results_to_file(TXT=False):
 
     if os.path.isdir(relax_outdir): #for relax
         relax_results = \
-            get_calculations_results(program=settings.program, calc_type='RELAX', E_slab_mol=settings.E_slab_mol)
+            get_calculations_results(program=settings.program, calc_type='RELAX', E_slab_mol=settings.E_slab_mol, VERBOSE=False)
         
         column_name = 'Eads_rel(eV)' if 0 not in settings.E_slab_mol else 'Etot_rel(eV)'
 
@@ -344,9 +352,9 @@ def write_results_to_file(TXT=False):
                 column_data.append(relax_results['energies'][i] )
 
                 if relax_results['scf_nonconverged'][i]:
-                    print(f'Warning! {i} failed to reach SCF convergence after electron_maxstep. The energy will be marked with **')
+                    print(f'Warning! {i} failed to reach SCF convergence in the last ionic step. The energy will be marked with **')
                     column_data[-1] = f'{column_data[-1]:.3f}**'
-                if not relax_results['relax_completed'][i]:
+                elif not relax_results['relax_completed'][i]:
                     print(f'Warning! {i} relaxation has not reached final configuration. The energy will be marked with a *')
                     column_data[-1] = f'{column_data[-1]:.3f}*'
 
@@ -366,19 +374,19 @@ def write_results_to_file(TXT=False):
                                                     calc_type='RELAX', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
-            bonding_status.append('Yes' if status else 'No')
+            bonding_status.append(','.join(status) if status else 'No')
         elif os.path.isdir(screening_outdir) and i in screening_results['energies'] and screening_results['energies'][i]:
             status = check_bond_status(settings.program, 
                                                     calc_type='SCREENING', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
-            bonding_status.append('Yes' if status else 'No')
+            bonding_status.append(','.join(status) if status else 'No')
         elif os.path.isdir(preopt_outdir) and i in preopt_results['energies'] and preopt_results['energies'][i]:
             status = check_bond_status('ML', 
                                                     calc_type='PREOPT', 
                                                     i_calc=i, 
                                                     mol_indices=mol_indices)
-            bonding_status.append('Yes' if status else 'No')
+            bonding_status.append(','.join(status) if status else 'No')
         else: #if the file does not exist
             bonding_status.append(None)
 
@@ -395,7 +403,7 @@ def write_results_to_file(TXT=False):
 
 def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices : list):
     '''
-    Reads output file and returns True if the molecule is bonded to the surface
+    Reads output file and returns the list of bonds between slab and molecule
 
     Args:
     - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
@@ -409,7 +417,7 @@ def check_bond_status(program : str, calc_type : str, i_calc : int, mol_indices 
     slab = atoms[[atom.index for atom in atoms if atom.index not in mol_indices]]
     mol = atoms[mol_indices]
 
-    return mol_bonded_to_slab(slab, mol)
+    return slab_mol_bonds(slab, mol)
 
 
 def launch_jobs(program : str, calc_type : str, jobscript : str, sbatch_command : str, indices_list : list, jobname_prefix : str = ''):
@@ -464,6 +472,7 @@ def launch_jobs_ml(jobscript_ml : str,
                    indices_list : list = None, 
                    explicit_labels : list | str = None, 
                    fix_bondlengths : bool = False,
+                   fix_slab : bool = False,
                    slab_indices : list = None,
                    jobname_prefix : str = ''):
     '''
@@ -504,8 +513,18 @@ def launch_jobs_ml(jobscript_ml : str,
             in_file = label+'.xyz'
             out_file = label+'.traj'
             log_file = label+'.log'
+            
+            if fix_bondlengths and fix_slab:
+                fixstring = 'fixslab+fixmolbonds'
+            elif fix_bondlengths:
+                fixstring = 'fixbonds'
+            elif fix_slab and label != 'mol':
+                fixstring = 'fixslab'
+            else:
+                fixstring = 'nofix'
+
             launch_string = f"{sbatch_command} {jobscript_stdname} {xsorb_dir}/ml_opt.py {in_file} {out_file} {log_file} {main_dir} \
-                {'fix' if fix_bondlengths else 'nofix'} {slab_indices[0]} {slab_indices[1]}"
+                {fixstring} {slab_indices[0]} {slab_indices[1]}"
             if(TEST): print(launch_string)
             else: 
                 outstring = subprocess.getoutput(launch_string)
@@ -534,8 +553,18 @@ def launch_jobs_ml(jobscript_ml : str,
             in_file = os.path.basename(IN_FILE_PATHS['PREOPT']['ML'].format(index))
             out_file = os.path.basename(OUT_FILE_PATHS['PREOPT']['ML'].format(index))
             log_file = os.path.basename(LOG_FILE_PATHS['PREOPT']['ML'].format(index))
+
+            if fix_bondlengths and fix_slab:
+                fixstring = 'fixslab+fixmolbonds'
+            elif fix_bondlengths:
+                fixstring = 'fixbonds'
+            elif fix_slab:
+                fixstring = 'fixslab'
+            else:
+                fixstring = 'nofix'
+
             launch_string = f"{sbatch_command} {jobscript_stdname} {xsorb_dir}/ml_opt.py {in_file} {out_file} {log_file} {main_dir} \
-                {'fix' if fix_bondlengths else 'nofix'} {slab_indices[0]} {slab_indices[1]}"
+                {fixstring} {slab_indices[0]} {slab_indices[1]}"
             if(TEST): print(launch_string)
             else: 
                 outstring = subprocess.getoutput(launch_string)

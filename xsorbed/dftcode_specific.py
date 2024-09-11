@@ -356,10 +356,10 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
     '''
     if settings.program == 'ESPRESSO':
 
+        settings.dftprogram_settings_dict['control'].update({'calculation' : 'relax'})
+        settings.dftprogram_settings_dict['control'].update({'restart_mode' : 'from_scratch'})
         settings.dftprogram_settings_dict['control'].update({'outdir' : 'WORK'}) #TODO: lasciarlo scegliere all'utente
         settings.dftprogram_settings_dict['system'].update({'nosym' : True})
-        if 'SYSTEM' in manual_dft_override and 'nspin' not in manual_dft_override['SYSTEM']:
-            settings.dftprogram_settings_dict['system'].update({'nspin' : 2}) #spin-polarized for isolated fragments (if not explicitly disabled in manual_dft_override)
 
         if settings.dftprogram_settings_dict['system'].get('nspin') == 2:
             for i, pseudo in enumerate(settings.dftprogram_settings_dict['pseudopotentials']):
@@ -369,7 +369,11 @@ def override_settings_isolated_fragment(settings, natoms_mol : int, manual_dft_o
         settings.dftprogram_settings_dict['koffset'] = None
 
         if manual_dft_override is not None:
+    
             if 'SYSTEM' in manual_dft_override:
+                if 'nspin' not in manual_dft_override['SYSTEM']:
+                    settings.dftprogram_settings_dict['system'].update({'nspin' : 2}) #spin-polarized for isolated fragments (if not explicitly disabled in manual_dft_override)
+                
                 for k, v in manual_dft_override['SYSTEM'].items():
                     settings.dftprogram_settings_dict['system'][k] = v
             if 'ELECTRONS' in manual_dft_override:

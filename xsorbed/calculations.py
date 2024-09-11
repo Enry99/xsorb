@@ -444,6 +444,7 @@ def preopt_ml(SAVEFIG : bool = False):
                    sbatch_command=settings.sbatch_command_ml,
                     explicit_labels=['slab', 'mol'],
                     fix_bondlengths=settings.fix_bondlengths_preopt,
+                    fix_slab=settings.fix_slab_preopt,
                     slab_indices=[0 + settings.mol_before_slab * len(mol), len(slab) + settings.mol_before_slab * len(mol)],
                     jobname_prefix=settings.jobname_prefix)
 
@@ -452,6 +453,7 @@ def preopt_ml(SAVEFIG : bool = False):
                 sbatch_command=settings.sbatch_command_ml,
                 indices_list=written_indices,
                 fix_bondlengths=settings.fix_bondlengths_preopt,
+                fix_slab=settings.fix_slab_preopt,
                 slab_indices=[0 + settings.mol_before_slab * len(mol), len(slab) + settings.mol_before_slab * len(mol)],
                 jobname_prefix=settings.jobname_prefix)  
 

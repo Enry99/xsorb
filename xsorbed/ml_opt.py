@@ -8,7 +8,9 @@ in_file = sys.argv[1]
 out_file = sys.argv[2]
 log_file = sys.argv[3]
 main_dir = sys.argv[4]
-fix = sys.argv[5] == 'fix'
+fixbonds = sys.argv[5] == 'fixbonds'
+fixslab = sys.argv[5] == 'fixslab'
+fixslabandmolbonds = sys.argv[5] == 'fixslab+fixmolbonds'
 slab_ibeg = int(sys.argv[6])
 slab_iend = int(sys.argv[7])
 
@@ -27,12 +29,12 @@ except:
 atoms = read(in_file)
 atoms.calc = calculator
 
-if fix:
+if fixbonds:
     from ase.neighborlist import NeighborList, natural_cutoffs
     from ase.constraints import FixBondLengths
     cutoffs = natural_cutoffs(atoms, mult=1.1)
 
-    slab_indices = [atom.index for atom in atoms if slab_ibeg <= atom.index <= slab_iend]
+    slab_indices = [atom.index for atom in atoms if slab_ibeg <= atom.index < slab_iend]
     mol_indices = [atom.index for atom in atoms if atom.index not in slab_indices]            
     nl = NeighborList(cutoffs, skin=0, self_interaction=False)
     nl.update(atoms)
@@ -41,8 +43,32 @@ if fix:
     slab_connected_pairs = [(i,j) for i in slab_indices for j in slab_indices if cm[i,j]]
     mol_connected_pairs = [(i,j) for i in mol_indices for j in mol_indices if cm[i,j]]
 
-    atoms.set_constraint([FixBondLengths(slab_connected_pairs, tolerance=0.2), FixBondLengths(mol_connected_pairs, tolerance=0.3)])
-    print("Constrained optimization.")
+    atoms.set_constraint([FixBondLengths(slab_connected_pairs, tolerance=0.2), FixBondLengths(mol_connected_pairs, tolerance=0.2)])
+    print("Optimization with fixed bond legnths.")
+
+elif fixslab:
+    from ase.constraints import FixAtoms
+    atoms.set_constraint(FixAtoms(indices=[atom.index for atom in atoms if slab_ibeg <= atom.index < slab_iend]))
+    print("Optimization with fixed slab.")
+
+elif fixslabandmolbonds:
+    from ase.neighborlist import NeighborList, natural_cutoffs
+    from ase.constraints import FixBondLengths
+    from ase.constraints import FixAtoms
+
+    slab_indices = [atom.index for atom in atoms if slab_ibeg <= atom.index < slab_iend]
+    mol_indices = [atom.index for atom in atoms if atom.index not in slab_indices]  
+
+    cutoffs = natural_cutoffs(atoms, mult=1.1)
+    nl = NeighborList(cutoffs, skin=0, self_interaction=False)
+    nl.update(atoms)
+    cm = nl.get_connectivity_matrix()
+    mol_connected_pairs = [(i,j) for i in mol_indices for j in mol_indices if cm[i,j]]
+
+    atoms.set_constraint([FixAtoms(indices=slab_indices), FixBondLengths(mol_connected_pairs, tolerance=0.2)])
+    
+    print("Optimization with fixed slab and molecular bonds.")
+
 
 
 # Optimize the structure

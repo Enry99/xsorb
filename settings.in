@@ -46,10 +46,11 @@
    # fix_slab_xyz                  = 0 0 0           #coordinates to fix for the selected atoms in slab (as in QE, so 0 = fix)
    # fix_mol_xyz                   = 0 0 1           #coordinates to fix for the selected atoms in molecule
    # fix_bondlengths_preopt        = False           #fix all bond lengths in the molecule in the preoptimization
+   # fix_slab_preopt               = False           #fix all atoms in the slab in the preoptimization (for now this is mutually exclusive with fix_bondlengths_preopt)
 
    # mol_before_slab               = False           #put molecule before slab in the order of atoms
    # sort_atoms_by_z               = True
-   # translate_slab                = True            #translate the slab upwards so that it is at least 1A above the cell bottom
+   # translate_slab                = True            #translate the slab upwards so that the lowest atom is exactly 1A above the cell bottom
 /
 
 

@@ -1128,7 +1128,8 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
                             kpt = SinglePointKPoint(w, s, k, eps_n=e)
                             kpts.append(kpt)
         except:
-            print('Warning: bands were not read from pwo file.')
+            #print('Warning: bands were not read from pwo file.')
+            pass
 
 
         # Put everything together

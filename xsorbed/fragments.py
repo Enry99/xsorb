@@ -437,10 +437,13 @@ def get_diss_energies(ML: bool = False):
             results_frag = get_calculations_results_ml(subtract_eslabmol=False)
         else:
             results_frag = get_calculations_results(settings.program, 'RELAX', [0,0])
+            if not results_frag['energies']:
+                print(f"No relax results found for fragment {fragment_name}. Reverting to screening results.")
+                results_frag = get_calculations_results(settings.program, 'SCREENING', [0,0])
         energies_frag = []
         indices_frag = []
         for idx, energy in results_frag['energies'].items():
-            #if energy is None: continue
+            if energy is None: continue
             energies_frag.append(energy)
             indices_frag.append(idx)
         i_min = indices_frag[energies_frag.index(min(energies_frag))]

@@ -17,6 +17,7 @@ from ase import Atoms
 from ase.io import read
 from ase.build.tools import sort
 from ase.data import atomic_numbers, covalent_radii
+from ase.neighborlist import NeighborList, natural_cutoffs
 from matplotlib import pyplot as plt
 import matplotlib.patheffects as PathEffects
 import numpy as np
@@ -60,7 +61,7 @@ class Slab:
         self.natoms   = len(self.slab_ase)
 
 
-        if(min(self.slab_ase.positions[:,2]) < 1 and translate_slab_from_below_cell_bottom):
+        if(translate_slab_from_below_cell_bottom):
             #translate slab so that the bottom layer is at least 1 angstrom from the bottom
             self.slab_ase.translate([0,0,1-min(self.slab_ase.positions[:,2])])
         
@@ -245,7 +246,6 @@ class Slab:
             
             print('Using ase.neighborlist {0}to find coordination numbers.'\
                   .format('with fixed radius for all atoms ' if kwargs.get('cn_plain_fixed_radius') else ''))
-            from ase.neighborlist import NeighborList, natural_cutoffs
             if kwargs.get('cn_plain_fixed_radius'):
                 cutoffs = [kwargs.get('cn_plain_fixed_radius')]*len(self.slab_ase)
             else:
@@ -259,21 +259,24 @@ class Slab:
         adsites = []
         adsite_labels = []
         adsites_indices = []
+        included_cn_values = []
 
         max_cn = kwargs.get('max_cn', min(cn_list) + kwargs.get('max_cn_offset'))
         for coords, cn, idx in zip(surf_coords, cn_list, surf_sites_indices):
             if cn <= max_cn:
                 adsites.append(coords)
-                atom_species = self.asf.slab[idx].species_string
-                adsite_labels.append('{0} {1}(cn={2:.1f}),{3:.3f},{4:.3f},'.format(len(adsite_labels), atom_species, cn, *coords[:2]))
                 adsites_indices.append(idx)
-
+                included_cn_values.append(cn)
 
         if kwargs['selected_sites']: #possibility to select only the main sites, not the surrounding ones
-            adsites = adsites[kwargs['selected_sites']]
-            adsite_labels = adsite_labels[kwargs['selected_sites']]
-            adsites_indices = adsites_indices[kwargs['selected_sites']]
-        
+            adsites = [adsites[i] for i in kwargs['selected_sites']]
+            adsites_indices = [adsites_indices[i] for i in kwargs['selected_sites']]
+            included_cn_values = [included_cn_values[i] for i in kwargs['selected_sites']]
+
+        for coords, cn, idx in zip(adsites, included_cn_values, adsites_indices):
+            atom_species = self.asf.slab[idx].species_string
+            adsite_labels.append('{0} {1}(cn={2:.1f}),{3:.3f},{4:.3f},'.format(len(adsite_labels), atom_species, cn, *coords[:2]))
+
 
         connected_adsites = {}
         all_connected_indices = []
@@ -491,22 +494,28 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
     return dz_tot
 
 
-def mol_bonded_to_slab(slab : Atoms, mol: Atoms):
+def slab_mol_bonds(slab : Atoms, mol: Atoms):
     '''
-    Returns true if the molecule is bonded to the slab, i.e. if a
-    (slab, molecule) atom pair is closer than 1.1 x sum of covalent radii
+    Returns the list of the bonds between the molecule and the slab.
 
     Args:
     - slab: Atoms object for the slab
     - mol: Atoms object for the molecule
     '''
 
-    i_mol, j_slab, distance = closest_pair(slab, mol)
+    atoms = slab+mol
+    cutoffs = natural_cutoffs(atoms, mult=1.15)
+    nl = NeighborList(cutoffs, skin=0, self_interaction=False, bothways=True)
+    nl.update(atoms)
+    cm = nl.get_connectivity_matrix()
 
-    max_bond_distance = 1.1 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
-                                + covalent_radii[atomic_numbers[mol[i_mol].symbol]])
+    bonds_list = []
+    for i in range(len(slab)):
+        for j in range(len(mol)):
+            if cm[i, len(slab)+j]:
+                bonds_list.append('{0}{1}-{2}{3}'.format(mol.symbols[j], j, slab.symbols[i], i))
     
-    return distance <= max_bond_distance
+    return bonds_list
 
 
 def save_adsites_image(adsites : list, 
@@ -577,9 +586,10 @@ def save_adsites_image(adsites : list,
             
             
             coord_nums = [float(label.split('(')[1].split(')')[0].split('=')[1]) for label in adsite_labels]
+            from matplotlib import colormaps
             from matplotlib import cm
             from matplotlib.colors import Normalize
-            cmap = cm.get_cmap('viridis_r')
+            cmap = colormaps.get_cmap('viridis_r')
             norm = Normalize(vmin=min(coord_nums), vmax=max(coord_nums))
 
             ax.set_title('Adsites based on C.N.')
