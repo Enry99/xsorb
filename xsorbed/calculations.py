@@ -336,7 +336,7 @@ def obtain_fullrelax_indices(settings : Settings,
             calculations_indices = [x[0] for x in sorted_items[:min(n_configs, len(sorted_items))] ]
         elif threshold is not None:
             e_min = min([x[1] for x in indices_and_energies])
-            calculations_indices = [x[0] for x in indices_and_energies_at_site if x[1] - e_min <= threshold]
+            calculations_indices = [x[0] for x in indices_and_energies if x[1] - e_min <= threshold]
 
     return calculations_indices
 
