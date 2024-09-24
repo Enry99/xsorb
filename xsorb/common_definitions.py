@@ -1,5 +1,3 @@
-VERSION                  = '2.2'  #program version
-
 N_relax_default             = 5
 
 

@@ -23,7 +23,7 @@
         #[Structure.adsorption_sites.coord_number_params]
             #cn_method                  = "plain"               # method for finding coordination numbers: 'plain' (default, produces integer values), MinimumDistanceNN (Pymatgen, integer values), CrystalNN (Pymatgen)
             #range_selection            = {mode = "max", value = 4}  # if mode is 'max', select all sites with CN <= value, if mode is 'offset', select all sites with CN = min(CN) + value
-            #include_surrounding_sites  = true                  # include also ontop sites of the atoms around the low CN ones.
+            #include_surrounding_sites  = false                 # include also ontop sites of the atoms around the low CN ones.
             #surrounding_sites_deltaz   = 1.5                   # ontop sites for the neighbor atoms with z >= z_central_atom - surrounding_sites_deltaz will be included as surrounding sites
             #surrounding_exclude_main   = true                  # exclude the main sites (those selected by low CN criterion) from the surrounding sites (this can avoid duplicates)
             #atomic_species             = ["Cu", "Ni"]          # explicitly select only certain atomic species for the site selection
@@ -31,17 +31,18 @@
 
     [Structure.molecule]
         molecule_axis                   = {mode = "atom_indices", values = [3, 14]}  # indices of the two atoms to define the x-axis direction, or vector to take as x-axis, e.g. {mode = "vector", values = [1,0,0]}
-        selected_atom_index             = 0                     # selected atom in molecule file, to be placed in all adsorption sites. If -1, use the center of mass of the molecule
+        selected_atom_index             = 0                     # selected atom in molecule file, to be placed in all adsorption sites. If -1, use the geometric center of the molecule
 
         x_rot_angles                    = [0, 90, 180]          # rotation angles (in deg) about x axis (performed first)
         y_rot_angles                    = [0, 90]               # rotation about y axis (performed secondly)
         z_rot_angles                    = [0, 90]               # rotation about z axis (performed lastly)
-        vertical_angles                 = "x"                   # which angles for y_rot +/- 90. Options: x (use x_rot_angles), z (use z_rot_angles), No (no rotations), list [list of angles] (custom list)
+        vertical_angles                 = "x"                   # which angles for y_rot +/- 90. Options: x (use x_rot_angles), z (use z_rot_angles), False (no rotations), list [list of angles] (custom list)
         #individual_rotations           = [[12, 50, 86], [1, 7, 8]]  # list of individual rotations, not to be included in the combinations. Each one should be a list of [x,y,z] angles (in deg)
 
         adsorption_distance_mode        = "value"               # options: 'value', 'covalent_radius', 'vdw_radius'
         target_distance                 = 2.0                   # DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
         min_distance                    = 1.5                   # minimum distance (in A) of ANY atom from surface, must be < selected_atom_distance. The molecule is translated upwards if necessary, in order to meet this requirement.
+        #radius_scale_factor            = 1.1                  # scaling factor for the covalent or vdW radii of the atoms in the molecule
 
     #[Structure.constraints]
         #layers_height                  = 0.5                   # delta_z within which atoms are considered to be part of the same layer (for fixing atoms). This is different from the surface_height flag, used for surface adsorption sites.
@@ -59,20 +60,20 @@
         #translate_slab                 = true                  # translate the slab upwards so that the lowest atom is exactly 1 Angstrom above the cell bottom
 
 [Calculation_parameters]
-    dft_program                         = "VASP"                # VASP, QE
+    dft_program                         = "VASP"                # VASP, ESPRESSO
 
-    [Calculation_parameters.dft_parameters]
-        #VASP
+        
+    [Calculation_parameters.VASP]
         vasp_pp_path                    = "VASP_PP_PATH"        # The pseudopotentials are expected to be in: LDA: VASP_PP_PATH/potpaw/, PBE: VASP_PP_PATH/potpaw_PBE/, PW91: $VASP_PP_PATH/potpaw_GGA/
         #vasp_xc_functional             = "PBE"                 # default: PBE
-        #vasp_pseudo_setups             = {"base": "recommended", "6": "C_h", "C": "_s"}  # for the default versions, just remove/comment this line
-        #pymatgen_set                   = "MPRelaxSet"          # Use INCAR/KPOINTS preset from Pymatgen's sets
-        #incar_path                     = "INCAR"               # path of the INCAR file
-        #kpoints_path                   = "KPOINTS"             # path of the KPOINTS file
+        #vasp_pseudo_setups             = {"base": "recommended", "6": "C_h", "C": "_s"}  # for the default versions (without subscripts) just remove/comment this line. Options for base are "minimal", "recommended", "materialsproject", "gw" (see ase.calculators.vasp.setups)
+        #pymatgen_set                   = "MPRelaxSet"          # Use INCAR/KPOINTS preset from Pymatgen's sets, as defined in pymatgen.io.vasp.sets (options: MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet)
+        incar_path                      = "INCAR"               # path of the INCAR file
+        kpoints_path                    = "KPOINTS"             # path of the KPOINTS file
         ediffg_screening                = -0.5
 
-        #QE
-        #pwi_path = "template.pwi"  # path of the input file for Quantum Espresso (containing the settings, without the positions)
-        #energy_conv_thr_screening      = 5e-3      # convergence threshold for energy
-        #force_conv_thr_screening       = 5e-2      # convergence threshold for forces
+    #[Calculation_parameters.ESPRESSO]
+        #pwi_path                       = "template.pwi"        # path of the input file for Quantum Espresso (containing the settings, without the positions)
+        #etot_conv_thr_screening        = 5e-3                  # convergence threshold for energy
+        #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces
 

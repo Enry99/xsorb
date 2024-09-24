@@ -14,4 +14,4 @@ https://gitlab.com/triboteam/xsorbed/-/wikis/home
 
 __version__ = "2.2"
 
-import ase_custom
+#import ase_custom  #check performance
