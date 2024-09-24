@@ -16,6 +16,8 @@ from ase.cell import Cell
 from typing import List
 from ase.symbols import string2symbols
 
+print("ASE CSTOM")
+
 #this class stores the custom labels of the atoms as a list, obtainable with get_custom_labels()
 class Atoms_custom(Atoms):
     """Atoms object.

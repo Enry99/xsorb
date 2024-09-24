@@ -1,6 +1,6 @@
 Input:
-  slab_filename:                   OUTCAR_slab        #path of file containing the slab atomic coordinates. The list of supported file types can be found on ASE website
-  molecule_filename:               OUTCAR_mol         #path of file containing the molecule atomic coordinates. The list of supported file types can be found on ASE website
+  slab_filename:                   ./slab/OUTCAR      #path of file containing the slab atomic coordinates. The list of supported file types can be found on ASE website
+  molecule_filename:               ./mol/OUTCAR       #path of file containing the molecule atomic coordinates. The list of supported file types can be found on ASE website
   jobscript_path:                  jobscript.sh       #path of a jobscript for running Quantum Espresso
   submit_command:                  sbatch             #command for submitting the jobscript to the job scheduler
 

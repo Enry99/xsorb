@@ -10,14 +10,14 @@ from ase.units import create_units
 from ase.constraints import FixScaled
 from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
-from xsorbed.common_definitions import *
+#from xsorbed.common_definitions import *
 
 #TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 
 SUPPORTED_PROGRAMS = ['VASP', 'ESPRESSO']
 
 HYBRID_SCREENING_THRESHOLDS = {
-    'VASP' : [-0.5], # ~ -2e-2 Ry/Bohr
+    'VASP' : -0.5, # ~ -2e-2 Ry/Bohr
     'ESPRESSO' : [5e-3, 5e-2]
 }
 
