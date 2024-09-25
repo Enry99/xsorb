@@ -36,7 +36,7 @@
         x_rot_angles                    = [0, 90, 180]          # rotation angles (in deg) about x axis (performed first)
         y_rot_angles                    = [0, 90]               # rotation about y axis (performed secondly)
         z_rot_angles                    = [0, 90]               # rotation about z axis (performed lastly)
-        vertical_angles                 = "x"                   # which angles for y_rot +/- 90. Options: x (use x_rot_angles), z (use z_rot_angles), False (no rotations), list [list of angles] (custom list)
+        vertical_angles                 = "x"                   # which angles for y_rot +/- 90. Options: "x" (use x_rot_angles), "z" (use z_rot_angles), "none" (no rotations), list [list of angles] (custom list)
         #individual_rotations           = [[12, 50, 86], [1, 7, 8]]  # list of individual rotations, not to be included in the combinations. Each one should be a list of [x,y,z] angles (in deg)
 
         adsorption_distance_mode        = "value"               # options: 'value', 'covalent_radius', 'vdw_radius'

@@ -89,7 +89,7 @@ class Molecule:
 
     individual_rotations: Optional[list[list[float]]]
 
-    vertical_angles: str | bool | list[float] = 'x'
+    vertical_angles: str | list[float] = 'x'
     adsorption_distance_mode: str = 'value'
     target_distance: float = 2.0
     min_distance: float = 1.5
@@ -110,6 +110,20 @@ class Molecule:
         if self.adsorption_distance_mode is not None:
             if self.adsorption_distance_mode not in ['value', 'covalent_radius', 'vdw_radius']:
                 raise ValueError('adsorption_distance_mode must be either value, covalent_radius or vdw_radius.')
+
+        if type(self.vertical_angles) is list:
+            if len(self.vertical_angles) == 0:
+                raise ValueError('vertical_angles given as a list has to contain at least one angle.')
+
+        elif type(self.vertical_angles) is str:
+            if self.vertical_angles not in ['x', 'z', 'none']:
+                raise ValueError('vertical_angles, when not given as a list, must be either "x", "z", "none".')
+            
+            if self.vertical_angles == 'x': self.vertical_angles = self.x_rot_angles
+            elif self.vertical_angles == 'z': self.vertical_angles = self.z_rot_angles
+            elif self.vertical_angles == 'none': self.vertical_angles = None
+                
+
             
 @dataclass
 class Constraints:

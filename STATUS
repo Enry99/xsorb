@@ -3,6 +3,8 @@ settings.toml:                  OK
 xsorb/settings:                 OK
 
 
+xsorb/structures/molecule:      OK
+
 xsorb/dft_codes/calculator:     OK
 xsorb/dft_codes/definitions:    OK
 xsorb/dft_codes/input_settings: OK  
@@ -14,3 +16,4 @@ xsorb/dft_codes/override:       OK~(check at the end for improvements)
 
 
 TODO: bump to ase 3.23 (need to modify ase_custom and also the constraints everywhere in the code, also read OUTCAR instead of vasprun.xml)
+TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
