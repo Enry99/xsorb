@@ -9,9 +9,13 @@ Small helper class to handle the slab
 
 """
 
+import json
+from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.patheffects as PathEffects
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.util.coord import find_in_coord_list_pbc
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder, plot_slab, get_rot
 from pymatgen.analysis.local_env import MinimumDistanceNN
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -80,7 +84,7 @@ class Slab:
         #SET CONSTRAINTS (before sorting)##############################
         fixed_atoms_indices = []
         if fixed_layers_slab: # identify the atoms belonging to the various layers
-            layer_indicization = get_layers(atoms=self.slab_ase, miller=(0,0,1)[0], tol=layers_threshold)
+            layer_indicization = get_layers(atoms=self.slab_ase, miller=(0,0,1), tol=layers_threshold)[0]
             fixed_atoms_indices = [i for i, layer in enumerate(layer_indicization) if layer in fixed_layers_slab]
 
         elif fixed_indices_slab:
@@ -114,10 +118,55 @@ class Slab:
             return self.find_adsorption_sites_amorphous(**kwargs)
 
 
-    def find_adsorption_sites_crystal(self, symm_reduce : float = 0.01, 
-                              near_reduce : float = 0.01, 
+    #TODO: write this file when launching the calculations
+    @staticmethod
+    def existing_sites():
+        """
+        Read already existing sites from previous calculations, stored in a sites.npy file in the form
+        [{"label": 0, "coords": [0.0, 1.0], "type": "ontop", "info": "C"}, ...]
+        """
+
+        if Path('adsites.txt').is_file():
+            existing_sites : list = np.loadtxt('adsites.txt').tolist()
+            return existing_sites
+        else:
+            return []
+
+
+    def get_symmetrically_equivalent_sets(self, coords_set, threshold=1e-6):
+        """Classifies the adsorption sites into sets of symmetrically equivalent sites.
+    
+        Args:
+            coords_set: coordinate set in Cartesian coordinates
+            threshold: tolerance for distance equivalence, used
+                as input to in_coord_list_pbc for dupl. checking
+        """
+        surf_sg = SpacegroupAnalyzer(self.asf.slab, 0.1)
+        symm_ops = surf_sg.get_symmetry_operations()
+        unique_coords = []
+        equivalent_sets = []
+        # Convert to fractional
+        coords_set = [self.asf.slab.lattice.get_fractional_coords(coords) for coords in coords_set]
+        for coords in coords_set:
+            in_coord = False
+            for op in symm_ops:
+                idxs = find_in_coord_list_pbc(unique_coords, op.operate(coords), atol=threshold)
+                if idxs:
+                    if len(idxs) > 1:
+                        print('ERROR: a new site is symmetrically equivalent to two INEQUIVALENT sites.')
+                    in_coord = True
+                    equivalent_sets[idxs[0]] += [self.asf.slab.lattice.get_cartesian_coords(coords)]
+                    break
+            if not in_coord:
+                unique_coords += [coords]
+                equivalent_sets += [[self.asf.slab.lattice.get_cartesian_coords(coords)]]
+
+        return equivalent_sets
+    
+
+    def find_adsorption_sites_crystal(self, symm_reduce : float = 0.01,  
                               no_obtuse_hollow : bool = True, 
-                              selected_sites : list = None,   
+                              selected_sites : list | None = None,   
                               SAVE_IMAGE : bool = False,
                               figname : str = 'adsorption_sites.png',
                               VERBOSE : bool = False):
@@ -127,7 +176,6 @@ class Slab:
 
         Args:
             -symm_reduce: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. It is a theshold for removing symmetrically equivalent sites.
-            -near_reduce: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. Threshold for removing sites duplicates (increase it to reduce duplicates).
             -no_obtuse_hollow: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. Avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation of topmost layer used to find sites.
             -selected_sites: indices of the sites to be returned by this function, selected between those found by AdsorbateSiteFinder
             -save_image: decide wether to save a png image of the sites
@@ -136,63 +184,100 @@ class Slab:
 
         if VERBOSE: print('Finding adsorption sites...')
 
+        site_types = ['ontop', 'hollow', 'bridge']
+
+        #adsites is a dict which contains the ontop, hollow and bridge sites
         adsites = self.asf.find_adsorption_sites(distance=0, 
-                                                 symm_reduce=symm_reduce, 
-                                                 near_reduce=near_reduce, 
-                                                 no_obtuse_hollow=no_obtuse_hollow)
-        if selected_sites:
-            sel_adsites = [adsites['all'][i] for i in selected_sites]
-        else:
-            sel_adsites = adsites['all']
+                                                 symm_reduce=0, 
+                                                 no_obtuse_hollow=no_obtuse_hollow).pop('all')
+        
+        
+        #find the equivalent sets of sites according to symm_reduce.
+        #in each set, selec the site closest to te cell center as the representative site
+        for site_type in site_types:
+            #sort the sites by distance from the center of the cell
+            sorted_sites = sorted(adsites[site_type], 
+                                        key=lambda x: np.linalg.norm(x - self.asf.slab.lattice.get_cartesian_coords([0.5, 0.5, 0])))
+            
+            #find the equivalent sets of sites
+            equivalent_sets_list = self.get_symmetrically_equivalent_sets(sorted_sites, symm_reduce)
 
-        adsite_labels = []
-
+            #select the representative site for each set and assign the selected sites to the adsites dict
+            adsites[site_type] = [equivalent_set[0] for equivalent_set in equivalent_sets_list]
+            
+        
+        
         #create structure containing only surface atoms
-        surf_coords = [s.coords for s in self.asf.surface_sites]
-        nonsurf_sites_indices = [i for i in range(len(self.asf.slab.sites)) if not np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
-        slab = self.asf.slab.copy()
-        slab.remove_sites(nonsurf_sites_indices)
-        for i in range(len(slab)): slab[i].z = 0 #flatten the surface (z=0 for all)
+        surf = self.asf.slab.copy().remove_sites(self.asf.slab.subsurface_sites()) #remove subsurface atoms
+        for i in range(len(surf)): surf[i].z = 0 #flatten the surface (z=0 for all)
 
         nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are at the center of a non-perfeclty equilater triangle
 
-        #run over all the slab_adsites, classifiying them by checking if the
-        #i-th element of 'all' is in one of the three lists 'ontop', 'hollow', 'bridge'        
-        for i, site in enumerate(sel_adsites):
-            #dummy structure just to place one atom in the site
-            coords = site.tolist()
-            coords[2] = 0.2 #place the dummy atom just above the surface level z=0
-            slab.append('O', coords, coords_are_cartesian=True)
-            coord_n = nn.get_cn(slab, len(slab)-1)
-            nn_list = nn.get_nn(slab, len(slab)-1) 
-            slab.remove_sites([len(slab)-1]) #remove dummy atom     
+        
+        
+        #create a list with all the sites, with info for each one, in the style
+        # [{"label": 0, "coords": [0.0, 1.0], "type": "ontop", "info": "C"}, ...]
+        
+        all_adsites = []
+        
+        #handle the case of existing sites
+        existing_sites = self.existing_sites()
 
-            # add further information to the site types
-            if any((site == x).all() for x in adsites['ontop']):
-                first_nn_species = nn_list[0].species_string #atomic species of the atom just below the ontop site
-                adsite_labels.append('{0} ontop_{1},{2:.3f},{3:.3f},'.format(i, first_nn_species, *site[:2]))   
-            elif any((site == x).all() for x in adsites['hollow']): #coordination number of the hollow site
-                adsite_labels.append('{0} hollow_c{1},{2:.3f},{3:.3f},'.format(i, coord_n, *site[:2])) 
-            else: 
-                if(coord_n>=4): #attemps to fix the problem of fake bridges for 4-fold sites
-                    adsite_labels.append('{0} hollow_c{1},{2:.3f},{3:.3f},'.format(i, coord_n, *site[:2]))
+        i_site = len(all_adsites)
+        for site_type, sites_list in zip(['ontop', 'hollow', 'bridge'], [adsites['ontop'], adsites['hollow'], adsites['bridge']]):
+            for site in sites_list:
+
+                if selected_sites and i_site not in selected_sites: continue
+                if any(np.allclose(site[:2], x['coords']) for x in existing_sites): continue
+
+                
+                #dummy structure just to place one atom in the site and obtain CN and NN list
+                coords = site.tolist()
+                coords[2] = 0.2 #place the dummy atom just above the surface level z=0
+                surf.append('O', coords, coords_are_cartesian=True)
+                coord_n = nn.get_cn(surf, len(surf)-1)
+                nn_list = nn.get_nn(surf, len(surf)-1) 
+                surf.remove_sites([len(surf)-1]) #remove dummy atom     
+
+
+                # add further information to the site types
+                if site_type == 'ontop':
+                    first_nn_species = nn_list[0].site.species_string
+                    info = first_nn_species
+                    correct_type = site_type
+                elif site_type == 'hollow':
+                    info = coord_n
+                    correct_type = site_type
+                elif site_type == 'bridge':
+                    if(coord_n>=4): #attemps to fix the problem of fake bridges for 4-fold sites
+                        info = coord_n
+                        correct_type = 'hollow'
+                    else:
+                        if len(nn_list) >=2:
+                            distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
+                            info = distance
+                            correct_type = site_type
+                        else: 
+                            info = ''
+                            correct_type = site_type
                 else:
-                    if len(nn_list) >=2:
-                        distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
-                        adsite_labels.append('{0} bridge_{1:.2f},{2:.3f},{3:.3f},'.format(i, distance, *site[:2]))
-                    else: adsite_labels.append('{0} bridge,{1:.3f},{2:.3f},'.format(i, *site[:2]))
-        
-        
+                    raise ValueError('Invalid site type.')
+
+
+
+                all_adsites.append({"label": i_site, "coords": site[:2], "type": correct_type, "info": info})
+                i_site += 1
+                
+
         if VERBOSE: print('Adsorption sites found.')
 
         if(SAVE_IMAGE): #save png to visualize the identified sites
-            save_adsites_image(adsites=sel_adsites, 
-                               adsite_labels=adsite_labels, 
+            save_adsites_image(adsites=all_adsites,
                                slab_pymat=self.slab_pymat, 
                                figname=figname, 
                                VERBOSE=VERBOSE)
 
-        return sel_adsites, adsite_labels, None
+        return all_adsites, None
 
 
     def find_adsorption_sites_amorphous(self, **kwargs):

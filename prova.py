@@ -4,15 +4,12 @@ p = Path('LICENSE')
 
 #print(p.is_file())
 
+import numpy as np
 
-from dataclasses import dataclass, field
-from typing import Optional
-@dataclass
-class VaspSettings:
-    vasp_pp_path: str
-    ediffg_screening: float =  10  
-    vasp_xc_functional: str = "PBE"   
 
-vs = VaspSettings(vasp_pp_path = 'path/to/vasp_pp')
+x = np.array([{"a": 1, "b": 2}, {"a": 3, "b": 4}])
 
-print(vars(vs))
+np.save("test.npy", x)
+
+#y = np.load("test.npy")
+#print(y)

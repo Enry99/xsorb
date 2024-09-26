@@ -18,7 +18,6 @@
 
         [Structure.adsorption_sites.high_symmetry_params]
             symm_reduce                 = 0.01                  # tolerance for finding symmetrically inequivalent sites
-            #near_reduce                = 0.01                  # tolerance for sites that are too close
 
         #[Structure.adsorption_sites.coord_number_params]
             #cn_method                  = "plain"               # method for finding coordination numbers: 'plain' (default, produces integer values), MinimumDistanceNN (Pymatgen, integer values), CrystalNN (Pymatgen)

@@ -38,7 +38,6 @@ class Input:
 @dataclass
 class High_symmetry_params:
     symm_reduce: float = 0.01
-    near_reduce: float = 0.01
 
 @dataclass
 class Coord_number_params:
