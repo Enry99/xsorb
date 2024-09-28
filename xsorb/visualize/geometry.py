@@ -1,6 +1,11 @@
-from ase.visualize.plot import plot_atoms
-from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
+import matplotlib.patheffects as PathEffects
+from pymatgen.core import Structure
+from pymatgen.analysis.adsorption import AdsorbateSiteFinder, plot_slab, get_rot
+from ase.visualize.plot import plot_atoms
+from ase.data import atomic_numbers, covalent_radii
+
 
 
 def save_rotations_images(mol_rotations_ase : list[dict], 
@@ -36,11 +41,10 @@ def save_rotations_images(mol_rotations_ase : list[dict],
 
 
 
-def save_adsites_image(adsites : list, 
-                       adsite_labels : list,
+def save_adsites_image(mode : str,
+                       adsites : list,        
                        slab_pymat : Structure,
                        connected_adsites : dict = None,
-                       crystal : bool = True,
                        figname : str = 'adsorption_sites.png',
                        VERBOSE : bool = False):
         '''
@@ -52,7 +56,7 @@ def save_adsites_image(adsites : list,
         - figname: filename of the image
         '''
 
-        if VERBOSE: print("Saving image to {0}".format(figname))
+        if VERBOSE: print(f"Saving image to {figname}")
         
 
         fig = plt.figure(figsize=(4,3))
