@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pylint
+        pip install pylint ase==3.22.1 pymatgen==2023.3.23 matplotlib>=3.7.1 numpy>=1.24.2 pandas>=2.0.0
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py')
