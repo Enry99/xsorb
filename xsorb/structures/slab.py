@@ -11,7 +11,6 @@ Small helper class to handle the slab
 
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
 import numpy as np
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.util.coord import find_in_coord_list_pbc
@@ -26,22 +25,31 @@ from xsorb.visualize.geometry import save_adsites_image
 from xsorb import ase_custom
 
 
-@dataclass
-class AdsorptionSite:
-    label: int
-    coords: list[float]
-    type: str
-    info: str
-    unique_id: str | int #str for crystal (x,y), int for amorphous (atom index)
-
-    #define equality as the equality of the unique_id
-    def __eq__(self, other : 'AdsorptionSite') -> bool:
-        return self.unique_id == other.unique_id
 
 
 @dataclass
 class SurroundingSite:
-    pass
+    label: str
+    coords: list[float]   #x,y,z coordinates
+    duplicate_surrounding: bool
+    duplicate_main: bool
+    unique_id: int
+
+
+
+@dataclass
+class AdsorptionSite:
+    label: int
+    coords: list[float]     #x,y,z coordinates
+    type: str               #ontop, hollow, bridge
+    info: str
+    unique_id: str | int    #str for crystal (x,y), int for amorphous (atom index)
+    coordination_number: float | None = None
+    surrounding_sites: list[SurroundingSite] | None = None
+
+    #define equality as the equality of the unique_id
+    def __eq__(self, other : 'AdsorptionSite') -> bool:
+        return self.unique_id == other.unique_id
 
 
 
@@ -122,11 +130,15 @@ class Slab:
         self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height) 
 
 
-    def find_adsorption_sites(self, crystal : bool = True, **kwargs):   
-        if crystal:
-            return self.find_adsorption_sites_crystal(**kwargs)
-        else:
-            return self.find_adsorption_sites_amorphous(**kwargs)
+    def find_adsorption_sites(self, mode: str, **kwargs):   
+
+        modes = {'high_symmetry': self.find_adsorption_sites_high_symmetry, 
+                 'coord_number': self.find_adsorption_sites_coord_number,}
+        
+        if mode not in modes:
+            raise ValueError(f"mode must be one of {modes.keys()}")
+        
+        return modes[mode](**kwargs)
 
 
     #TODO: write this file when launching the calculations
@@ -174,7 +186,7 @@ class Slab:
         return equivalent_sets
     
 
-    def find_adsorption_sites_crystal(self, symm_reduce : float = 0.01,  
+    def find_adsorption_sites_high_symmetry(self, symm_reduce : float = 0.01,  
                               no_obtuse_hollow : bool = True, 
                               selected_sites : list | None = None,   
                               SAVE_IMAGE : bool = False,
@@ -194,7 +206,7 @@ class Slab:
 
         if VERBOSE: print('Finding adsorption sites...')
 
-        site_types = ['ontop', 'hollow', 'bridge']
+        site_types = ('ontop', 'hollow', 'bridge')
 
         #adsites is a dict which contains the ontop, hollow and bridge sites
         adsites = self.asf.find_adsorption_sites(distance=0, 
@@ -277,7 +289,7 @@ class Slab:
                     raise ValueError('Invalid site type.')
 
                 all_adsites.append(AdsorptionSite(label=i_site, 
-                                                  coords=site[:2], 
+                                                  coords=site, 
                                                   type=correct_type, 
                                                   info=info, 
                                                   unique_id=unique_id))
@@ -287,28 +299,30 @@ class Slab:
         if VERBOSE: print('Adsorption sites found.')
 
         if(SAVE_IMAGE): #save png to visualize the identified sites
-            save_adsites_image(mode='crystal',
+            save_adsites_image(mode='high_symmetry',
                                adsites=all_adsites,
                                slab_pymat=self.slab_pymat, 
                                figname=figname, 
                                VERBOSE=VERBOSE)
 
-        return all_adsites, None
+        return all_adsites
 
 
-    def amorphous_surface_analysis(self,
+    def coord_number_surface_analysis(self,
                                    cn_method: str, 
                                    cn_plain_fixed_radius : float | None = 1.5,
                                    VERBOSE: bool=False):
                                    
         surf_coords = [s.coords for s in self.asf.surface_sites]
-        surf_sites_indices = [i for i in range(len(self.asf.slab.sites)) if np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
+        surf_sites_indices = [i for i in range(len(self.asf.slab.sites)) \
+                              if np.any(np.all(self.asf.slab.cart_coords[i] == surf_coords, axis=1))]
 
         if cn_method == 'plain':
             #standard coordination number (integer no. of nearest neighbours)
             #with fixed radius. If radius is set to None, the natural_cutoffs are used.
             if VERBOSE: print('Using ase.neighborlist {0} to find coordination numbers.'\
-                  .format('with fixed radius for all atoms' if cn_plain_fixed_radius else 'with ase.neighborlist.natural_cutoffs.'))
+                  .format('with fixed radius for all atoms' if cn_plain_fixed_radius \
+                          else 'with ase.neighborlist.natural_cutoffs.'))
             
             from ase.neighborlist import NeighborList, natural_cutoffs
             if cn_plain_fixed_radius:
@@ -321,14 +335,16 @@ class Slab:
             cn_list = [cm[idx].count_nonzero() for idx in surf_sites_indices]
 
         elif cn_method == 'minimumdistancenn':
-            if VERBOSE: print('Using pymatgen.analysis.local_env.MinimumDistanceNN to find coordination numbers.')
+            if VERBOSE: print('Using pymatgen.analysis.local_env.MinimumDistanceNN \
+                              to find coordination numbers.')
             
             from pymatgen.analysis.local_env import MinimumDistanceNN
             nn = MinimumDistanceNN(tol=0.2)
             cn_list = [nn.get_cn(self.asf.slab, idx) for idx in surf_sites_indices]
         
         elif cn_method == 'crystalnn':
-            if VERBOSE: print('Using pymatgen.analysis.local_env.CrystalNN with weigths to find coordination numbers.')
+            if VERBOSE: print('Using pymatgen.analysis.local_env.CrystalNN with weigths \
+                              to find coordination numbers.')
             
             from pymatgen.analysis.local_env import CrystalNN
             nn = CrystalNN(weighted_cn=True)
@@ -343,51 +359,56 @@ class Slab:
         return surf_coords, cn_list, surf_sites_indices
 
 
-    def get_amorphous_connected_adsites(self, adsites : list[dict], 
-                                        adsites_indices : list[int],
-                                        surrounding_sites_deltaz: float = 1.5, 
-                                        VERBOSE=False):
-        
-        connected_adsites = {}
-        all_connected_indices = []
-        main_sites_pairs = []
+    def add_surrounding_adsites(self, adsites : list[AdsorptionSite], 
+                                surf_sites_indices : list[int],
+                                surrounding_sites_deltaz: float = 1.5):
+        """
+        Add (inplace) the surrounding sites to the adsites list, for each adsite.
+        """
 
         from pymatgen.analysis.local_env import MinimumDistanceNN
         nn = MinimumDistanceNN(tol=0.2)
 
-        for main_site, label, idx in zip(adsites, adsite_labels, adsites_indices):
-            nnsites = nn.get_nn_info(self.asf.slab, idx)
-            label_num = int(label.split()[0])
-            connected_adsites[label_num] = []
+        
+        all_main_idxs = [adsite.unique_id for adsite in adsites]
+        all_connected_idxs = []
+
+        for adsite in adsites:
+
+            adsite.surrounding_sites = []
+
+            nnsites = nn.get_nn_info(self.asf.slab, adsite.unique_id)            
+            
+            nn_counter_for_this_site = 0
             for nnsite in nnsites:
+                
                 nnindex = nnsite['site_index']
+                
                 if (nnindex in surf_sites_indices if surrounding_sites_deltaz is None \
-                    else abs(main_site[2] - nnsite['site'].coords[2]) < surrounding_sites_deltaz):
-                    #print("site: ", f'{label_num}.{len(connected_adsites[label_num])}', "pos:", nnsite['site'].coords)
+                    else abs(adsite.coords[2] - nnsite['site'].coords[2]) < surrounding_sites_deltaz):
+
                     atom_species = self.asf.slab[nnindex].species_string
-                    connected_adsites[label_num].append(
-                        {
-                        'position' : nnsite['site'].coords, 
-                        'index' : nnindex,
-                        'label' : '{0}.{1} {2},{3:.3f},{4:.3f},'.format(label_num, len(connected_adsites[label_num]), atom_species,  *nnsite['site'].coords[:2]),
-                        'duplicate_surrounding' : nnindex in all_connected_indices,
-                        'duplicate_main' : {nnindex, idx} in main_sites_pairs #check if already present in swapped order
-                        }
+
+                    surrounding_site = SurroundingSite(
+                        label = f'{adsite.unique_id}.{nn_counter_for_this_site} {atom_species}',
+                        coords = nnsite['site'].coords,
+                        duplicate_surrounding = nnindex in all_connected_idxs,
+                        duplicate_main = nnindex in all_main_idxs,
+                        unique_id = nnindex    
                     )
-                    #print("duplicate main: ", {nnindex, idx} in main_sites_pairs)
-                    all_connected_indices.append(nnindex)
-                    if nnindex in adsites_indices:
-                        main_sites_pairs.append({idx, nnindex})
+                    adsite.surrounding_sites.append(surrounding_site)
+                    all_connected_idxs.append(nnindex)
+                    nn_counter_for_this_site += 1
 
 
-    def find_adsorption_sites_amorphous(self,               
+    def find_adsorption_sites_coord_number(self,               
                                         cn_method: str, 
                                         cn_plain_fixed_radius : float | None = 1.5, 
                                         max_cn_offset : float | None = 2, 
                                         max_cn: float | None = None, 
                                         selected_sites: list | None = None, 
                                         selected_atomic_species: list | None = None,
-                                        amorphous_surrounding_sites : bool = False, 
+                                        include_surrounding_sites : bool = False, 
                                         surrounding_sites_deltaz: float | None = 1.5, 
                                         SAVE_IMAGE: bool = False,
                                         figname: str = 'adsorption_sites.png',
@@ -396,9 +417,11 @@ class Slab:
         if VERBOSE: print('Finding adsorption sites...')
 
         surf_coords, cn_list, surf_sites_indices = \
-            self.amorphous_surface_analysis(cn_method, cn_plain_fixed_radius, VERBOSE)
+            self.coord_number_surface_analysis(cn_method, cn_plain_fixed_radius, VERBOSE)
+        
         max_cn = max_cn if max_cn is not None else min(cn_list) + max_cn_offset
 
+        
         #create a list with all the sites, with info for each one
         all_adsites : list[AdsorptionSite] = []
         
@@ -421,29 +444,30 @@ class Slab:
             if cn <= max_cn:
                 info = f"{atom_species}(cn={cn:.1f})"
                 all_adsites.append(AdsorptionSite(label=i_site, 
-                                                  coords=coords[:2], 
+                                                  coords=coords, 
                                                   type='ontop', 
                                                   info=info, 
-                                                  unique_id=unique_id))
+                                                  unique_id=unique_id,
+                                                  coordination_number=cn))
                 i_site += 1
 
-        if amorphous_surrounding_sites:
-            connected_adsites = self.get_amorphous_connected_adsites(
+        if include_surrounding_sites:
+            self.add_surrounding_adsites(
                 adsites=all_adsites, 
-                surrounding_sites_deltaz=surrounding_sites_deltaz,
-                VERBOSE=VERBOSE)
+                surf_sites_indices=surf_sites_indices,
+                surrounding_sites_deltaz=surrounding_sites_deltaz)
+            
 
         if VERBOSE: print('Adsorption sites found.')
 
 
         if SAVE_IMAGE: #save png to visualize the identified sites
             save_adsites_image(
-                mode='amorphous',
+                mode='coord_number_surrounding' if include_surrounding_sites else 'coord_number',
                 adsites=all_adsites, 
-                slab_pymat=self.slab_pymat, 
-                connected_adsites=connected_adsites,
+                slab_pymat=self.slab_pymat,
                 figname=figname, 
                 VERBOSE=VERBOSE)
 
-        return all_adsites, connected_adsites
+        return all_adsites
 

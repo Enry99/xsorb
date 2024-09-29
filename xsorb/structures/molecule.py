@@ -10,13 +10,27 @@ Small helper class to manage the molecule
 """
 
 import warnings
+from dataclasses import dataclass
 import numpy as np
 from ase.io import read
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.core.bonds import CovalentBond
+from ase import Atoms
 from ase.constraints import FixCartesian
 from xsorb.visualize.geometry import save_rotations_images
 from xsorb import ase_custom 
+
+
+@dataclass
+class MoleculeRotation:
+    '''
+    Class to store the information of a rotated molecule
+    '''
+    atoms: Atoms
+    xrot: float
+    yrot: float
+    zrot: float
+
 
 
 class Molecule:
@@ -133,7 +147,7 @@ class Molecule:
         
         if VERBOSE: print('Generating molecular configurations...')
 
-        mol_rotations_ase = []
+        mol_rotations_ase : list[MoleculeRotation] = []
 
 
         #just to enter the loop and generate the (only one) unmodified configuration, useful if the argument was []
@@ -164,9 +178,9 @@ class Molecule:
            
             mol.rotate(x_angle, 'x')
             mol.rotate(y_angle, '-y')
-            mol.rotate(z_angle, 'z')          
+            mol.rotate(z_angle, 'z')
 
-            mol_rotations_ase.append({'atoms': mol, 'angles': (x_angle, y_angle, z_angle)})
+            mol_rotations_ase.append(MoleculeRotation(mol, x_angle, y_angle, z_angle))          
                 
         if VERBOSE: print('All molecular configurations generated.') 
 
