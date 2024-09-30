@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Optional
+
 from dacite import from_dict, Config
+from ase.io.espresso import read_fortran_namelist    
+
 from xsorb.dft_codes.definitions import HYBRID_SCREENING_THRESHOLDS
 
 
@@ -25,7 +28,7 @@ def read_espresso_settings(input_settings_dict : dict):
                                         config=Config(type_hooks={str: str.lower}, strict=True))
     
 
-    from ase.io.espresso import read_fortran_namelist    
+
     
     # parse namelist section and extract remaining lines
     with open(espresso_settings_class.pwi_path, 'r') as file:

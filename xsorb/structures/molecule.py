@@ -11,12 +11,14 @@ Small helper class to manage the molecule
 
 import warnings
 from dataclasses import dataclass
+
 import numpy as np
-from ase.io import read
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.core.bonds import CovalentBond
+from ase.io import read
 from ase import Atoms
 from ase.constraints import FixCartesian
+
 from xsorb.visualize.geometry import save_rotations_images
 from xsorb import ase_custom 
 

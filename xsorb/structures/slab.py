@@ -9,16 +9,20 @@ Small helper class to handle the slab
 
 """
 
+import warnings
 from pathlib import Path
 from dataclasses import dataclass
+
 import numpy as np
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.util.coord import find_in_coord_list_pbc
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder
 from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.local_env import MinimumDistanceNN, CrystalNN
 from ase.io import read
 from ase.build.tools import sort
 from ase.constraints import FixCartesian
+from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
 from xsorb.visualize.geometry import save_adsites_image
@@ -122,7 +126,6 @@ class Slab:
 
         
         #create pymatgen version of the slab, and initialize the AdsorbateSiteFinder
-        import warnings
         with warnings.catch_warnings(): #to suppress the warning about constraints not supported in pymatgen
             warnings.simplefilter("ignore")
             self.slab_pymat = AseAtomsAdaptor.get_structure(self.slab_ase)
@@ -233,7 +236,6 @@ class Slab:
         surf = self.asf.slab.copy().remove_sites(self.asf.slab.subsurface_sites()) #remove subsurface atoms
         for i in range(len(surf)): surf[i].z = 0 #flatten the surface (z=0 for all)
 
-        from pymatgen.analysis.local_env import MinimumDistanceNN
         nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are at the 
         #center of a non-perfeclty equilater triangle
 
@@ -324,7 +326,7 @@ class Slab:
                   .format('with fixed radius for all atoms' if cn_plain_fixed_radius \
                           else 'with ase.neighborlist.natural_cutoffs.'))
             
-            from ase.neighborlist import NeighborList, natural_cutoffs
+
             if cn_plain_fixed_radius:
                 cutoffs = [cn_plain_fixed_radius]*len(self.slab_ase)
             else:
@@ -338,7 +340,6 @@ class Slab:
             if VERBOSE: print('Using pymatgen.analysis.local_env.MinimumDistanceNN \
                               to find coordination numbers.')
             
-            from pymatgen.analysis.local_env import MinimumDistanceNN
             nn = MinimumDistanceNN(tol=0.2)
             cn_list = [nn.get_cn(self.asf.slab, idx) for idx in surf_sites_indices]
         
@@ -346,9 +347,8 @@ class Slab:
             if VERBOSE: print('Using pymatgen.analysis.local_env.CrystalNN with weigths \
                               to find coordination numbers.')
             
-            from pymatgen.analysis.local_env import CrystalNN
+
             nn = CrystalNN(weighted_cn=True)
-            import warnings
             with warnings.catch_warnings(): #to suppress the warning
                 warnings.simplefilter("ignore")
                 cn_list = [nn.get_cn(self.asf.slab, idx, use_weights=True) for idx in surf_sites_indices]
@@ -366,7 +366,6 @@ class Slab:
         Add (inplace) the surrounding sites to the adsites list, for each adsite.
         """
 
-        from pymatgen.analysis.local_env import MinimumDistanceNN
         nn = MinimumDistanceNN(tol=0.2)
 
         

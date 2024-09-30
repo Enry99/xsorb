@@ -9,10 +9,15 @@ import shutil
 import glob
 import os
 import warnings
+
+from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
+from pymatgen.io.ase import AseAtomsAdaptor
 from ase import Atoms
 from ase.constraints import FixScaled
 from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
+
+
 from xsorb.settings import Settings
 from xsorb.dft_codes.definitions import IN_FILE_PATHS
 
@@ -34,8 +39,7 @@ def Calculator(settings : Settings, label : str, atoms : Atoms, directory : str)
         preset_incar_settings = {}
         
         if "pymatgen_set" in settings.dftprogram_settings_dict:
-            from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
-            from pymatgen.io.ase import AseAtomsAdaptor
+
             
             sets_map = {'mprelaxset': MPRelaxSet, 'mpmetalrelaxset': MPMetalRelaxSet, 'mpscanrelaxset': MPScanRelaxSet, 'mphserelaxset': MPHSERelaxSet, 'mitrelaxset': MITRelaxSet}
             RelaxSet = sets_map[settings.dftprogram_settings_dict["pymatgen_set"]]

@@ -4,6 +4,9 @@ import matplotlib.patheffects as PathEffects
 from pymatgen.core import Structure
 from pymatgen.analysis.adsorption import plot_slab, get_rot
 from ase.visualize.plot import plot_atoms
+from matplotlib import colormaps
+from matplotlib import cm
+from matplotlib.colors import Normalize
 
 from xsorb.structures.slab import AdsorptionSite
 from xsorb.structures.molecule import MoleculeRotation
@@ -88,9 +91,6 @@ def save_adsites_image(mode : str,
             cmap_high_sym = {'ontop':'r', 'bridge':'g', 'hollow':'b'}
         else:
             ax.set_title('Adsites based on C.N.')
-            from matplotlib import colormaps
-            from matplotlib import cm
-            from matplotlib.colors import Normalize
             coord_nums = [adsite.coordination_number for adsite in adsites]
             cmap_coord_numb = colormaps.get_cmap('viridis_r')            
             norm = Normalize(vmin=min(coord_nums), vmax=max(coord_nums))
