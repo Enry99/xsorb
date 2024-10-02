@@ -19,6 +19,7 @@ from ase.io import read
 from ase import Atoms
 from ase.constraints import FixCartesian
 
+from xsorb.structures.slab import SurroundingSite
 from xsorb.visualize.geometry import save_rotations_images
 from xsorb import ase_custom 
 
@@ -29,9 +30,9 @@ class MoleculeRotation:
     Class to store the information of a rotated molecule
     '''
     atoms: Atoms
-    xrot: float
-    yrot: float
-    zrot: float
+    xrot: str
+    yrot: str
+    zrot: str
 
 
 
@@ -128,11 +129,11 @@ class Molecule:
 
     def generate_molecule_rotations(
             self, 
-            x_rot_angles : list,
-            y_rot_angles : list,
-            z_rot_angles : list,
-            vert_angles_list : list | None,
-            individual_rotations : list | None = None,
+            x_rot_angles : list[float],
+            y_rot_angles : list[float],
+            z_rot_angles : list[float] | list[SurroundingSite] ,
+            vert_angles_list : list[float] | None,
+            individual_rotations : list[float] | None = None,
             SAVE_IMAGE : bool = False,
             VERBOSE : bool = False
             ):
@@ -161,8 +162,8 @@ class Molecule:
         rotations_list = []
         for y_angle in y_rot_angles:
             if (int(y_angle) in [90, -90]): #special case, no further loops with x and z angles
-                #x rotation is equivalent to z rotation   
-                rotations_list.extend([[0, y_angle, ang] for ang in vert_angles_list] \
+                # z rotation is equivalent to x rotation   
+                rotations_list.extend([[ang, y_angle, 0] for ang in vert_angles_list] \
                                       if vert_angles_list else [[0, y_angle, 0]])           
                 continue
             for x_angle in x_rot_angles:         
@@ -180,12 +181,25 @@ class Molecule:
            
             mol.rotate(x_angle, 'x')
             mol.rotate(y_angle, '-y')
-            mol.rotate(z_angle, 'z')
 
-            mol_rotations_ase.append(MoleculeRotation(mol, x_angle, y_angle, z_angle))          
+            if type(z_angle) == SurroundingSite:
+                vector = z_angle.vector.copy()
+                vector[2] = 0 #project on xy plane
+                mol.rotate('x', vector)
+            else:
+                mol.rotate(z_angle, 'z')
+
+            mol_rotations_ase.append(MoleculeRotation(mol, str(x_angle), str(y_angle), str(z_angle)))          
                 
         if VERBOSE: print('All molecular configurations generated.') 
 
         if SAVE_IMAGE: save_rotations_images(mol_rotations_ase, VERBOSE=True)
 
         return mol_rotations_ase
+    
+    def generate_vertical_molecule(self, y_angle: int = 90):
+        mol = self.mol_ase.copy()
+        if y_angle not in [90, -90]: raise ValueError("Vertical angle must be 90 or -90")
+        mol.rotate(y_angle, '-y')
+
+        return MoleculeRotation(mol, str(0), str(y_angle), str(0))

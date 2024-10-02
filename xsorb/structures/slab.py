@@ -37,13 +37,17 @@ class SurroundingSite:
     coords: list[float]   #x,y,z coordinates
     duplicate_surrounding: bool
     duplicate_main: bool
+    vector: list[float]   #vector from the main site to the surrounding site
     unique_id: int
+
+    def __str__(self) -> str:
+        return self.label
 
 
 
 @dataclass
 class AdsorptionSite:
-    label: int
+    label: int | str        #str if it comes from as SurroundingSite
     coords: list[float]     #x,y,z coordinates
     type: str               #ontop, hollow, bridge
     info: str
@@ -79,8 +83,8 @@ class Slab:
     '''
 
     def __init__(self, slab_filename : str, 
-                 layers_threshold : float = 0.5, 
                  surface_sites_height : float = 0.9, 
+                 layers_threshold : float = 0.5, 
                  fixed_layers_slab : list | None = None, 
                  fixed_indices_slab : list | None = None, 
                  fix_slab_xyz : list | None = None, 
@@ -133,7 +137,7 @@ class Slab:
         self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height) 
 
 
-    def find_adsorption_sites(self, mode: str, **kwargs):   
+    def find_adsorption_sites(self, mode: str, **kwargs) -> list[AdsorptionSite]:   
 
         modes = {'high_symmetry': self.find_adsorption_sites_high_symmetry, 
                  'coord_number': self.find_adsorption_sites_coord_number,}
@@ -388,11 +392,15 @@ class Slab:
 
                     atom_species = self.asf.slab[nnindex].species_string
 
+                    #calculate vector from main site to surrounding site
+                    vector = nnsite['site'].coords - adsite.coords
+
                     surrounding_site = SurroundingSite(
                         label = f'{adsite.unique_id}.{nn_counter_for_this_site} {atom_species}',
                         coords = nnsite['site'].coords,
                         duplicate_surrounding = nnindex in all_connected_idxs,
                         duplicate_main = nnindex in all_main_idxs,
+                        vector = vector,
                         unique_id = nnindex    
                     )
                     adsite.surrounding_sites.append(surrounding_site)
