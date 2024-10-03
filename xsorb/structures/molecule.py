@@ -134,6 +134,7 @@ class Molecule:
             z_rot_angles : list[float] | list[SurroundingSite] ,
             vert_angles_list : list[float] | None,
             individual_rotations : list[float] | None = None,
+            surrounding_exclude_main : bool = False,
             SAVE_IMAGE : bool = False,
             VERBOSE : bool = False
             ):
@@ -183,6 +184,8 @@ class Molecule:
             mol.rotate(y_angle, '-y')
 
             if type(z_angle) == SurroundingSite:
+                if z_angle.duplicate_main and surrounding_exclude_main:
+                    continue
                 vector = z_angle.vector.copy()
                 vector[2] = 0 #project on xy plane
                 mol.rotate('x', vector)
@@ -197,9 +200,3 @@ class Molecule:
 
         return mol_rotations_ase
     
-    def generate_vertical_molecule(self, y_angle: int = 90):
-        mol = self.mol_ase.copy()
-        if y_angle not in [90, -90]: raise ValueError("Vertical angle must be 90 or -90")
-        mol.rotate(y_angle, '-y')
-
-        return MoleculeRotation(mol, str(0), str(y_angle), str(0))

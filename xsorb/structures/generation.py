@@ -111,11 +111,14 @@ class AdsorptionStructuresGenerator:
             if hasattr(self, 'molecule_rotations'):
                 return self.molecule_rotations
             z_rot_angles = self.settings.structure.molecule.z_rot_angles
+            surrounding_exclude_main = False
             VERBOSE = self.VERBOSE
         else:
             if adsite is None:
                 raise ValueError("adsite must be provided for surrounding mode")
             z_rot_angles = adsite.surrounding_sites
+            surrounding_exclude_main = \
+                self.settings.structure.adsorption_sites.coord_number_params.surrounding_exclude_main
             VERBOSE = False
 
         molecule_rotations = self.mol.generate_molecule_rotations(
@@ -124,6 +127,7 @@ class AdsorptionStructuresGenerator:
             z_rot_angles=z_rot_angles, 
             vert_angles_list=self.settings.structure.molecule.vertical_angles,
             individual_rotations=self.settings.structure.molecule.individual_rotations,
+            surrounding_exclude_main=surrounding_exclude_main,
             SAVE_IMAGE=SAVEFIG,
             VERBOSE=VERBOSE)
 
@@ -166,6 +170,9 @@ class AdsorptionStructuresGenerator:
         adsorption_structures_site : list[AdsorptionStructure] = []
 
         for surr_site in adsite.surrounding_sites:
+
+            if surr_site.duplicate_main or surr_site.duplicate_surrounding:
+                continue
             
             #promote surr_site to AdsorptionSite
             surr_site = AdsorptionSite(label=surr_site.label, 

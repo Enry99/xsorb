@@ -6,20 +6,24 @@ Main functions to generate the adsorption configurations and set up the calculat
 
 """
 
-from ase.io import read, write
-import numpy as np
-import os, sys
+import os
+import sys
 from operator import itemgetter
-#
-from ase.constraints import FixCartesian
-from xsorbed.slab import Slab
-from xsorbed.molecule import Molecule
-from xsorbed.io_utils import launch_jobs, launch_jobs_ml, get_calculations_results, get_calculations_results_ml, _get_configurations_numbers
-from xsorbed.settings import Settings
-from xsorbed.dftcode_specific import override_settings, Calculator, OUT_FILE_PATHS, IN_FILE_PATHS
-from xsorbed.common_definitions import *
 
-from xsorbed import ase_custom
+import numpy as np
+from ase.io import read, write
+from ase.constraints import FixCartesian
+import ase.db
+
+from xsorb.io_utils import launch_jobs, launch_jobs_ml, get_calculations_results, get_calculations_results_ml, _get_configurations_numbers
+from xsorb.settings import Settings
+from xsorb.dft_codes.calculator import Calculator
+from xsorb.dft_codes.override import override_settings
+from xsorb.dft_codes.definitions import OUT_FILE_PATHS, IN_FILE_PATHS
+from xsorb.common_definitions import *
+from xsorb.structures.generation import AdsorptionStructuresGenerator
+
+from xsorb import ase_custom
 
 
 
@@ -52,7 +56,7 @@ def regenerate_missing_sitelabels():
 
  
 def write_inputs(settings : Settings, 
-                 all_mol_on_slab_configs_ase : list, 
+                 all_adsorption_structures : list, 
                  calc_indices : list,
                  calc_type : str,
                  OVERRIDE_SETTINGS : bool = True, 
@@ -76,6 +80,19 @@ def write_inputs(settings : Settings,
 
     if OVERRIDE_SETTINGS: override_settings(settings, calc_type) 
 
+    #when launching ml or screening from scratch, write to db_initial.
+    #when launching screenining from preopt, read from db_ml, do not write to db_initial
+    #when launching relax, read either from db_ml or db_screening.
+    
+    db = ase.db.connect('db_initial.db')
+    for i, atoms in enumerate(all_adsorption_structures):
+        already_present = False
+        for row in db.select():
+            if row.toatoms() == atoms:
+                already_present = True
+                break
+        if not already_present:
+            db.write(atoms, label=f'{i}')
 
     ANSWER_ALL = False
     answer = 'yes'
@@ -309,17 +326,16 @@ def generate(SAVEFIG=False):
     - SAVEFIG: save an image of the adsorption sites and of the molecular rotations when generating the configurations
     '''
     
-    settings=Settings(read_energies=False)
+    settings=Settings(READ_ENERGIES=False)
 
-    all_mol_on_slab_configs_ase, full_labels, _, _ = adsorption_configurations(settings, SAVEFIG)
+    gen = AdsorptionStructuresGenerator(settings, VERBOSE=True)
+    all_adsorption_structures = gen.generate_adsorption_structures(SAVEFIG)
+
 
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
-    indices_list = np.arange(len(all_mol_on_slab_configs_ase))
-
     write_inputs(settings, 
-                 all_mol_on_slab_configs_ase,
-                 indices_list,
+                 all_adsorption_structures,
                  calc_type='SCREENING',
                  OVERRIDE_SETTINGS=False,
                  INTERACTIVE=True)
