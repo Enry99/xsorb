@@ -27,7 +27,6 @@ from xsorb.io.utils import ase_custom_read as read
 from xsorb.visualize.geometry import save_adsites_image
 from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteCrystal, \
     AdsorptionSiteAmorphous, SurroundingSite
-from xsorb import ase_custom
 
 
 class Slab:
@@ -40,9 +39,8 @@ class Slab:
         - slab_filename: file containing the structure of the slab
         - layers_threshold: deltaz for the atoms to be considered as part of the same layer.
             Used to identify layers when fixing atoms by layer.
-        - surface_sites_height: deltaz from the topmost atom to identify which atoms are
-            surface atoms, used by Pymatgen to find adsorption sites (it is the 'height'
-            parameter of Pymatgen's AdsorbateSiteFinder)
+        - surface_thickness: thickness (delta_z) of the surface layer (in A)
+            to be considered as surface atoms
         - fixed_layers_slab: list of layers of the slab to be fixed
             (counting starts from the bottom, beginning with 0)
         - fixed_indices_slab: list of specific atoms to be fixed (-1: fix all)
@@ -56,7 +54,7 @@ class Slab:
     '''
 
     def __init__(self, slab_filename : str,
-                 surface_sites_height : float = 0.9,
+                 surface_thickness : float = 0.9,
                  layers_threshold : float = 0.5,
                  fixed_layers_slab : list | None = None,
                  fixed_indices_slab : list | None = None,
@@ -64,8 +62,9 @@ class Slab:
                  sort_atoms_by_z : bool = False,
                  translate_slab_from_below_cell_bottom : bool = True):
 
-        self.slab_ase = ase_custom.Atoms_custom(read(filename=slab_filename))
+        self.slab_ase = read(filename=slab_filename)
         self.natoms   = len(self.slab_ase)
+        self.surface_thickness = surface_thickness
 
         # First, check if the cell is defined according to the right-handed rule, if not,
         # swap the first two vectors so that the surface normal is found correctly by
@@ -111,10 +110,11 @@ class Slab:
             warnings.simplefilter("ignore")
             self.slab_pymat = AseAtomsAdaptor.get_structure(self.slab_ase)
 
-        self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_sites_height)
+        self.asf = AdsorbateSiteFinder(self.slab_pymat, height=surface_thickness)
 
 
-    def find_adsorption_sites(self, mode: str, **kwargs) -> list[AdsorptionSite]:
+    def find_adsorption_sites(self, mode: str, **kwargs) -> \
+        list[AdsorptionSiteCrystal | AdsorptionSiteAmorphous]:
         '''
         Find the adsorption sites on the surface of the slab, using the specified mode.
 
@@ -152,7 +152,7 @@ class Slab:
             return []
 
 
-    def get_symmetrically_equivalent_sets(self, coords_set : list, threshold : float =1e-6):
+    def _get_symmetrically_equivalent_sets(self, coords_set : list, threshold : float =1e-6):
         """Classifies the adsorption sites into sets of symmetrically equivalent sites.
 
         Args:
@@ -175,8 +175,8 @@ class Slab:
                 idxs = find_in_coord_list_pbc(unique_coords, op.operate(coords), atol=threshold)
                 if idxs:
                     if len(idxs) > 1:
-                        print('ERROR: a new site is symmetrically equivalent \
-                              to two INEQUIVALENT sites.')
+                        raise RuntimeError('ERROR: a new site is symmetrically equivalent' \
+                              ' to two INEQUIVALENT sites.')
                     in_coord = True
                     equivalent_sets[idxs[0]] += [self.asf.slab.lattice.get_cartesian_coords(coords)]
                     break
@@ -185,6 +185,89 @@ class Slab:
                 equivalent_sets += [[self.asf.slab.lattice.get_cartesian_coords(coords)]]
 
         return equivalent_sets
+
+
+    def _get_classified_high_symmetry_sites(self, site_types : tuple[str, str, str],
+                                           adsites_coords : dict,
+                                           selected_sites : list | None = None):
+        """
+        Build the list of AdsorptionSiteCrystal objects,
+        classified according to the site type, and include the info.
+
+        Args:
+        - site_types: tuple containing the types of adsorption sites to be classified
+        - adsites_coords: dictionary containing the coordinates of the ontop,
+            hollow and bridge sites
+        - selected_sites (optional): indices of the sites for manual selection
+
+        Returns:
+        - list of AdsorptionSiteCrystal objects,
+        containing the information about the adsorption sites.
+        """
+
+        #create structure containing only surface atoms
+        surf = self.asf.slab.copy().remove_sites(self.asf.slab.subsurface_sites())
+        #flatten the surface (z=0 for all)
+        for i in range(len(surf)): surf[i].z = 0 # pylint: disable=consider-using-enumerate,multiple-statements
+
+        nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are
+        #at the center of a non-perfeclty equilater triangle
+
+
+        #create a list with all the sites, with info for each one
+        all_adsites : list[AdsorptionSiteCrystal] = []
+
+        #handle the case of existing sites
+        existing_sites = self.existing_sites()
+        all_adsites.extend(existing_sites)
+
+        i_site = len(all_adsites)
+        for site_type, sites_coords_list in zip(site_types,
+            [adsites_coords['ontop'], adsites_coords['hollow'], adsites_coords['bridge']]):
+
+            for site_coords in sites_coords_list:
+
+                unique_id = "{0:.2f},{1:.2f}".format(*site_coords[:2]) #pylint: disable=consider-using-f-string
+
+                if selected_sites and i_site not in selected_sites:
+                    continue
+                if any(unique_id == x.unique_id for x in existing_sites):
+                    continue
+
+
+                #dummy structure just to place one atom in the site and obtain CN and NN list
+                dummy_coords = site_coords.copy()
+                dummy_coords[2] = 0.2 #place the dummy atom just above the surface level z=0
+                surf.append('O', dummy_coords, coords_are_cartesian=True)
+                coord_n = nn.get_cn(surf, len(surf)-1)
+                nn_list = nn.get_nn(surf, len(surf)-1)
+                surf.remove_sites([len(surf)-1]) #remove dummy atom
+
+
+                # add further information to the site types
+                if site_type == 'ontop':
+                    first_nn_species = nn_list[0].site.species_string
+                    info = f"{site_type} {first_nn_species}"
+                elif site_type == 'hollow':
+                    info = f"{site_type} {coord_n}-fold"
+                elif site_type == 'bridge':
+                    if coord_n>=4: #attemps to fix the problem of fake bridges for 4-fold sites
+                        info = f"hollow {coord_n}-fold"
+                    else:
+                        if len(nn_list) >=2:
+                            distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
+                            info = f"{site_type} {distance}"
+                        else:
+                            info = f"{site_type}"
+                else:
+                    raise ValueError('Invalid site type.')
+
+                all_adsites.append(AdsorptionSiteCrystal(label=i_site,
+                                                         coords=site_coords,
+                                                         info=info))
+                i_site += 1
+
+        return all_adsites
 
 
     def find_adsorption_sites_high_symmetry(self, symm_reduce : float = 0.01,
@@ -215,7 +298,7 @@ class Slab:
         site_types = ('ontop', 'hollow', 'bridge')
 
         #adsites is a dict which contains the ontop, hollow and bridge sites
-        adsites = self.asf.find_adsorption_sites(distance=0,
+        adsites_coords = self.asf.find_adsorption_sites(distance=0,
                                                  symm_reduce=0,
                                                  no_obtuse_hollow=no_obtuse_hollow).pop('all')
 
@@ -224,78 +307,21 @@ class Slab:
         #in each set, selec the site closest to te cell center as the representative site
         for site_type in site_types:
             #sort the sites by distance from the center of the cell
-            sorted_sites = sorted(adsites[site_type],
+            sorted_sites = sorted(adsites_coords[site_type],
                 key=lambda x: np.linalg.norm(
                     x - self.asf.slab.lattice.get_cartesian_coords([0.5, 0.5, 0]))
                     )
 
             #find the equivalent sets of sites
-            equivalent_sets_list = self.get_symmetrically_equivalent_sets(sorted_sites, symm_reduce)
+            equivalent_sets_list = self._get_symmetrically_equivalent_sets(sorted_sites,symm_reduce)
 
             #select the representative site for each set and assign the sites to the adsites dict
-            adsites[site_type] = [equivalent_set[0] for equivalent_set in equivalent_sets_list]
+            adsites_coords[site_type]=[equivalent_set[0] for equivalent_set in equivalent_sets_list]
 
-
-        #create structure containing only surface atoms
-        surf = self.asf.slab.copy().remove_sites(self.asf.slab.subsurface_sites())
-        for i in range(len(surf)):
-            surf[i].z = 0 #flatten the surface (z=0 for all)
-
-        nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are
-        #at the center of a non-perfeclty equilater triangle
-
-
-        #create a list with all the sites, with info for each one
-        all_adsites : list[AdsorptionSite] = []
-
-        #handle the case of existing sites
-        existing_sites = self.existing_sites()
-        all_adsites.extend(existing_sites)
-
-        i_site = len(all_adsites)
-        for site_type, sites_list in zip(site_types, \
-                                         [adsites['ontop'], adsites['hollow'], adsites['bridge']]):
-            for site in sites_list:
-
-                unique_id = "{0:.2f},{1:.2f}".format(*site[:2])
-
-                if selected_sites and i_site not in selected_sites:
-                    continue
-                if any(unique_id == x.unique_id for x in existing_sites):
-                    continue
-
-
-                #dummy structure just to place one atom in the site and obtain CN and NN list
-                coords = site.tolist()
-                coords[2] = 0.2 #place the dummy atom just above the surface level z=0
-                surf.append('O', coords, coords_are_cartesian=True)
-                coord_n = nn.get_cn(surf, len(surf)-1)
-                nn_list = nn.get_nn(surf, len(surf)-1)
-                surf.remove_sites([len(surf)-1]) #remove dummy atom
-
-
-                # add further information to the site types
-                if site_type == 'ontop':
-                    first_nn_species = nn_list[0].site.species_string
-                    info = f"{site_type} {first_nn_species}"
-                elif site_type == 'hollow':
-                    info = f"{site_type} {coord_n}-fold"
-                elif site_type == 'bridge':
-                    if coord_n>=4: #attemps to fix the problem of fake bridges for 4-fold sites
-                        info = f"hollow {coord_n}-fold"
-                    else:
-                        if len(nn_list) >=2:
-                            distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
-                            info = f"{site_type} {distance}"
-                        else:
-                            info = f"{site_type}"
-                else:
-                    raise ValueError('Invalid site type.')
-
-                all_adsites.append(AdsorptionSiteCrystal(label=i_site,
-                                                         coords=site,
-                                                         info=info))
-                i_site += 1
+        #classify the adsorption sites, building the list of AdsorptionSiteCrystal objects
+        all_adsites = self._get_classified_high_symmetry_sites(site_types,
+                                                               adsites_coords,
+                                                               selected_sites)
 
 
         if verbose:
@@ -311,7 +337,7 @@ class Slab:
         return all_adsites
 
 
-    def coord_number_surface_analysis(self,
+    def _coord_number_surface_analysis(self,
                                       cn_method: str,
                                       cn_plain_fixed_radius: float | None = 1.5,
                                       verbose: bool=False):
@@ -341,16 +367,29 @@ class Slab:
 
         """
 
-        surf_coords = [s.coords for s in self.asf.surface_sites]
-        surf_sites_indices = [i for i in range(len(self.asf.slab.sites)) \
-                              if np.any(np.all(self.asf.slab.cart_coords[i]==surf_coords, axis=1))]
+        #Select which sites belong to the surface. Sites whose z coordinate
+        # is below self.surface_thickness from the maximum z of the atoms within
+        # a circle of radius 2.5 A around the atom are considered surface sites.
+        # This allows to have a more accurate selection of the surface sites
+        # in case of non-flat surfaces.
+        circle_radius = 2.5
+        surf_coords = []
+        surf_sites_indices = []
+        for atom in self.slab_ase:
+            #find the max z of atoms within a circle of radius 2.5 A around the atom
+            max_z = np.max([atom.position[2] for atom in self.slab_ase \
+                    if np.linalg.norm(atom.position[:2] - atom.position[:2])  <circle_radius])
+            if atom.position[2] > max_z - self.surface_thickness:
+                surf_coords.append(atom.position)
+                surf_sites_indices.append(atom.index)
+
 
         if cn_method == 'plain':
             #standard coordination number (integer no. of nearest neighbours)
             #with fixed radius. If radius is set to None, the natural_cutoffs are used.
             if verbose:
-                print('Using ase.neighborlist {0} to find coordination numbers.'\
-                  .format('with fixed radius for all atoms' if cn_plain_fixed_radius \
+                print('Using ase.neighborlist {0} to find coordination numbers.'.format( # pylint: disable=consider-using-f-string
+                    'with fixed radius for all atoms' if cn_plain_fixed_radius \
                           else 'with ase.neighborlist.natural_cutoffs.'))
 
 
@@ -365,16 +404,16 @@ class Slab:
 
         elif cn_method == 'minimumdistancenn':
             if verbose:
-                print('Using pymatgen.analysis.local_env.MinimumDistanceNN \
-                              to find coordination numbers.')
+                print('Using pymatgen.analysis.local_env.MinimumDistanceNN' \
+                        ' to find coordination numbers.')
 
             nn = MinimumDistanceNN(tol=0.2)
             cn_list = [nn.get_cn(self.asf.slab, idx) for idx in surf_sites_indices]
 
         elif cn_method == 'crystalnn':
             if verbose:
-                print('Using pymatgen.analysis.local_env.CrystalNN with weigths \
-                              to find coordination numbers.')
+                print('Using pymatgen.analysis.local_env.CrystalNN with weigths' \
+                        ' to find coordination numbers.')
 
 
             nn = CrystalNN(weighted_cn=True)
@@ -389,7 +428,7 @@ class Slab:
         return surf_coords, cn_list, surf_sites_indices
 
 
-    def add_surrounding_adsites(self, adsites : list[AdsorptionSiteAmorphous],
+    def _add_surrounding_adsites(self, adsites : list[AdsorptionSiteAmorphous],
                                 surf_sites_indices : list[int],
                                 surrounding_sites_deltaz: float = 1.5):
         """
@@ -441,6 +480,59 @@ class Slab:
                     nn_counter_for_this_site += 1
 
 
+    def _get_classified_coord_number_sites(self,
+                                           surf_coords : list,
+                                          cn_list : list,
+                                          surf_sites_indices : list,
+                                          max_cn : float,
+                                          selected_sites : list | None = None,
+                                          selected_atomic_species : list | None = None,
+                                          include_surrounding_sites : bool = False,
+                                          surrounding_sites_deltaz: float | None = 1.5):
+        """
+        Build the list of AdsorptionSiteAmorphous objects, and include the info.
+        """
+
+        #create a list with all the sites, with info for each one
+        all_adsites : list[AdsorptionSite] = []
+
+        #handle the case of existing sites
+        existing_sites = self.existing_sites()
+        all_adsites.extend(existing_sites)
+
+
+        i_site = len(all_adsites)
+        for coords, cn, idx in zip(surf_coords, cn_list, surf_sites_indices):
+
+            #here unique id is the atom index in the slab, since we are considering atoms as sites
+            unique_id = idx
+            atom_species = self.asf.slab[idx].species_string
+
+            if selected_sites and i_site not in selected_sites:
+                continue
+            if selected_atomic_species and atom_species not in selected_atomic_species:
+                continue
+            if any(unique_id == x.unique_id for x in existing_sites):
+                continue
+
+            if cn <= max_cn:
+                info = f"{atom_species}(cn={cn:.1f})"
+                all_adsites.append(AdsorptionSiteAmorphous(label=str(i_site),
+                                                           coords=coords,
+                                                           info=info,
+                                                           atom_index=idx,
+                                                           coordination_number=cn))
+                i_site += 1
+
+        if include_surrounding_sites:
+            self._add_surrounding_adsites(
+                adsites=all_adsites,
+                surf_sites_indices=surf_sites_indices,
+                surrounding_sites_deltaz=surrounding_sites_deltaz)
+
+        return all_adsites
+
+
     def find_adsorption_sites_coord_number(self,
                                         cn_method: str,
                                         cn_plain_fixed_radius : float | None = 1.5,
@@ -480,49 +572,20 @@ class Slab:
             print('Finding adsorption sites...')
 
         surf_coords, cn_list, surf_sites_indices = \
-            self.coord_number_surface_analysis(cn_method, cn_plain_fixed_radius, verbose)
+            self._coord_number_surface_analysis(cn_method, cn_plain_fixed_radius, verbose)
 
         max_cn = max_cn if max_cn is not None else min(cn_list) + max_cn_offset
 
-
-        #create a list with all the sites, with info for each one
-        all_adsites : list[AdsorptionSite] = []
-
-        #handle the case of existing sites
-        existing_sites = self.existing_sites()
-        all_adsites.extend(existing_sites)
-
-
-        i_site = len(all_adsites)
-        for coords, cn, idx in zip(surf_coords, cn_list, surf_sites_indices):
-
-            #here unique id is the atom index in the slab, since we are considering atoms as sites
-            unique_id = idx
-            atom_species = self.asf.slab[idx].species_string
-
-            if selected_sites and i_site not in selected_sites:
-                continue
-            if selected_atomic_species and atom_species not in selected_atomic_species:
-                continue
-            if any(unique_id == x.unique_id for x in existing_sites):
-                continue
-
-            if cn <= max_cn:
-                info = f"{atom_species}(cn={cn:.1f})"
-                all_adsites.append(AdsorptionSiteAmorphous(label=str(i_site),
-                                                           coords=coords,
-                                                           info=info,
-                                                           atom_index=idx,
-                                                           coordination_number=cn)
-                                                           )
-                i_site += 1
-
-        if include_surrounding_sites:
-            self.add_surrounding_adsites(
-                adsites=all_adsites,
-                surf_sites_indices=surf_sites_indices,
-                surrounding_sites_deltaz=surrounding_sites_deltaz)
-
+        #build the list of AdsorptionSiteAmorphous objects, and include the info
+        all_adsites = self._get_classified_coord_number_sites(
+            surf_coords=surf_coords,
+            cn_list=cn_list,
+            surf_sites_indices=surf_sites_indices,
+            max_cn=max_cn,
+            selected_sites=selected_sites,
+            selected_atomic_species=selected_atomic_species,
+            include_surrounding_sites=include_surrounding_sites,
+            surrounding_sites_deltaz=surrounding_sites_deltaz)
 
         if verbose:
             print('Adsorption sites found.')

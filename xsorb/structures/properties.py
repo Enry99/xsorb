@@ -12,10 +12,10 @@ from ase import Atoms
 class MoleculeRotation:
     '''
     Class to store a rotated molecule and the rotation angles.
-    The rotation angles are stored as strings, to be able to store also the 
-    SurroundingSite object when using the coordination number method. 
-    Angles are not intended to reproduce the rotation of the molecule given 
-    the initial structure, since the rotated molecule is already stored in 
+    The rotation angles are stored as strings, to be able to store also the
+    SurroundingSite object when using the coordination number method.
+    Angles are not intended to reproduce the rotation of the molecule given
+    the initial structure, since the rotated molecule is already stored in
     the Atoms object.
 
     Contains:
@@ -71,7 +71,7 @@ class AdsorptionSite:
         '''
         String that fully identifies the site
         '''
-        return "{0:.2f},{1:.2f},{2:.2f}".format(*self.coords)
+        return "{0:.2f},{1:.2f},{2:.2f}".format(*self.coords) #pylint: disable=consider-using-f-string
 
     #define equality as the equality of the unique_id
     def __eq__(self, other : 'AdsorptionSite') -> bool:
@@ -158,7 +158,9 @@ class AdsorptionStructure:
     - atoms: Atoms object of the adsorption structure
     - adsite: AdsorptionSite object of the adsorption site
     - mol_rot: MoleculeRotation object of the rotated molecule
-    - distance: float, distance between the reference atom of the molecule 
+    - distance: float, distance between the reference atom of the molecule
+    - slab_indices: list[int], indices of the atoms of the slab
+    - mol_indices: list[int], indices of the atoms of the molecule
     and the adsorption site
 
     Properties:
@@ -172,36 +174,31 @@ class AdsorptionStructure:
     adsite: AdsorptionSite
     mol_rot: MoleculeRotation
     distance : float
+    slab_indices: list[int]
+    mol_indices: list[int]
 
-    @property
-    def dataframe_column_names(self):
-        """
-        Returns a tuple with the names of the columns of the AdsorptionStructure object,
-        to be used as column names in a pandas DataFrame
-        """
-        return ("site",
-                "site_info",
-                "x",
-                "y",
-                "z",
-                "distance",
-                "xrot",
-                "yrot",
-                "zrot")
 
-    def to_dataframe_row(self):
+    def to_info_dict(self, include_indices : bool = True):
         """
-        Returns a list with the data of the AdsorptionStructure object, 
-        to be used as a row in a pandas DataFrame
+        Returns a dictionary with the information of the AdsorptionStructure object
         """
-        return [self.adsite.label,
-                self.adsite.info,
-                *self.adsite.coords,
-                self.distance,
-                self.mol_rot.xrot,
-                self.mol_rot.yrot,
-                self.mol_rot.zrot]
+        infodict = {"site": self.adsite.label,
+                    "site_info": self.adsite.info,
+                    "x": self.adsite.coords[0],
+                    "y": self.adsite.coords[1],
+                    "z": self.adsite.coords[2],
+                    "distance": self.distance,
+                    "xrot": self.mol_rot.xrot,
+                    "yrot": self.mol_rot.yrot,
+                    "zrot": self.mol_rot.zrot}
 
-        #df = pd.DataFrame(columns=['a', 'b'])
-        #df_line = [1,2]
+        if include_indices:
+            infodict.update({"slab_indices": self.slab_indices,
+                             "mol_indices": self.mol_indices})
+
+        return infodict
+
+        #
+        #df = pd.DataFrame(columns=infodict.keys())
+        #df_line = pd.Series(infodict)
         #df.loc[0] = df_line

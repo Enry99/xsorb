@@ -1,14 +1,16 @@
 '''
-Module that contains the class AdsorptionStructuresGenerator, 
+Module that contains the class AdsorptionStructuresGenerator,
 used to generate the adsorption structures
 '''
 
 from dataclasses import asdict
 
+import numpy as np
 from ase import Atoms
-from ase.data import atomic_numbers, covalent_radii
+from ase.geometry import get_distances
+from ase.data import covalent_radii
+from ase.data.vdw_alvarez import vdw_radii
 
-from xsorb.structures.utils import closest_pair
 from xsorb.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
@@ -16,50 +18,15 @@ from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteAmorphous,
     MoleculeRotation, AdsorptionStructure
 
 
-def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : float):
-    '''
-    Returns the vertical translation required so that the closest mol-slab atom pair is at least
-    min_z_distance_from_surf apart (or half the sum of the covalent radii) along z
-
-    Args:
-    - slab: Atoms object for the slab
-    - mol: Atoms object for the molecule
-    - min_distance: minimum required distance along z
-    '''
-
-    dz_tot = 0
-    molcopy = mol.copy()
-    while True:
-        #First, find the closest slab-mol atoms pair
-        i_mol, j_slab, _ = closest_pair(slab, molcopy)
-
-        #Find the z coordinates of the closest atoms pair, and half their covalent distance
-        half_covalent_distance = 0.5 * (covalent_radii[atomic_numbers[slab[j_slab].symbol]] \
-                                    + covalent_radii[atomic_numbers[molcopy[i_mol].symbol]])
-        zmol = molcopy[i_mol].position[2]
-        zslab = slab[j_slab].position[2]
-
-        #Calculate the distance required to enforce the minimum distance
-        necessary_min_z_dist = max(min_z_distance_from_surf, half_covalent_distance)
-        if zmol < zslab + necessary_min_z_dist:
-            dz = zslab + necessary_min_z_dist - zmol
-            dz_tot += dz
-            molcopy.translate([0,0,dz])
-        else:
-            break
-
-    return dz_tot
-
-
 
 class AdsorptionStructuresGenerator:
     '''
-    Class to generate adsorption structures for a given slab and molecule, 
+    Class to generate adsorption structures for a given slab and molecule,
     obtained as the combinations of the molecule on different adsorption sites
     and different molecular rotations.
-    When instantiated, it reads slab and molecule from file, and does the 
+    When instantiated, it reads slab and molecule from file, and does the
     preprocessing of the structural parameters.
-    Then the generate_adsorption_structures method can be used to get the 
+    Then the generate_adsorption_structures method can be used to get the
     adsorption structures.
 
     Initialization parameters:
@@ -74,7 +41,7 @@ class AdsorptionStructuresGenerator:
         It is initialized as None, and is stored for subsequent calls to avoid recomputing it.
 
     Methods:
-    - generate_adsorption_structures: generate all adsorption structures considering 
+    - generate_adsorption_structures: generate all adsorption structures considering
         the combinations of molecular rotations and adsorption sites
     '''
 
@@ -88,7 +55,7 @@ class AdsorptionStructuresGenerator:
         if verbose:
             print('Loading slab...')
         self.slab = Slab(slab_filename=settings.input.slab_filename,
-                    surface_sites_height=settings.structure.adsorption_sites.surface_height,
+                    surface_thickness=settings.structure.adsorption_sites.surface_thickness,
                     layers_threshold=settings.structure.constraints.layers_height,
                     fixed_layers_slab=settings.structure.constraints.fixed_layers_slab,
                     fixed_indices_slab=settings.structure.constraints.fixed_indices_slab,
@@ -127,7 +94,7 @@ class AdsorptionStructuresGenerator:
 
         Args:
         - rot_mode: 'standard' for the standard mode, 'surrounding' for the surrounding mode
-        - adsite: for the surrounding mode, AdsorptionSiteAmorphous object that contains info to 
+        - adsite: for the surrounding mode, AdsorptionSiteAmorphous object that contains info to
             rotate the molecule towards the surrounding sites
         - save_image: save an image of the molecule rotations
         - verbose: print additional information during the generation
@@ -165,6 +132,59 @@ class AdsorptionStructuresGenerator:
         return molecule_rotations
 
 
+    def _mindistance_deltaz(self, mol: Atoms):
+        '''
+        Returns the vertical translation required so that the closest mol-slab atom pair is at least
+        at least min_distance away from each other along the z axis, where min_distance can be
+        a value, the sum of the covalent radii, or the sum of the van der Waals radii.
+        It works by iteratively translating the molecule upwards until the condition is satisfied.
+
+        Args:
+        - mol: Atoms object for the molecule
+        '''
+
+        mode = self.settings.structure.molecule.adsorption_distance_mode
+        slab = self.slab.slab_ase
+        min_distance = self.settings.structure.molecule.min_distance
+        mult = self.settings.structure.molecule.radius_scale_factor
+
+        dz_tot = 0
+        molcopy = mol.copy()
+
+        while True:
+            #Iteratively translate the molecule upwards until the condition is satisfied
+            #The iterative procedure is necessary if part of the molecule is below the slab
+
+            vector_matrix, d_matrix = get_distances(slab.positions,mol.positions,slab.cell,pbc=True)
+            candidate_translations = []
+            for id1, at1 in enumerate(slab):
+                for id2, at2 in enumerate(mol):
+
+                    distance = d_matrix[id1, id2]
+                    h = np.dot(vector_matrix[id1, id2], [0,0,1])
+                    b = np.sqrt(distance**2 - h**2)
+
+                    if mode == 'covalent_radius':
+                        D = mult*(covalent_radii[at1.number] + covalent_radii[at2.number]) #pylint: disable=invalid-name
+                    elif mode == 'vdw_radius':
+                        D = mult*(vdw_radii[at1.number] + vdw_radii[at2.number]) #pylint: disable=invalid-name
+                    else:
+                        D = min_distance #pylint: disable=invalid-name
+
+                    if distance < D:
+                        dz = np.sqrt(D**2 - b**2) - h
+                        candidate_translations.append(dz)
+
+            if candidate_translations:
+                dz = np.max(candidate_translations)
+                dz_tot += dz
+                molcopy.translate([0,0,dz])
+            else:
+                break
+
+        return dz_tot
+
+
     def _put_together_slab_and_mol(self, adsite : AdsorptionSite,
                                   mol_rot : MoleculeRotation):
         '''
@@ -175,35 +195,46 @@ class AdsorptionStructuresGenerator:
         - mol_rot: MoleculeRotation object containing the rotated molecule
 
         Returns:
-        - AdsorptionStructure object containing the Atoms object and info 
+        - AdsorptionStructure object containing the Atoms object and info
             on the adsorption site and the molecule rotation
         '''
 
 
         mol = mol_rot.atoms.copy()
+        distance = 0
 
         #place the molecule in the adsorption site, then translate it upwards by the target height
         mol.translate(adsite.coords)
 
-        distance = self.settings.structure.molecule.target_distance
-        mol.translate([0,0,distance])
+        if self.settings.structure.molecule.adsorption_distance_mode == 'value':
+            #Use the target distance from the settings. Otherwise just let the iterative
+            #min_z_distance_from_surf function handle the distance
+            distance += self.settings.structure.molecule.target_distance
+            mol.translate([0,0,distance])
 
         #Check for min_z_distance_from_surf and translate accordingly
-        further_transl = mindistance_deltaz(self.slab.slab_ase,
-                                            mol,
-                                            self.settings.structure.molecule.min_distance)
+        further_transl = self._mindistance_deltaz(mol)
         if further_transl:
             mol.translate( [0, 0, further_transl] )
             distance += further_transl
 
-        atoms : Atoms = mol + self.slab.slab_ase if self.settings.structure.misc.mol_before_slab \
-            else self.slab.slab_ase + mol
+
+        if self.settings.structure.misc.mol_before_slab:
+            atoms : Atoms = mol + self.slab.slab_ase
+            slab_indices = list(range(len(mol), len(mol)+len(self.slab.slab_ase)))
+            mol_indices = list(range(len(mol)))
+        else:
+            atoms : Atoms = self.slab.slab_ase + mol
+            slab_indices = list(range(len(self.slab.slab_ase)))
+            mol_indices = list(range(len(self.slab.slab_ase), len(self.slab.slab_ase)+len(mol)))
         atoms.cell = self.slab.slab_ase.cell
 
         return AdsorptionStructure(atoms=atoms,
                                    adsite=adsite,
                                    mol_rot=mol_rot,
-                                   distance=distance)
+                                   distance=distance,
+                                   slab_indices=slab_indices,
+                                   mol_indices=mol_indices)
 
 
     def _get_structures_for_vertical_surrounding_sites(self, adsite : AdsorptionSiteAmorphous):
@@ -240,7 +271,7 @@ class AdsorptionStructuresGenerator:
 
     def generate_adsorption_structures(self, save_image : bool = False, verbose : bool = True):
         '''
-        Generate all adsorption structures considering the combinations of 
+        Generate all adsorption structures considering the combinations of
         molecular rotations and adsorption sites.
 
         Args:
@@ -248,7 +279,7 @@ class AdsorptionStructuresGenerator:
         - verbose: print additional information during the generation
 
         Returns:
-        - adsorption_structures: list of AdsorptionStructure objects, each containing 
+        - adsorption_structures: list of AdsorptionStructure objects, each containing
             the Atoms object and info on the adsorption site and the molecule rotation.
         '''
 

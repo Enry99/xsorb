@@ -6,7 +6,6 @@
 """
 Module containing the Settings class,
 used to read the settings file and store the parameters.
-Checks are performed to ensure that the settings file is correctly formatted.
 
 """
 
@@ -32,7 +31,7 @@ class InputParams:
     molecule_filename: str
     jobscript_path: str
     submit_command: str
-    E_slab_mol : Optional[list[float]]
+    E_slab_mol : Optional[list[float]] # pylint: disable=invalid-name
     jobscript_ml_path: Optional[str]
     submit_command_ml: Optional[str]
     jobname_prefix: str = ''
@@ -88,7 +87,7 @@ class AdsorptionSitesParams:
     selected_sites: Optional[list[int]]
     high_symmetry_params: Optional[HighSymmetryParams]
     coord_number_params: Optional[CoordNumberParams]
-    surface_height: float = 0.9
+    surface_thickness: float = 0.9
 
     def __post_init__(self):
         if self.mode not in ['high_symmetry', 'coord_number']:
@@ -118,7 +117,7 @@ class MoleculeParams:
     adsorption_distance_mode: str = 'value'
     target_distance: float = 2.0
     min_distance: float = 1.5
-    radius_scale_factor: float = 1.1
+    radius_scale_factor: float = 1.0
 
     def __post_init__(self):
         if 'mode' not in self.molecule_axis or 'values' not in self.molecule_axis:
@@ -141,6 +140,9 @@ class MoleculeParams:
                 raise ValueError('adsorption_distance_mode must be either value, \
                                  covalent_radius or vdw_radius.')
 
+        if self.target_distance < self.min_distance:
+            raise ValueError('target_distance must be greater than min_distance.')
+
         if isinstance(self.vertical_angles, list):
             if len(self.vertical_angles) == 0:
                 raise ValueError('vertical_angles given as a list has to contain at least 1 angle.')
@@ -161,6 +163,10 @@ class MoleculeParams:
 
 @dataclass
 class ConstraintsParams:
+    '''
+    Dataclass to store the parameters in the
+    constraints card of the settings file.
+    '''
     fixed_layers_slab: Optional[list[int]]
     fixed_indices_slab: Optional[list[int]]
     fixed_indices_mol: Optional[list[int]]
@@ -179,12 +185,20 @@ class ConstraintsParams:
 
 @dataclass
 class MiscParams:
+    '''
+    Dataclass to store the parameters in the
+    misc card of the settings file.
+    '''
     mol_before_slab: bool = False
     sort_atoms_by_z: bool = True
     translate_slab: bool = True
 
 @dataclass
 class StructureParams:
+    '''
+    Dataclass to store the parameters in the
+    structure card of the settings file.
+    '''
     adsorption_sites: AdsorptionSitesParams
     molecule: MoleculeParams
     constraints: ConstraintsParams = field(
@@ -194,6 +208,15 @@ class StructureParams:
 
 
 class Settings:
+    '''
+    Class to read the settings file and store all the input parameters.
+    Checks are performed to ensure that the settings file is correctly formatted.
+
+    Initialization parameters:
+    - settings_filename : name of the settings file to read
+    - read_energies : if True, it will attempt to read energies of the slab and molecule
+    - verbose : if True, messages will be printed to standard output
+    '''
 
     def __init__(self,
                  settings_filename: str = "settings.toml",
@@ -240,12 +263,19 @@ class Settings:
             self.read_E_slab_mol(verbose)
 
 
-    def read_E_slab_mol(self, verbose : bool = True):
+    def read_E_slab_mol(self, verbose : bool = True): # pylint: disable=invalid-name
+        '''
+        Attempt to read the energies of the slab and molecule from the slab and molecule files,
+        and store them in E_slab_mol of the input dataclass.
+        If the energies cannot be read, E_slab_mol is set to [0.0, 0.0].
+        '''
         try:
             slab_en = read(self.input.slab_filename).get_potential_energy()
             mol_en = read(self.input.molecule_filename).get_potential_energy()
             self.input.E_slab_mol = [slab_en, mol_en]
-        except Exception as e:
+        except Exception as e: # pylint: disable=broad-except
+            #this is a general exception to catch any error that might occur.
+            #It can be file not found, or energy not present in the file, etc.
             self.input.E_slab_mol = [0.0, 0.0]
             if verbose:
                 print('It was not possible to obtain slab and molecule energy in any way.',

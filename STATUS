@@ -1,19 +1,6 @@
 settings.toml:                  OK
-
 xsorb/settings:                 OK
-
-
-xsorb/structures/molecule:      OK
-xsorb/structures/slab:          OK
-
-
-xsorb/visualize/geometry:       OK
-
-
-xsorb/dft_codes/calculator:     OK
-xsorb/dft_codes/definitions:    OK
-xsorb/dft_codes/input_settings: OK  
-
+xsorb/structures/*:             OK
 
 
 

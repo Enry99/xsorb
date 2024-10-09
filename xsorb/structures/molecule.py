@@ -17,9 +17,8 @@ from pymatgen.core.bonds import CovalentBond
 from ase.constraints import FixCartesian
 
 from xsorb.io.utils import ase_custom_read as read
-from xsorb.structures.properties import MoleculeRotation, SurroundingSite
 from xsorb.visualize.geometry import save_rotations_images
-from xsorb import ase_custom
+from xsorb.structures.properties import MoleculeRotation, SurroundingSite
 
 
 class Molecule:
@@ -56,7 +55,7 @@ class Molecule:
                  fix_mol_xyz : list | None = None):
 
 
-        self.mol_ase = ase_custom.Atoms_custom(read(molecule_filename))
+        self.mol_ase = read(molecule_filename)
 
         #align axis to x axis
         if molecule_axis_atoms and axis_vector:
