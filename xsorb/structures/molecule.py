@@ -14,9 +14,9 @@ import warnings
 import numpy as np
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.core.bonds import CovalentBond
-from ase.io import read
 from ase.constraints import FixCartesian
 
+from xsorb.io.utils import ase_custom_read as read
 from xsorb.structures.properties import MoleculeRotation, SurroundingSite
 from xsorb.visualize.geometry import save_rotations_images
 from xsorb import ase_custom
@@ -30,18 +30,18 @@ class Molecule:
 
         Initialization parameters:
         - molecule_filename: file containing the structure of the molecule
-        - atom_index: index of the reference atom (indexing starting from 0, 
+        - atom_index: index of the reference atom (indexing starting from 0,
             in the order of the input file)
-        - molecule_axis_atoms: indices of the two atoms defining the x-axis 
-            of the molecule (a = r2 - r1) 
+        - molecule_axis_atoms: indices of the two atoms defining the x-axis
+            of the molecule (a = r2 - r1)
         - axis_vector: [ax, ay, az] of the vector that is considered as the x-axis of the molecule
-        - atoms_subset: indices of the atoms to include. Only removes atom NOT in this list, 
+        - atoms_subset: indices of the atoms to include. Only removes atom NOT in this list,
             does not check if the atoms in the list actually exist in the molecule
-        - break_bond_indices: indices of the two atoms of the bond to be broken. 
+        - break_bond_indices: indices of the two atoms of the bond to be broken.
             The fragment containing the first atom will be kept.
         - fixed_indices_mol: list of specific atoms to be fixed (-1 : fix all)
             (indices start from 0, with the ordering of the atoms in the input file)
-        - fix_mol_xyz: which coordinates to fix for the fixed atoms, 
+        - fix_mol_xyz: which coordinates to fix for the fixed atoms,
             e.g. [True, True, False] = fix motion in x,y, free to move along z.
     '''
 
@@ -143,7 +143,7 @@ class Molecule:
         - x_rot_angles: list of angles to rotate around the x axis
         - y_rot_angles: list of angles to rotate around the y axis
         - z_rot_angles: list of angles to rotate around the z axis
-        - vert_angles_list: custom list of rotation angles for when the molecule is vertical 
+        - vert_angles_list: custom list of rotation angles for when the molecule is vertical
             (for y_angle = +/- 90°)
         - save_image: decide wether to save an image of all the molecular rotations
         '''
@@ -208,4 +208,3 @@ class Molecule:
             save_rotations_images(mol_rotations_ase, verbose=True)
 
         return mol_rotations_ase
-    

@@ -88,10 +88,10 @@ class AdsorptionStructuresGenerator:
         if verbose:
             print('Loading slab...')
         self.slab = Slab(slab_filename=settings.input.slab_filename,
-                    surface_sites_height=settings.structure.adsorption_sites.surface_height, 
-                    layers_threshold=settings.structure.constraints.layers_height, 
-                    fixed_layers_slab=settings.structure.constraints.fixed_layers_slab, 
-                    fixed_indices_slab=settings.structure.constraints.fixed_indices_slab, 
+                    surface_sites_height=settings.structure.adsorption_sites.surface_height,
+                    layers_threshold=settings.structure.constraints.layers_height,
+                    fixed_layers_slab=settings.structure.constraints.fixed_layers_slab,
+                    fixed_indices_slab=settings.structure.constraints.fixed_indices_slab,
                     fix_slab_xyz=settings.structure.constraints.fix_slab_xyz,
                     sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,
                     translate_slab_from_below_cell_bottom=settings.structure.misc.translate_slab)

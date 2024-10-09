@@ -4,20 +4,30 @@
 #@author: Enrico Pedretti
 
 """
-Class to store the parameters for generating the geometries and launching the calculations.
+Module containing the Settings class,
+used to read the settings file and store the parameters.
+Checks are performed to ensure that the settings file is correctly formatted.
 
 """
 
 from dataclasses import dataclass, field
 from typing import Optional
-from dacite import from_dict, Config
 import tomllib
+
+from dacite import from_dict, Config
+
+from xsorb.io.utils import ase_custom_read as read
 from xsorb.dft_codes.definitions import SUPPORTED_PROGRAMS
 from xsorb.dft_codes.input_settings import get_dftprogram_settings
 
 
 @dataclass
-class Input:
+class InputParams:
+    '''
+    Dataclass to store the parameters in the
+    INPUT card of the settings file.
+    '''
+
     slab_filename: str
     molecule_filename: str
     jobscript_path: str
@@ -31,16 +41,24 @@ class Input:
         if self.E_slab_mol is not None:
             if len(self.E_slab_mol) != 2:
                 raise ValueError("E_slab_mol must be a list of two floats.")
-            
+
         if self.jobscript_ml_path is not None and self.submit_command_ml is None:
             raise ValueError("jobscript_ml_path is provided but submit_command_ml is not.")
 
 @dataclass
-class High_symmetry_params:
+class HighSymmetryParams:
+    '''
+    Dataclass to store the parameters in the
+    high_symmetry_params card of the settings file.
+    '''
     symm_reduce: float = 0.01
 
 @dataclass
-class Coord_number_params:
+class CoordNumberParams:
+    '''
+    Dataclass to store the parameters in the
+    coord_number_params card of the settings file.
+    '''
     cn_method: str
     range_selection: dict
 
@@ -61,11 +79,15 @@ class Coord_number_params:
             raise ValueError('range_selection mode must be either max or offset.')
 
 @dataclass
-class Adsorption_sites:
-    mode : str    
+class AdsorptionSitesParams:
+    '''
+    Dataclass to store the parameters in the
+    adsorption_sites card of the settings file.
+    '''
+    mode : str
     selected_sites: Optional[list[int]]
-    high_symmetry_params: Optional[High_symmetry_params]
-    coord_number_params: Optional[Coord_number_params]
+    high_symmetry_params: Optional[HighSymmetryParams]
+    coord_number_params: Optional[CoordNumberParams]
     surface_height: float = 0.9
 
     def __post_init__(self):
@@ -73,13 +95,17 @@ class Adsorption_sites:
             raise ValueError('mode must be either high_symmetry or coord_number.')
         if self.mode == 'high_symmetry':
             if self.high_symmetry_params is None:
-                raise ValueError('high_symmetry_params must be provided when mode is high_symmetry.')
+                raise ValueError('high_symmetry_params must be provided when mode is high_symmetry')
         elif self.mode == 'coord_number':
             if self.coord_number_params is None:
                 raise ValueError('coord_number_params must be provided when mode is coord_number.')
 
 @dataclass
-class Molecule:
+class MoleculeParams:
+    '''
+    Dataclass to store the parameters in the
+    molecule card of the settings file.
+    '''
     molecule_axis: dict
     selected_atom_index: int
     x_rot_angles: list[float]
@@ -96,36 +122,45 @@ class Molecule:
 
     def __post_init__(self):
         if 'mode' not in self.molecule_axis or 'values' not in self.molecule_axis:
-            raise ValueError('molecule_axis must be in the format {mode = "atom_indices", values = [1, 2]} or {mode = "vector", values = [1,0,0]}.')
+            raise ValueError('molecule_axis must be in the format \
+                             {mode = "atom_indices", values = [1, 2]} or\
+                              {mode = "vector", values = [1,0,0]}.')
         if self.molecule_axis['mode'] not in ['atom_indices', 'vector']:
             raise ValueError('molecule_axis mode must be either atom_indices or vector.')
         if self.molecule_axis['mode'] == 'atom_indices':
             if len(self.molecule_axis['values']) != 2:
-                raise ValueError('molecule_axis values must be a list of two atom indices when mode is atom_indices.')
+                raise ValueError('molecule_axis values must be a list of two atom indices \
+                                 when mode is atom_indices.')
         elif self.molecule_axis['mode'] == 'vector':
             if len(self.molecule_axis['values']) != 3:
-                raise ValueError('molecule_axis values must be a list of three floats when mode is vector.')
-            
+                raise ValueError('molecule_axis values must be a list of three floats \
+                                 when mode is vector.')
+
         if self.adsorption_distance_mode is not None:
             if self.adsorption_distance_mode not in ['value', 'covalent_radius', 'vdw_radius']:
-                raise ValueError('adsorption_distance_mode must be either value, covalent_radius or vdw_radius.')
+                raise ValueError('adsorption_distance_mode must be either value, \
+                                 covalent_radius or vdw_radius.')
 
-        if type(self.vertical_angles) is list:
+        if isinstance(self.vertical_angles, list):
             if len(self.vertical_angles) == 0:
-                raise ValueError('vertical_angles given as a list has to contain at least one angle.')
+                raise ValueError('vertical_angles given as a list has to contain at least 1 angle.')
 
-        elif type(self.vertical_angles) is str:
+        elif isinstance(self.vertical_angles, str):
             if self.vertical_angles not in ['x', 'z', 'none']:
-                raise ValueError('vertical_angles, when not given as a list, must be either "x", "z", "none".')
-            
-            if self.vertical_angles == 'x': self.vertical_angles = self.x_rot_angles
-            elif self.vertical_angles == 'z': self.vertical_angles = self.z_rot_angles
-            elif self.vertical_angles == 'none': self.vertical_angles = None
-                
+                raise ValueError('vertical_angles, when not given as a list, must be either \
+                                 "x", "z", "none".')
 
-            
+            if self.vertical_angles == 'x':
+                self.vertical_angles = self.x_rot_angles
+            elif self.vertical_angles == 'z':
+                self.vertical_angles = self.z_rot_angles
+            elif self.vertical_angles == 'none':
+                self.vertical_angles = None
+
+
+
 @dataclass
-class Constraints:
+class ConstraintsParams:
     fixed_layers_slab: Optional[list[int]]
     fixed_indices_slab: Optional[list[int]]
     fixed_indices_mol: Optional[list[int]]
@@ -137,32 +172,34 @@ class Constraints:
 
     def __post_init__(self):
         if self.fixed_layers_slab is not None and self.fixed_indices_slab is not None:
-            raise ValueError('You can use either fixed_layers_slab or fixed_indices_slab, not both at the same time.')
+            raise ValueError('You can use either fixed_layers_slab or fixed_indices_slab, \
+                             not both at the same time.')
         if self.fix_bondlengths_preopt and self.fix_slab_preopt:
             raise ValueError('fix_bondlengths_preopt and fix_slab_preopt cannot be used together.')
-        
+
 @dataclass
-class Misc:
+class MiscParams:
     mol_before_slab: bool = False
     sort_atoms_by_z: bool = True
     translate_slab: bool = True
 
 @dataclass
-class Structure:
-    adsorption_sites: Adsorption_sites
-    molecule: Molecule
-    constraints: Constraints = field(default_factory=lambda: Constraints(None, None, None))
-    misc: Misc = field(default_factory=lambda: Misc())
+class StructureParams:
+    adsorption_sites: AdsorptionSitesParams
+    molecule: MoleculeParams
+    constraints: ConstraintsParams = field(
+        default_factory=lambda: ConstraintsParams(None, None, None))
+    misc: MiscParams = field(default_factory=MiscParams())
 
 
 
 class Settings:
-    
-    def __init__(self, 
-                 settings_filename: str = "settings.toml", 
-                 READ_ENERGIES: bool = True, 
-                 VERBOSE: bool = True):
-        
+
+    def __init__(self,
+                 settings_filename: str = "settings.toml",
+                 read_energies: bool = True,
+                 verbose: bool = True):
+
         # read the settings file
         with open(settings_filename, "rb") as f:
             self.settings_dict = tomllib.load(f)
@@ -171,44 +208,46 @@ class Settings:
         cards = ['Input','Structure', 'Calculation_parameters']
         for card in cards:
             if card not in self.settings_dict:
-                raise RuntimeError(f"{card} card not found in {settings_filename}.")    
+                raise RuntimeError(f"{card} card not found in {settings_filename}.")
 
 
         #intialize the dataclasses
-        self.input = from_dict(data_class=Input, 
-                               data=self.settings_dict["Input"], 
+        self.input = from_dict(data_class=InputParams,
+                               data=self.settings_dict["Input"],
                                config=Config(type_hooks={str: str.lower}, strict=True))
-    
-        
-        self.structure = from_dict(data_class=Structure, 
-                                   data=self.settings_dict["Structure"], 
+
+
+        self.structure = from_dict(data_class=StructureParams,
+                                   data=self.settings_dict["Structure"],
                                    config=Config(type_hooks={str: str.lower}, strict=True))
-    
+
 
         #initialize the dft settings
         self.program : str = self.settings_dict["Calculation_parameters"]["dft_program"].upper()
-        
+
         if self.program not in SUPPORTED_PROGRAMS:
             raise ValueError('dft_program must be either "VASP" or "ESPRESSO".')
         if self.program not in self.settings_dict["Calculation_parameters"]:
             raise ValueError(f"Settings for {self.program} are missing.")
 
-        self.dftprogram_settings_dict = get_dftprogram_settings(self.program, self.settings_dict["Calculation_parameters"][self.program])
-        
-        #read energies of slab and mol if requested
-        if READ_ENERGIES and self.input.E_slab_mol is None:
-            self.read_E_slab_mol(VERBOSE)
+        self.dftprogram_settings_dict = get_dftprogram_settings(
+            self.program,
+            self.settings_dict["Calculation_parameters"][self.program]
+            )
 
-                    
-    def read_E_slab_mol(self, VERBOSE : bool = True):
+        #read energies of slab and mol if requested
+        if read_energies and self.input.E_slab_mol is None:
+            self.read_E_slab_mol(verbose)
+
+
+    def read_E_slab_mol(self, verbose : bool = True):
         try:
-            from ase.io import read
-            import ase_custom
             slab_en = read(self.input.slab_filename).get_potential_energy()
             mol_en = read(self.input.molecule_filename).get_potential_energy()
             self.input.E_slab_mol = [slab_en, mol_en]
-        except:
+        except Exception as e:
             self.input.E_slab_mol = [0.0, 0.0]
-            if VERBOSE:
-                print('It was not possible to obtain slab and molecule energy in any way.' \
+            if verbose:
+                print('It was not possible to obtain slab and molecule energy in any way.',
+                       f'Error message from ase: {e}.',
                         'Total energies will be shown instead of adsorption energies.')

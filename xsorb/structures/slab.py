@@ -18,12 +18,12 @@ from pymatgen.util.coord import find_in_coord_list_pbc
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.local_env import MinimumDistanceNN, CrystalNN
-from ase.io import read
 from ase.build.tools import sort
 from ase.constraints import FixCartesian
 from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
+from xsorb.io.utils import ase_custom_read as read
 from xsorb.visualize.geometry import save_adsites_image
 from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteCrystal, \
     AdsorptionSiteAmorphous, SurroundingSite
@@ -38,20 +38,20 @@ class Slab:
 
         Initialization parameters:
         - slab_filename: file containing the structure of the slab
-        - layers_threshold: deltaz for the atoms to be considered as part of the same layer. 
+        - layers_threshold: deltaz for the atoms to be considered as part of the same layer.
             Used to identify layers when fixing atoms by layer.
-        - surface_sites_height: deltaz from the topmost atom to identify which atoms are 
-            surface atoms, used by Pymatgen to find adsorption sites (it is the 'height' 
+        - surface_sites_height: deltaz from the topmost atom to identify which atoms are
+            surface atoms, used by Pymatgen to find adsorption sites (it is the 'height'
             parameter of Pymatgen's AdsorbateSiteFinder)
-        - fixed_layers_slab: list of layers of the slab to be fixed 
+        - fixed_layers_slab: list of layers of the slab to be fixed
             (counting starts from the bottom, beginning with 0)
         - fixed_indices_slab: list of specific atoms to be fixed (-1: fix all)
             (indices start from 0, with the ordering of the atoms in the input file)
-        - fix_slab_xyz: which coordinates to fix for the fixed atoms, 
+        - fix_slab_xyz: which coordinates to fix for the fixed atoms,
             e.g. [True, True, False] = fix motion in x,y, free to move along z.
-        - sort_atoms_by_z: sort the atoms of the slab according to their z coordinate, 
+        - sort_atoms_by_z: sort the atoms of the slab according to their z coordinate,
             in reverse order (from higher to lower)
-        - translate_slab_from_below_cell_bottom: translate slab to make sure that it is 
+        - translate_slab_from_below_cell_bottom: translate slab to make sure that it is
             at least 1 Angstrom from the bottom of the cell
     '''
 
@@ -154,7 +154,7 @@ class Slab:
 
     def get_symmetrically_equivalent_sets(self, coords_set : list, threshold : float =1e-6):
         """Classifies the adsorption sites into sets of symmetrically equivalent sites.
-    
+
         Args:
             - coords_set: coordinate set in Cartesian coordinates
             - threshold: tolerance for distance equivalence, used
@@ -198,12 +198,12 @@ class Slab:
         Optionally save a figure with the sites on the surface.
 
         Args:
-            -symm_reduce: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. 
+            -symm_reduce: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter.
                 It is a theshold for removing symmetrically equivalent sites.
-            -no_obtuse_hollow: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter. 
+            -no_obtuse_hollow: Pymatgen's AdsorbateSiteFinder.find_adsorption_sites parameter.
                 Avoid considering hollow sites inside obtuse triangles of the Delaunay triangulation
                 of topmost layer used to find sites.
-            -selected_sites: indices of the sites to be returned by this function, 
+            -selected_sites: indices of the sites to be returned by this function,
                 selected between those found by AdsorbateSiteFinder
             -save_image: decide wether to save a png image of the sites
             -figname: filename of the image.
@@ -317,7 +317,7 @@ class Slab:
                                       verbose: bool=False):
         """
         Analyzes the coordination number of surface sites in a slab structure.
-        
+
         Args:
 
         - cn_method : str
@@ -338,7 +338,7 @@ class Slab:
             List of coordination numbers for the surface sites.
         - surf_sites_indices : list
             List of indices of the surface sites in the slab structure.
-        
+
         """
 
         surf_coords = [s.coords for s in self.asf.surface_sites]
@@ -457,9 +457,9 @@ class Slab:
         Find adsorption sites using coordination number mode.
 
         Args:
-        - cn_method: method to calculate the coordination number. It can be 
+        - cn_method: method to calculate the coordination number. It can be
             'plain', 'minimumdistancenn' or 'crystalnn'.
-        - cn_plain_fixed_radius: fixed radius for the coordination number calculation, 
+        - cn_plain_fixed_radius: fixed radius for the coordination number calculation,
             if cn_method is 'plain'.
         - max_cn_offset: the max. coord. numb. will be set to min(cn) + max_cn_offset.
         - max_cn: maximum coordination number allowed. Priority over max_cn_offset.
