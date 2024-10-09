@@ -15,7 +15,7 @@ from xsorb.structures.molecule import MoleculeRotation
 
 def save_rotations_images(mol_rotations_ase : list[MoleculeRotation], 
                           figname : str = 'molecule_orientations.png', 
-                          VERBOSE : bool = False):
+                          verbose : bool = False):
     '''
     Plot all the rotated molecules from top view
 
@@ -24,7 +24,7 @@ def save_rotations_images(mol_rotations_ase : list[MoleculeRotation],
     - labels: list of strings containing the info on each rotation
     '''
 
-    if VERBOSE: print("Saving image to {0}".format(figname))
+    if verbose: print("Saving image to {0}".format(figname))
 
     rows_fig = max(int(np.ceil(len(mol_rotations_ase)/5)), 1)
     cols_fig = max(int(np.ceil(len(mol_rotations_ase)/rows_fig)), 1)
@@ -40,7 +40,7 @@ def save_rotations_images(mol_rotations_ase : list[MoleculeRotation],
     fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
     fig.savefig(figname, dpi=800, bbox_inches='tight')
 
-    if VERBOSE: print("Image saved.")
+    if verbose: print("Image saved.")
 
 
 
@@ -48,7 +48,7 @@ def save_adsites_image(mode : str,
                        adsites : list[AdsorptionSite],        
                        slab_pymat : Structure,
                        figname : str = 'adsorption_sites.png',
-                       VERBOSE : bool = False):
+                       verbose : bool = False):
         '''
         Internal helper function to save an image of the adsorption sites with their numeric label
         Args:
@@ -62,7 +62,7 @@ def save_adsites_image(mode : str,
         if mode not in allowed_modes:
             raise ValueError(f"The mode to plot adsorption sites must be one of {allowed_modes}")
         
-        if VERBOSE: print(f"Saving image to {figname}...")
+        if verbose: print(f"Saving image to {figname}...")
         
 
         # preparation to plot the sites ####################################################
@@ -156,4 +156,4 @@ def save_adsites_image(mode : str,
         
         fig.savefig(figname, dpi=800, bbox_inches='tight')
 
-        if VERBOSE: print("Image saved.")
+        if verbose: print("Image saved.")

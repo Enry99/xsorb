@@ -1,3 +1,8 @@
+'''
+Module that contains the class AdsorptionStructuresGenerator, 
+used to generate the adsorption structures
+'''
+
 from dataclasses import asdict
 
 from ase import Atoms
@@ -7,7 +12,8 @@ from xsorb.structures.utils import closest_pair
 from xsorb.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
-from xsorb.structures.properties import AdsorptionSite, MoleculeRotation, AdsorptionStructure
+from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteAmorphous, \
+    MoleculeRotation, AdsorptionStructure
 
 
 def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : float):
@@ -23,7 +29,7 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
 
     dz_tot = 0
     molcopy = mol.copy()
-    while(True):
+    while True:
         #First, find the closest slab-mol atoms pair
         i_mol, j_slab, _ = closest_pair(slab, molcopy)
 
@@ -35,34 +41,52 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
 
         #Calculate the distance required to enforce the minimum distance
         necessary_min_z_dist = max(min_z_distance_from_surf, half_covalent_distance)
-        if(zmol < zslab + necessary_min_z_dist):
+        if zmol < zslab + necessary_min_z_dist:
             dz = zslab + necessary_min_z_dist - zmol
             dz_tot += dz
             molcopy.translate([0,0,dz])
         else:
             break
-    
+
     return dz_tot
 
 
 
 class AdsorptionStructuresGenerator:
+    '''
+    Class to generate adsorption structures for a given slab and molecule, 
+    obtained as the combinations of the molecule on different adsorption sites
+    and different molecular rotations.
+    When instantiated, it reads slab and molecule from file, and does the 
+    preprocessing of the structural parameters.
+    Then the generate_adsorption_structures method can be used to get the 
+    adsorption structures.
 
-    def __init__(self, settings: Settings, VERBOSE : bool = False) -> None:
-    
+    Initialization parameters:
+    - settings: Settings object containing the input parameters
+    - verbose: print additional information during the initialization
+
+    Attributes:
+    - settings: Settings object containing the input parameters
+    - slab: Slab object containing the slab structure
+    - mol: Molecule object containing the molecule structure
+    - molecule_rotations: list of MoleculeRotation objects containing the rotated molecules.
+        It is initialized as None, and is stored for subsequent calls to avoid recomputing it.
+
+    Methods:
+    - generate_adsorption_structures: generate all adsorption structures considering 
+        the combinations of molecular rotations and adsorption sites
+    '''
+
+    def __init__(self, settings: Settings, verbose : bool = False) -> None:
+
+
         self.settings = settings
-        self.VERBOSE = VERBOSE
+        self.molecule_rotations = None
 
-        if self.settings.structure.adsorption_sites.mode == 'coord_number'\
-            and self.settings.structure.adsorption_sites.coord_number_params.include_surrounding_sites:
-            self.rot_mode = 'surrounding'
-        else:
-            self.rot_mode = 'standard'
-
-        self.mol_before_slab = self.settings.structure.misc.mol_before_slab
-    
         #Slab import from file
-        if self.VERBOSE: print('Loading slab...')
+        if verbose:
+            print('Loading slab...')
         self.slab = Slab(slab_filename=settings.input.slab_filename,
                     surface_sites_height=settings.structure.adsorption_sites.surface_height, 
                     layers_threshold=settings.structure.constraints.layers_height, 
@@ -71,132 +95,171 @@ class AdsorptionStructuresGenerator:
                     fix_slab_xyz=settings.structure.constraints.fix_slab_xyz,
                     sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,
                     translate_slab_from_below_cell_bottom=settings.structure.misc.translate_slab)
-        if self.VERBOSE: print('Slab loaded.')
+        if verbose:
+            print('Slab loaded.')
 
 
         #Molecule import from file
-        if self.VERBOSE: print('Loading molecule...')
+        if verbose:
+            print('Loading molecule...')
         self.mol = Molecule(molecule_filename=settings.input.molecule_filename,
                     atom_index=settings.structure.molecule.selected_atom_index,
                     molecule_axis_atoms=settings.structure.molecule.molecule_axis["values"] \
-                        if settings.structure.molecule.molecule_axis["mode"] == "atom_indices" else None, 
+                        if settings.structure.molecule.molecule_axis["mode"] == "atom_indices" \
+                            else None,
                     axis_vector=settings.structure.molecule.molecule_axis["values"] \
-                        if settings.structure.molecule.molecule_axis["mode"] == "vector" else None,  
-                    fixed_indices_mol=settings.structure.constraints.fixed_indices_mol, 
+                        if settings.structure.molecule.molecule_axis["mode"] == "vector" \
+                            else None,
+                    fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
                     fix_mol_xyz=settings.structure.constraints.fix_mol_xyz)
-        if self.VERBOSE: print('Molecule loaded.')
+        if verbose:
+            print('Molecule loaded.')
 
 
 
-    def generate_molecule_rotations(self,
+    def _generate_molecule_rotations(self,
                                      rot_mode : str = 'standard',
-                                     adsite : AdsorptionSite | None = None, 
-                                     SAVEFIG : bool = False):
+                                     adsite : AdsorptionSiteAmorphous | None = None,
+                                     save_image : bool = False,
+                                     verbose : bool = True):
+        '''
+        Generate the molecule rotations, depending on the mode.
+
+        Args:
+        - rot_mode: 'standard' for the standard mode, 'surrounding' for the surrounding mode
+        - adsite: for the surrounding mode, AdsorptionSiteAmorphous object that contains info to 
+            rotate the molecule towards the surrounding sites
+        - save_image: save an image of the molecule rotations
+        - verbose: print additional information during the generation
+        '''
+
+        structure_settings = self.settings.structure
 
         if rot_mode == 'standard':
-            if hasattr(self, 'molecule_rotations'):
+            if self.molecule_rotations is not None:
                 return self.molecule_rotations
-            z_rot_angles = self.settings.structure.molecule.z_rot_angles
+            z_rot_angles = structure_settings.molecule.z_rot_angles
             surrounding_exclude_main = False
-            VERBOSE = self.VERBOSE
         else:
             if adsite is None:
                 raise ValueError("adsite must be provided for surrounding mode")
             z_rot_angles = adsite.surrounding_sites
             surrounding_exclude_main = \
-                self.settings.structure.adsorption_sites.coord_number_params.surrounding_exclude_main
-            VERBOSE = False
+                structure_settings.adsorption_sites.coord_number_params.surrounding_exclude_main
+            verbose = False
 
         molecule_rotations = self.mol.generate_molecule_rotations(
-            x_rot_angles=self.settings.structure.molecule.x_rot_angles, 
-            y_rot_angles=self.settings.structure.molecule.y_rot_angles,
-            z_rot_angles=z_rot_angles, 
-            vert_angles_list=self.settings.structure.molecule.vertical_angles,
-            individual_rotations=self.settings.structure.molecule.individual_rotations,
+            x_rot_angles=structure_settings.molecule.x_rot_angles,
+            y_rot_angles=structure_settings.molecule.y_rot_angles,
+            z_rot_angles=z_rot_angles,
+            vert_angles_list=structure_settings.molecule.vertical_angles,
+            individual_rotations=structure_settings.molecule.individual_rotations,
             surrounding_exclude_main=surrounding_exclude_main,
-            SAVE_IMAGE=SAVEFIG,
-            VERBOSE=VERBOSE)
+            save_image=save_image,
+            verbose=verbose)
 
-        if rot_mode == 'standard': 
+        if rot_mode == 'standard':
             #in case of standard, store the rotations to avoid calling the function multiple times
             self.molecule_rotations = molecule_rotations
 
         return molecule_rotations
 
 
-    def put_together_slab_and_mol(self, adsite : AdsorptionSite, 
+    def _put_together_slab_and_mol(self, adsite : AdsorptionSite,
                                   mol_rot : MoleculeRotation):
-            mol = mol_rot.atoms.copy()
-            
-            #place the molecule in the adsorption site, then translate it upwards by the target height
-            mol.translate(adsite.coords)
+        '''
+        Place the molecule on the adsorption site and translate it upwards by the target height.
 
-            dz = self.settings.structure.molecule.target_distance
-            mol.translate([0,0,dz])
+        Args:
+        - adsite: AdsorptionSite object containing the adsorption site
+        - mol_rot: MoleculeRotation object containing the rotated molecule
 
-            #Check for min_z_distance_from_surf and translate accordingly
-            further_transl = mindistance_deltaz(self.slab.slab_ase, 
-                                                mol, 
-                                                self.settings.structure.molecule.min_distance)
-            if further_transl:
-                mol.translate( [0, 0, further_transl] )
-                #print("The molecule was translated further by {0} to enforce minimum distance.".format(dz))
-                dz += further_transl
-
-            struct : Atoms = mol + self.slab.slab_ase if self.mol_before_slab else self.slab.slab_ase + mol
-            struct.cell = self.slab.slab_ase.cell
-
-            return AdsorptionStructure(atoms=struct, adsite=adsite, mol_rot=mol_rot, dz=dz)
+        Returns:
+        - AdsorptionStructure object containing the Atoms object and info 
+            on the adsorption site and the molecule rotation
+        '''
 
 
-    def get_structures_for_vertical_surrounding_sites(self, adsite : AdsorptionSite):
-        
-        #put the molecule vertically on the surrounding sites
+        mol = mol_rot.atoms.copy()
 
-        adsorption_structures_site : list[AdsorptionStructure] = []
+        #place the molecule in the adsorption site, then translate it upwards by the target height
+        mol.translate(adsite.coords)
+
+        distance = self.settings.structure.molecule.target_distance
+        mol.translate([0,0,distance])
+
+        #Check for min_z_distance_from_surf and translate accordingly
+        further_transl = mindistance_deltaz(self.slab.slab_ase,
+                                            mol,
+                                            self.settings.structure.molecule.min_distance)
+        if further_transl:
+            mol.translate( [0, 0, further_transl] )
+            distance += further_transl
+
+        atoms : Atoms = mol + self.slab.slab_ase if self.settings.structure.misc.mol_before_slab \
+            else self.slab.slab_ase + mol
+        atoms.cell = self.slab.slab_ase.cell
+
+        return AdsorptionStructure(atoms=atoms,
+                                   adsite=adsite,
+                                   mol_rot=mol_rot,
+                                   distance=distance)
+
+
+    def _get_structures_for_vertical_surrounding_sites(self, adsite : AdsorptionSiteAmorphous):
+        '''
+        Obtain adsorption structures on surrounding sites of an adsorption site in the amorphous
+        mode, when the molecule is placed vertically.
+
+        Args:
+        - adsite: AdsorptionSiteAmorphous object containing the surrounding sites
+
+        Returns:
+        - adsorption_structures: list of AdsorptionStructure objects
+        '''
+
+        adsorption_structures : list[AdsorptionStructure] = []
 
         for surr_site in adsite.surrounding_sites:
 
             if surr_site.duplicate_main or surr_site.duplicate_surrounding:
                 continue
-            
-            #promote surr_site to AdsorptionSite
-            surr_site = AdsorptionSite(label=surr_site.label, 
-                                        coords=surr_site.coords, 
-                                        type='ontop',
-                                        info='',
-                                        unique_id=surr_site.unique_id)
-            
-            molecule_rotations = self.generate_molecule_rotations(rot_mode='standard')
+
+            molecule_rotations = self._generate_molecule_rotations(rot_mode='standard')
             for mol_rot in molecule_rotations:
                 #if y_angle != +/- 90, continue
-                if mol_rot.yrot not in ['90', '-90']:
+                if int(float(mol_rot.yrot)) not in [90, -90]:
                     continue
-                structure = self.put_together_slab_and_mol(adsite=surr_site,mol_rot=mol_rot)
-                adsorption_structures_site.append(structure)
+                structure = self._put_together_slab_and_mol(adsite=surr_site,
+                                                           mol_rot=mol_rot)
+                adsorption_structures.append(structure)
 
 
-        return adsorption_structures_site
+        return adsorption_structures
 
 
-    def generate_adsorption_structures(self, SAVEFIG : bool = False):
+    def generate_adsorption_structures(self, save_image : bool = False, verbose : bool = True):
         '''
         Generate all adsorption structures considering the combinations of 
         molecular rotations and adsorption sites.
 
-        Returns a list of  ASE atoms with the configurations, 
-        and a list of info (csv format) of each configuration.
-
         Args:
-        - settings: Settings object, containing the filenames of molecule and slab, and all the parameters for the rotations of the molecule and the indentifications of adsorption sites
-        - SAVEFIG: save an image of the adsorption sites and of the molecular rotations.
-        ''' 
+        - save_image: save an image of the adsorption sites and of the molecular rotations.
+        - verbose: print additional information during the generation
+
+        Returns:
+        - adsorption_structures: list of AdsorptionStructure objects, each containing 
+            the Atoms object and info on the adsorption site and the molecule rotation.
+        '''
+
+        sites_settings = self.settings.structure.adsorption_sites
 
 
         #Find adsorption sites and labels (site type and x,y coords.)
-        mode_params = {'high_symmetry': self.settings.structure.adsorption_sites.high_symmetry_params, 
-                 'coord_number': self.settings.structure.adsorption_sites.coord_number_params,}
-        mode = self.settings.structure.adsorption_sites.mode    
+        mode_params = {
+            'high_symmetry': sites_settings.high_symmetry_params,
+            'coord_number': sites_settings.coord_number_params,}
+        mode = sites_settings.mode
         if mode not in mode_params:
             raise ValueError(f"mode must be one of {mode_params.keys()}")
 
@@ -204,27 +267,39 @@ class AdsorptionStructuresGenerator:
         adsites = self.slab.find_adsorption_sites(
             mode=mode,
             **asdict(mode_params[mode]),
-            selected_sites=self.settings.structure.adsorption_sites.selected_sites,
-            SAVE_IMAGE=SAVEFIG,
-            VERBOSE=self.VERBOSE)
+            selected_sites=sites_settings.selected_sites,
+            save_image=save_image,
+            verbose=verbose)
 
 
         #Adsorption of molecule on all adsorption sites for all molecule orientations
-        if self.VERBOSE: print('Generating adsorption structures...') 
+        if verbose:
+            print('Generating adsorption structures...')
+
+        if sites_settings.mode == 'coord_number'\
+            and sites_settings.coord_number_params.include_surrounding_sites:
+            rot_mode = 'surrounding'
+        else:
+            rot_mode = 'standard'
 
         adsorption_structures : list[AdsorptionStructure] = []
         for adsite in adsites:
-            molecule_rotations = self.generate_molecule_rotations(rot_mode=self.rot_mode, adsite=adsite,SAVEFIG=SAVEFIG)
+            molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
+                                                                  adsite=adsite,
+                                                                  save_image=save_image,
+                                                                  verbose=verbose)
             for mol_rot in molecule_rotations:
-                structure = self.put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
+                structure = self._put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
                 adsorption_structures.append(structure)
 
 
             #handle the case of vertical molecule on surrounding sites
-            if adsite.surrounding_sites is not None:
-                adsorption_structures.extend(self.get_structures_for_vertical_surrounding_sites(adsite))
+            if rot_mode == 'surrounding':
+                adsorption_structures.extend(
+                    self._get_structures_for_vertical_surrounding_sites(adsite))
 
 
-        if self.VERBOSE: print('Adsorption structures generated.')
+        if verbose:
+            print('Adsorption structures generated.')
 
         return adsorption_structures
