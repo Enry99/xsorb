@@ -11,7 +11,6 @@ Small helper class to handle the slab
 
 import warnings
 from pathlib import Path
-from dataclasses import dataclass
 
 import numpy as np
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
@@ -26,38 +25,13 @@ from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
 from xsorb.visualize.geometry import save_adsites_image
+from xsorb.structures.properties import AdsorptionSite, SurroundingSite
 from xsorb import ase_custom
 
 
 
 
-@dataclass
-class SurroundingSite:
-    label: str
-    coords: list[float]   #x,y,z coordinates
-    duplicate_surrounding: bool
-    duplicate_main: bool
-    vector: list[float]   #vector from the main site to the surrounding site
-    unique_id: int
 
-    def __str__(self) -> str:
-        return self.label
-
-
-
-@dataclass
-class AdsorptionSite:
-    label: int | str        #str if it comes from as SurroundingSite
-    coords: list[float]     #x,y,z coordinates
-    type: str               #ontop, hollow, bridge
-    info: str
-    unique_id: str | int    #str for crystal (x,y), int for amorphous (atom index)
-    coordination_number: float | None = None
-    surrounding_sites: list[SurroundingSite] | None = None
-
-    #define equality as the equality of the unique_id
-    def __eq__(self, other : 'AdsorptionSite') -> bool:
-        return self.unique_id == other.unique_id
 
 
 
@@ -274,29 +248,23 @@ class Slab:
                 # add further information to the site types
                 if site_type == 'ontop':
                     first_nn_species = nn_list[0].site.species_string
-                    info = first_nn_species
-                    correct_type = site_type
+                    info = f"{site_type} {first_nn_species}"
                 elif site_type == 'hollow':
-                    info = coord_n
-                    correct_type = site_type
+                    info = f"{site_type} {coord_n}-fold"
                 elif site_type == 'bridge':
                     if(coord_n>=4): #attemps to fix the problem of fake bridges for 4-fold sites
-                        info = coord_n
-                        correct_type = 'hollow'
+                        info = f"hollow {coord_n}-fold"
                     else:
                         if len(nn_list) >=2:
                             distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
-                            info = distance
-                            correct_type = site_type
+                            info = f"{site_type} {distance}"
                         else: 
-                            info = ''
-                            correct_type = site_type
+                            info = f"{site_type}"
                 else:
                     raise ValueError('Invalid site type.')
 
                 all_adsites.append(AdsorptionSite(label=i_site, 
                                                   coords=site, 
-                                                  type=correct_type, 
                                                   info=info, 
                                                   unique_id=unique_id))
                 i_site += 1

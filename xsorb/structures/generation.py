@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 
 from ase import Atoms
 from ase.data import atomic_numbers, covalent_radii
@@ -6,8 +6,8 @@ from ase.data import atomic_numbers, covalent_radii
 from xsorb.structures.utils import closest_pair
 from xsorb.settings import Settings
 from xsorb.structures.molecule import Molecule
-from xsorb.structures.slab import Slab, AdsorptionSite
-from xsorb.structures.molecule import MoleculeRotation
+from xsorb.structures.slab import Slab
+from xsorb.structures.properties import AdsorptionSite, MoleculeRotation, AdsorptionStructure
 
 
 def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : float):
@@ -44,20 +44,6 @@ def mindistance_deltaz(slab : Atoms, mol: Atoms, min_z_distance_from_surf : floa
     
     return dz_tot
 
-
-@dataclass
-class AdsorptionStructure:
-    atoms: Atoms
-    adsite: AdsorptionSite
-    mol_rot: MoleculeRotation
-    dz : float
-
-    def to_dataframe_row(self):
-        return {
-            # 'adsite': self.adsite.label,
-            # 'mol_rot': self.mol_rot.to_dict(),
-            # 'dz': self.dz
-        }
 
 
 class AdsorptionStructuresGenerator:

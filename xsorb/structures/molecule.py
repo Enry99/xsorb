@@ -10,29 +10,19 @@ Small helper class to manage the molecule
 """
 
 import warnings
-from dataclasses import dataclass
 
 import numpy as np
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.core.bonds import CovalentBond
 from ase.io import read
-from ase import Atoms
 from ase.constraints import FixCartesian
 
-from xsorb.structures.slab import SurroundingSite
+from xsorb.structures.properties import MoleculeRotation, SurroundingSite
 from xsorb.visualize.geometry import save_rotations_images
 from xsorb import ase_custom 
 
 
-@dataclass
-class MoleculeRotation:
-    '''
-    Class to store the information of a rotated molecule
-    '''
-    atoms: Atoms
-    xrot: str
-    yrot: str
-    zrot: str
+
 
 
 
