@@ -75,4 +75,5 @@
         #pwi_path                       = "template.pwi"        # path of the input file for Quantum Espresso (containing the settings, without the positions)
         #etot_conv_thr_screening        = 5e-3                  # convergence threshold for energy
         #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces
+        #upscale_screening              = 1                     # upscale for electronic convergence in the screening
 

@@ -11,7 +11,9 @@ used to read the settings file and store the parameters.
 
 from dataclasses import dataclass, field
 from typing import Optional
+from pathlib import Path
 import tomllib
+import json
 
 from dacite import from_dict, Config
 
@@ -212,26 +214,34 @@ class Settings:
     Class to read the settings file and store all the input parameters.
     Checks are performed to ensure that the settings file is correctly formatted.
 
+    The file must be present in the working directory,
+    either in .toml or .json format: settings.toml or settings.json.
+
     Initialization parameters:
-    - settings_filename : name of the settings file to read
     - read_energies : if True, it will attempt to read energies of the slab and molecule
     - verbose : if True, messages will be printed to standard output
     '''
 
     def __init__(self,
-                 settings_filename: str = "settings.toml",
-                 read_energies: bool = True,
+                 read_energies: bool = False,
                  verbose: bool = True):
 
-        # read the settings file
-        with open(settings_filename, "rb") as f:
-            self.settings_dict = tomllib.load(f)
+        #Read the settings file
+        if Path('settings.toml').is_file():
+            with open("settings.toml", "rb") as f:
+                self.settings_dict = tomllib.load(f)
+        elif Path('settings.json').is_file():
+            with open("settings.json", "rb") as f:
+                self.settings_dict = json.load(f)
+        else:
+            raise FileNotFoundError("Settings file (settings.toml or settings.json)"\
+                                    " not found in working directory. Terminating.")
 
         #check for existence of the main cards
         cards = ['Input','Structure', 'Calculation_parameters']
         for card in cards:
             if card not in self.settings_dict:
-                raise RuntimeError(f"{card} card not found in {settings_filename}.")
+                raise RuntimeError(f"{card} card not found in settings file.")
 
 
         #intialize the dataclasses

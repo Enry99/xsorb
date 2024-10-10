@@ -178,7 +178,16 @@ class AdsorptionStructure:
     mol_indices: list[int]
 
 
-    def to_info_dict(self, include_indices : bool = True):
+    @staticmethod
+    @property
+    def dataframe_column_names():
+        '''
+        Returns the names of the columns of the AdsorptionStructure object
+        '''
+        return ("site", "site_info", "x", "y", "z", "distance", "xrot", "yrot", "zrot",
+                "slab_indices", "mol_indices")
+
+    def to_info_dict(self, for_csv : bool = False):
         """
         Returns a dictionary with the information of the AdsorptionStructure object
         """
@@ -192,13 +201,12 @@ class AdsorptionStructure:
                     "yrot": self.mol_rot.yrot,
                     "zrot": self.mol_rot.zrot}
 
-        if include_indices:
-            infodict.update({"slab_indices": self.slab_indices,
-                             "mol_indices": self.mol_indices})
-
         return infodict
 
-        #
-        #df = pd.DataFrame(columns=infodict.keys())
-        #df_line = pd.Series(infodict)
-        #df.loc[0] = df_line
+    def additional_data_arrays(self):
+        '''
+        Returns a dictionary with the additional data arrays of the AdsorptionStructure object
+        '''
+        return {"slab_indices": self.slab_indices,
+                "mol_indices": self.mol_indices,
+                "custom_labels": self.atoms.get_array("custom_labels")}

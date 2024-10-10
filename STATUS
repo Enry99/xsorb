@@ -5,6 +5,6 @@ xsorb/structures/*:             OK
 
 
 
-
+TODO: add final distance dz in the results
 TODO: bump to ase 3.23 (need to modify ase_custom and also the constraints everywhere in the code, also read OUTCAR instead of vasprun.xml)
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax

@@ -8,5 +8,5 @@ User-exposed classes and functions:
 
 """
 
-from .generation import AdsorptionStructuresGenerator
-from .utils import slab_mol_bonds
+from xsorb.structures.generation import AdsorptionStructuresGenerator, AdsorptionStructure
+from xsorb.structures.utils import slab_mol_bonds
