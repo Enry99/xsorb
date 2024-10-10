@@ -187,7 +187,7 @@ class AdsorptionStructure:
         return ("site", "site_info", "x", "y", "z", "distance", "xrot", "yrot", "zrot",
                 "slab_indices", "mol_indices")
 
-    def to_info_dict(self, for_csv : bool = False):
+    def to_info_dict(self):
         """
         Returns a dictionary with the information of the AdsorptionStructure object
         """

@@ -97,7 +97,6 @@ class Slab:
              for atom_index in fixed_atoms_indices]  #negate: in qe 0 = fix, here 1(true)=fix
         self.slab_ase.set_constraint(c) #if no user-defined constraints, c is empty.
         #This is necessary to clean possible constraints read from file
-        # (in Molecule there is an if else.)
         ###############################################################
 
         if sort_atoms_by_z: #sort atoms by height (from higher to lower)
@@ -135,9 +134,8 @@ class Slab:
         return modes[mode](**kwargs)
 
 
-    #TODO: write this file when launching the calculations
     @staticmethod
-    def existing_sites() -> list[AdsorptionSite]:
+    def read_sites() -> list[AdsorptionSite]:
         """
         Read already existing sites from previous calculations, stored in a sites.npy file
 
@@ -150,6 +148,17 @@ class Slab:
             return existing_sites
         else:
             return []
+
+    @staticmethod
+    def write_sites(sites : list[AdsorptionSite]) -> None:
+        """
+        Write the sites to a sites.npy file
+
+        Args:
+        - sites: list of AdsorptionSite objects
+        """
+
+        np.save('adsites.npy', sites, allow_pickle=True)
 
 
     def _get_symmetrically_equivalent_sets(self, coords_set : list, threshold : float =1e-6):
@@ -218,7 +227,7 @@ class Slab:
         all_adsites : list[AdsorptionSiteCrystal] = []
 
         #handle the case of existing sites
-        existing_sites = self.existing_sites()
+        existing_sites = self.read_sites()
         all_adsites.extend(existing_sites)
 
         i_site = len(all_adsites)
@@ -497,7 +506,7 @@ class Slab:
         all_adsites : list[AdsorptionSite] = []
 
         #handle the case of existing sites
-        existing_sites = self.existing_sites()
+        existing_sites = self.read_sites()
         all_adsites.extend(existing_sites)
 
 

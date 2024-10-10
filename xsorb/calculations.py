@@ -23,6 +23,7 @@ from xsorb.dft_codes.override import override_settings
 from xsorb.dft_codes.definitions import OUT_FILE_PATHS, IN_FILE_PATHS
 from xsorb.common_definitions import *
 from xsorb.structures import AdsorptionStructuresGenerator, AdsorptionStructure
+from xsorb.io.inputs import write_inputs
 
 from xsorb import ase_custom
 
@@ -62,104 +63,6 @@ def regenerate_missing_sitelabels():
     write_labels_csvfile(full_labels, labels_filename=labels_filename)
 
 
-def write_inputs(settings : Settings,
-                 all_adsorption_structures : list,
-                 calc_indices : list,
-                 calc_type : str,
-                 OVERRIDE_SETTINGS : bool = True,
-                 INTERACTIVE : bool = False):
-    '''
-    Writes the input files for all the adsorption configurations.
-
-
-    Args:
-    - settings: Settings object, containing the dft code parameters
-    - all_mol_on_slab_configs_ase: list of ASE atoms for all the adsorption configurations
-    - calc_type: 'SCREENING' or 'RELAX'
-    - OVERRIDE_SETTINGS: override some specifc settings (e.g. conv tresholds)
-    - INTERACTIVE: interactive mode: ask before overwriting files that are already present
-
-    Returns:
-    - written_indices: list of the indices of the configurations for which the input files have been written
-    '''
-
-    if INTERACTIVE: print('Writing input files...')
-
-    if OVERRIDE_SETTINGS: override_settings(settings, calc_type)
-
-    #when launching ml or screening from scratch, write to db_initial.
-    #when launching screenining from preopt, read from db_ml, do not write to db_initial
-    #when launching relax, read either from db_ml or db_screening.
-
-
-
-    ANSWER_ALL = False
-    answer = 'yes'
-
-    written_indices = []
-
-    for i, atoms in zip(calc_indices, all_mol_on_slab_configs_ase):
-
-        file_label = f'{calc_type.lower()}_{i}'
-
-        corresponding_outfile = OUT_FILE_PATHS[calc_type][settings.program].format(i)
-
-        #if in interactive mode, ask before overwriting
-        if(INTERACTIVE and os.path.isfile(corresponding_outfile)): #convoluted, but it works
-            print(f'{corresponding_outfile} already present, possibly from a running calculation. '+ \
-                  ('It will be {0}, as requested.'.format('skipped' if 'n' in answer  else 're-calculated') \
-                  if ANSWER_ALL else 'You can decide to re-calculate it or skip it.'))
-            while True and not ANSWER_ALL:
-                answer = input('Re-calculate? ("y" = yes to this one, "yall" = yes to all, "n" = no to this one, "nall" = no to all): ')
-                if answer == 'yes' or answer == 'y' or answer == 'yall' or answer == 'no' or answer == 'n' or answer == 'nall':
-                    if answer == 'yall' or answer == 'nall': ANSWER_ALL = True
-                    break
-                else: print('Value not recognized. Try again.')
-            if answer == 'no' or answer == 'n' or answer == 'nall': continue #skip if user does not want to overwrite
-
-
-        j_dir = f'{screening_outdir if calc_type == "SCREENING" else relax_outdir}/{i}'
-        calc = Calculator(settings, file_label, atoms, j_dir)
-        calc.write_input(atoms)
-        written_indices.append(i)
-
-    if INTERACTIVE: print('All input files written.')
-
-    return written_indices
-
-
-def write_inputs_ml(settings : Settings,
-                 all_mol_on_slab_configs_ase : list,
-                 calc_indices : list,
-                 VERBOSE : bool = True):
-    '''
-    Writes the input files for all the adsorption configurations.
-
-
-    Args:
-    - settings: Settings object, containing the dft code parameters
-    - all_mol_on_slab_configs_ase: list of ASE atoms for all the adsorption configurations
-
-    Returns:
-    - written_indices: list of the indices of the configurations for which the input files have been written
-    '''
-
-    if VERBOSE: print('Writing pre-optimization input files...')
-
-    written_indices = []
-
-    os.makedirs(preopt_outdir, exist_ok=True)
-
-    for i, atoms in zip(calc_indices, all_mol_on_slab_configs_ase):
-
-        os.makedirs(f'{preopt_outdir}/{i}', exist_ok=True)
-        atoms.pbc = True #ensure that the periodic boundary conditions are set
-        write(IN_FILE_PATHS['PREOPT']['ML'].format(i), atoms)
-        written_indices.append(i)
-
-    if VERBOSE: print('All input files written.')
-
-    return written_indices
 
 
 def write_slab_mol_ml(slab, mol):
@@ -330,7 +233,8 @@ def generate(save_image : bool = False):
     settings=Settings()
 
     gen = AdsorptionStructuresGenerator(settings, verbose=True)
-    all_adsorption_structures = gen.generate_adsorption_structures(save_image)
+    all_adsorption_structures = gen.generate_adsorption_structures(write_sites=False,
+                                                                   save_image=save_image)
 
     write_csvfile(all_adsorption_structures)
 
@@ -392,31 +296,32 @@ def get_preopt_structures():
     return all_mol_on_slab_configs_ase
 
 
-def launch_screening(save_image : bool = False, from_preopt : bool = False):
+def launch_screening(from_preopt : bool = False, save_image : bool = False,):
     '''
-    Generates adsorption configurations, writes inputs and launches calculations for the preliminary screening.
+    Generates adsorption configurations, writes inputs
+    and launches calculations for the preliminary screening.
 
     Args:
-    - save_image: save an image of the adsorption sites and of the molecular rotations when generating the configurations
+    - from_preopt: use the final configuration from machine learning pre-optimization
+        as starting point instead of generating them from scratch
+    - save_image: save an image of the adsorption sites
+    and of the molecular rotations when generating the configurations
     '''
 
     settings=Settings()
 
-    all_mol_on_slab_configs_ase, full_labels, _, _ = adsorption_configurations(settings, save_image, VERBOSE=True)
-
     if from_preopt:
-        preopt_structures = get_preopt_structures()
-        for i, atoms in enumerate(preopt_structures):
-            all_mol_on_slab_configs_ase[i].positions = atoms.positions
+        adsorption_structures = get_preopt_structures()
     else:
-        write_labels_csvfile(full_labels, labels_filename=labels_filename)
+        gen = AdsorptionStructuresGenerator(settings, verbose=True)
+        adsorption_structures = gen.generate_adsorption_structures(write_sites=True,
+                                                                    save_image=save_image)
 
 
     written_indices = write_inputs(settings,
-                                    all_mol_on_slab_configs_ase,
-                                    calc_indices=np.arange(len(all_mol_on_slab_configs_ase)),
-                                    calc_type='SCREENING',
-                                    INTERACTIVE=True)
+                                   adsorption_structures,
+                                   calc_type='screening',
+                                   interactive=True)
 
     launch_jobs(program=settings.program,
                 calc_type='SCREENING',

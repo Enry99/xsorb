@@ -269,12 +269,18 @@ class AdsorptionStructuresGenerator:
         return adsorption_structures
 
 
-    def generate_adsorption_structures(self, save_image : bool = False, verbose : bool = True):
+    def generate_adsorption_structures(self, write_sites : bool = False,
+                                       save_image : bool = False,
+                                       verbose : bool = True):
         '''
         Generate all adsorption structures considering the combinations of
         molecular rotations and adsorption sites.
 
         Args:
+        - write_sites: write the adsorption sites to file. This allows to mantain
+            the correct site labeling even if ordering is changed after modifying the
+            parameters in a following run performed to add sites.
+            Use only when launching the calculations, not when just plotting image.
         - save_image: save an image of the adsorption sites and of the molecular rotations.
         - verbose: print additional information during the generation
 
@@ -302,6 +308,9 @@ class AdsorptionStructuresGenerator:
             save_image=save_image,
             verbose=verbose)
 
+        #write sites, so that they are stored for following calculations
+        if write_sites:
+            Slab.write_sites(adsites)
 
         #Adsorption of molecule on all adsorption sites for all molecule orientations
         if verbose:
