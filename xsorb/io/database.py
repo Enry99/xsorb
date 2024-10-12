@@ -39,22 +39,22 @@ class Database:
 
     calc_types = {
         'screening': 'screening.db',
-        'ml_opt': 'ml_opt.db'
+        'ml_opt': 'ml_opt.db',
+        'relax': 'relaxations.db',
     }
 
+
     @staticmethod
-    def write_new_inputs(adsorption_structures : list [AdsorptionStructure],
-                         calc_type : str = None,
-                         program : str = None) -> None:
+    def add_structures(adsorption_structures : list [AdsorptionStructure]) -> None:
         '''
-        Write the input files for generated adsorption structures,
-        and adds them to the main database. If calc_type is provided,
-        also writes them to the corresponding database for the calculation type.
+        Adds the generated adsorption structures to the structures database,
+        returning the corresponding calc_ids
 
         Args:
         - adsorption_structures: list of AdsorptionStructure objects
-        - calc_type (optional): if provided, the initial structures will be written
-            also to the corresponding database for the calculation type
+
+        Returns:
+        - list of integers with the calc_ids of the structures
         '''
 
         # Write the adsorption structures to the database
@@ -74,22 +74,37 @@ class Database:
                                        data=ads_struct.additional_data_arrays(),)
                     calc_ids.append(calc_id)
 
+        return calc_ids
+
+
+
+
+    @staticmethod
+    def add_calculations(systems : list [dict],
+                         calc_type : str = None) -> None:
+        '''
+        Write new calculations to corresponding database
+
+        Args:
+        - systems: list of dictionaries, each containing
+            'calc_id', 'atoms', 'in_file_path', 'out_file_path'
+        - calc_type: screening, relax or ml_opt
+        '''
 
         # Write the adsorption structures to the corresponding database
-        if calc_type:
-            with ase.db.connect(Database.calc_types[calc_type]) as db:
-                for calc_id, ads_struct in zip(calc_ids,adsorption_structures):
-                    try:
-                        db.get_atoms(f'calc_id={calc_id}')
-                    except KeyError:
-                        already_present = False
-                    if not already_present:
-                        db.write(ads_struct.atoms,
-                                calc_id=calc_id,
-                                kwargs=ads_struct.to_info_dict(),
-                                in_filename=IN_FILE_PATHS[calc_type][program].format(calc_id),
-                                out_filename=OUT_FILE_PATHS[calc_type][program].format(calc_id),
-                                data=ads_struct.additional_data_arrays(),
+        with ase.db.connect(Database.calc_types[calc_type]) as db:
+            for system in systems:
+                try:
+                    db.get_atoms(f'calc_id={system.get("calc_id")}')
+                except KeyError:
+                    already_present = False
+                if not already_present:
+                    db.write(ads_struct.atoms,
+                            calc_id=calc_id,
+                            kwargs=ads_struct.to_info_dict(),
+                            in_filename=IN_FILE_PATHS[calc_type][program].format(calc_id),
+                            out_filename=OUT_FILE_PATHS[calc_type][program].format(calc_id),
+                            data=ads_struct.additional_data_arrays(),
                                )
 
 

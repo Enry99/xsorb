@@ -19,9 +19,10 @@ def overwrite_question(file_path : str) -> str:
     '''
 
     while True:
-        answer = input(f'{file_path} already exists. Overwrite? (y/n/yall/nall): ')
+        answer = input(f'{file_path} already exists. Overwrite? '\
+                       '("y" = yes to this one, "yall" = yes to all,'\
+                         ' "n" = no to this one, "nall" = no to all): ')
         if answer.lower() in ['y', 'n', 'yall', 'nall']:
-            break
+            return answer
         else:
             print('Value not recognized. Try again.')
-    return answer

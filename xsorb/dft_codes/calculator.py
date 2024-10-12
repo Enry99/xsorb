@@ -24,68 +24,76 @@ from xsorb.dft_codes.definitions import IN_FILE_PATHS
 #TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 
 
-def Calculator(settings : Settings, label : str, atoms : Atoms, directory : str):
-    
-    if settings.program == 'ESPRESSO':
-        return Espresso(label = label,
-                        pseudopotentials=settings.dftprogram_settings_dict['pseudopotentials'],
-                        kpts=settings.dftprogram_settings_dict["kpts"],
-                        koffset=settings.dftprogram_settings_dict["koffset"],
-                        input_data=settings.dftprogram_settings_dict,
-                        additional_cards=settings.dftprogram_settings_dict['additional_cards'])
-                            
-    elif settings.program == 'VASP':
-        
-        preset_incar_settings = {}
-        
-        if "pymatgen_set" in settings.dftprogram_settings_dict:
+def write_file_with_Calculator(atoms : Atoms,
+                               program: str,
+                               dftsettings : dict,
+                               label : str,
+                               directory : str):
 
-            
+    if program == 'espresso':
+        calc = Espresso(label = label,
+                        directory=directory,
+                        pseudopotentials=dftsettings['pseudopotentials'],
+                        kpts=dftsettings["kpts"],
+                        koffset=dftsettings["koffset"],
+                        input_data=dftsettings,
+                        additional_cards=dftsettings['additional_cards'])
+
+    elif program == 'vasp':
+
+        preset_incar_settings = {}
+
+        if "pymatgen_set" in dftsettings:
+
+
             sets_map = {'mprelaxset': MPRelaxSet, 'mpmetalrelaxset': MPMetalRelaxSet, 'mpscanrelaxset': MPScanRelaxSet, 'mphserelaxset': MPHSERelaxSet, 'mitrelaxset': MITRelaxSet}
-            RelaxSet = sets_map[settings.dftprogram_settings_dict["pymatgen_set"]]
-            with warnings.catch_warnings(): 
+            RelaxSet = sets_map[dftsettings["pymatgen_set"]]
+            with warnings.catch_warnings():
                 warnings.simplefilter("ignore") #to suppress the warning about constraints not supported in pymatgen
                 relax = RelaxSet(AseAtomsAdaptor.get_structure(atoms))
 
-            preset_incar_settings = {k.lower(): v for k, v in relax.incar.as_dict().items()} 
+            preset_incar_settings = {k.lower(): v for k, v in relax.incar.as_dict().items()}
             if 'isif' in preset_incar_settings: preset_incar_settings['isif'] = 2 #OVERRIDE: we do not want a vc-relax, unless explicitly specified in &INCAR
             preset_incar_settings.pop('@module')
             preset_incar_settings.pop('@class')
             relax.kpoints.write_file('_temp_kpts_')
 
-        preset_incar_settings["xc"] = settings.dftprogram_settings_dict["vasp_xc_functional"]
+        preset_incar_settings["xc"] = dftsettings["vasp_xc_functional"]
 
-        adjust_constraints(atoms, 'VASP')
+        adjust_constraints(atoms, 'vasp')
 
-        os.environ["VASP_PP_PATH"] = settings.dftprogram_settings_dict["vasp_pp_path"]
+        os.environ["VASP_PP_PATH"] = dftsettings["vasp_pp_path"]
 
-        calc = Vasp(directory=directory, 
-                    setups=settings.dftprogram_settings_dict["vasp_pseudo_setups"], 
+        calc = Vasp(directory=directory,
+                    setups=dftsettings["vasp_pseudo_setups"],
                     **preset_incar_settings) #set here the default values from pymat recommended
 
 
         #write user-defined settings to string, to be parsed by ASE, overriding the preset flags
-        if "incar_string" in settings.dftprogram_settings_dict:
+        if "incar_string" in dftsettings:
             with open('_temp_incar_', 'w') as f:
-                f.write(settings.dftprogram_settings_dict["incar_string"])
+                f.write(dftsettings["incar_string"])
             calc.read_incar('_temp_incar_')
-            os.remove('_temp_incar_') 
+            os.remove('_temp_incar_')
 
-        if "kpoints_string" in settings.dftprogram_settings_dict:
+        if "kpoints_string" in dftsettings:
             with open('_temp_kpts_', 'w') as f:
-                f.write(settings.dftprogram_settings_dict["kpoints_string"])
+                f.write(dftsettings["kpoints_string"])
 
-        if "kpoints_string" in settings.dftprogram_settings_dict or "pymatgen_set" in settings.dftprogram_settings_dict:
-            calc.read_kpoints('_temp_kpts_') 
+        if "kpoints_string" in dftsettings or "pymatgen_set" in dftsettings:
+            calc.read_kpoints('_temp_kpts_')
             os.remove('_temp_kpts_')
-        
-        return calc
+
+    else:
+        raise ValueError(f'Program {settings.program} not supported')
+
+    calc.write_input(atoms)
 
 
 
 def adjust_constraints(atoms : Atoms, program : str):
-    
-    if program == 'VASP':
+
+    if program == 'vasp':
         c = [FixScaled(atoms.cell, constr.a, ~constr.mask) for constr in atoms.constraints] #atoms.constraints are FixCartesian
         atoms.set_constraint(c)
 
@@ -95,13 +103,13 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
     Edit the input files, setting the correct flags for restart.
 
     Args:
-    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
+    - program: DFT program. Possible values: 'espresso' or 'vasp'
     - calc_type: 'SCREENING' or 'RELAX'
     - indices_list: indices of the calculations
     '''
 
     for index in indices:
-        if program == 'ESPRESSO':
+        if program == 'espresso':
             with open(IN_FILE_PATHS[calc_type][program].format(index), 'r') as f:
                 lines = f.readlines()
                 for i, line in enumerate(lines):
@@ -111,14 +119,14 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
             with open(IN_FILE_PATHS[calc_type][program].format(index), 'w') as f:
                 f.writelines(lines)
 
-        elif program == 'VASP':
+        elif program == 'vasp':
             poscar = IN_FILE_PATHS[calc_type][program].format(index)
             contcar = poscar.replace('POSCAR', 'CONTCAR')
             incar = poscar.replace('POSCAR', 'INCAR')
             outcar = poscar.replace('POSCAR', 'OUTCAR')
             vasprun = poscar.replace('POSCAR', 'vasprun.xml')
             oszicar = poscar.replace('POSCAR', 'OSZICAR')
-            
+
             with open(incar, 'r') as f:
                 lines = f.readlines()
                 istart_found = False
@@ -138,6 +146,6 @@ def edit_files_for_restart(program : str, calc_type : str, indices : list):
             shutil.copyfile(vasprun, vasprun.replace('vasprun.xml', f'vasprun_{last_i}.xml'))
             shutil.copyfile(poscar, poscar.replace('POSCAR', f'POSCAR_{last_i}'))
             shutil.copyfile(oszicar, oszicar.replace('OSZICAR', f'OSZICAR_{last_i}'))
-           
+
             #copy contcar to poscar to restart
             shutil.copyfile(contcar, poscar)

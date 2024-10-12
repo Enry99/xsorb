@@ -256,10 +256,10 @@ class Settings:
 
 
         #initialize the dft settings
-        self.program : str = self.settings_dict["Calculation_parameters"]["dft_program"].upper()
+        self.program : str = self.settings_dict["Calculation_parameters"]["dft_program"].lower()
 
         if self.program not in SUPPORTED_PROGRAMS:
-            raise ValueError('dft_program must be either "VASP" or "ESPRESSO".')
+            raise ValueError(f'DFT program must be one of {SUPPORTED_PROGRAMS}.')
         if self.program not in self.settings_dict["Calculation_parameters"]:
             raise ValueError(f"Settings for {self.program} are missing.")
 

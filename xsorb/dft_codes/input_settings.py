@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from dacite import from_dict, Config
-from ase.io.espresso import read_fortran_namelist    
+from ase.io.espresso import read_fortran_namelist
 
 from xsorb.dft_codes.definitions import HYBRID_SCREENING_THRESHOLDS
 
@@ -11,25 +11,25 @@ from xsorb.dft_codes.definitions import HYBRID_SCREENING_THRESHOLDS
 @dataclass
 class EspressoSettings:
     pwi_path: str
-    etot_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLDS['ESPRESSO'][0]
-    forc_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLDS['ESPRESSO'][1]
+    etot_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLDS['espresso'][0]
+    forc_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLDS['espresso'][1]
 
 
 def read_espresso_settings(input_settings_dict : dict):
-    
-    #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file, 
+
+    #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included in input file,
     #as they are read from the input structures
     #NOTE 2: This code does not yet support the following Espresso blocks:
     #OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS
-    
 
-    espresso_settings_class = from_dict(data_class=EspressoSettings, 
+
+    espresso_settings_class = from_dict(data_class=EspressoSettings,
                                         data=input_settings_dict,
                                         config=Config(type_hooks={str: str.lower}, strict=True))
-    
 
 
-    
+
+
     # parse namelist section and extract remaining lines
     with open(espresso_settings_class.pwi_path, 'r') as file:
         dftprogram_settings_dict, card_lines = read_fortran_namelist(file)
@@ -64,7 +64,7 @@ def read_espresso_settings(input_settings_dict : dict):
         for other_card in cards_list:
             if other_card == card.upper(): continue
             if other_card in line.upper(): return True
-        
+
         return False
 
     #ATOMIC_SPECIES
@@ -72,9 +72,9 @@ def read_espresso_settings(input_settings_dict : dict):
     i = atomic_species_index+1
     while i < len(card_lines):
         line = card_lines[i]
-        
-        if end_of_card(card='ATOMIC_SPECIES', line=line): break       
-        
+
+        if end_of_card(card='ATOMIC_SPECIES', line=line): break
+
         element, mass, pseudo = line.split()
         dftprogram_settings_dict['pseudopotentials'].update({element : pseudo})
         i+=1
@@ -96,10 +96,10 @@ def read_espresso_settings(input_settings_dict : dict):
         i = hubbard_index
         while i < len(card_lines):
             line = card_lines[i]
-            
-            if end_of_card(card='HUBBARD', line=line): break       
-            
-            dftprogram_settings_dict['additional_cards'] += [line]    
+
+            if end_of_card(card='HUBBARD', line=line): break
+
+            dftprogram_settings_dict['additional_cards'] += [line]
             i+=1
 
     return dftprogram_settings_dict
@@ -111,19 +111,19 @@ def read_espresso_settings(input_settings_dict : dict):
 class VaspSettings:
     vasp_pp_path: str
     vasp_pseudo_setups: Optional[dict]
-    pymatgen_set: Optional[str] 
+    pymatgen_set: Optional[str]
     incar_path: Optional[str]
     kpoints_path: Optional[str]
-    ediffg_screening: float = HYBRID_SCREENING_THRESHOLDS['VASP']   
-    vasp_xc_functional: str = "PBE"   
+    ediffg_screening: float = HYBRID_SCREENING_THRESHOLDS['VASP']
+    vasp_xc_functional: str = "PBE"
 
 def read_vasp_settings(input_settings_dict : dict):
 
-    vasp_settings_class = from_dict(data_class=VaspSettings, 
+    vasp_settings_class = from_dict(data_class=VaspSettings,
                                     data=input_settings_dict,
                                     config=Config(type_hooks={str: str.lower}, strict=True))
-    
-    
+
+
     dftprogram_settings_dict = vars(vasp_settings_class)
 
     if vasp_settings_class.incar_path:
@@ -135,11 +135,11 @@ def read_vasp_settings(input_settings_dict : dict):
             dftprogram_settings_dict["kpoints_string"] = f.read()
 
     return dftprogram_settings_dict
-    
+
 
 def get_dftprogram_settings(program : str, input_settings_dict : dict):
-    
-    if program == 'ESPRESSO':
+
+    if program == 'espresso':
         return read_espresso_settings(input_settings_dict)
     elif program == 'VASP':
         return read_vasp_settings(input_settings_dict)
