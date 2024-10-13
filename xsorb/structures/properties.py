@@ -163,12 +163,9 @@ class AdsorptionStructure:
     - mol_indices: list[int], indices of the atoms of the molecule
     and the adsorption site
 
-    Properties:
-    - dataframe_column_names: tuple with the names of the columns of the AdsorptionStructure object
-
     Methods:
-    - to_dataframe_row: returns a list with the data of the AdsorptionStructure object
-    to be used as a row in a pandas DataFrame
+    - to_info_dict: returns a dictionary with the information of the AdsorptionStructure object
+    - additional_data_arrays: returns a dictionary with slab_indices, mol_indices and custom_labels
     '''
     atoms: Atoms
     adsite: AdsorptionSite
@@ -184,8 +181,7 @@ class AdsorptionStructure:
         '''
         Returns the names of the columns of the AdsorptionStructure object
         '''
-        return ("site", "site_info", "x", "y", "z", "distance", "xrot", "yrot", "zrot",
-                "slab_indices", "mol_indices")
+        return ("site", "site_info", "x", "y", "z", "distance", "xrot", "yrot", "zrot")
 
     def to_info_dict(self):
         """
@@ -200,6 +196,10 @@ class AdsorptionStructure:
                     "xrot": self.mol_rot.xrot,
                     "yrot": self.mol_rot.yrot,
                     "zrot": self.mol_rot.zrot}
+
+        #check that the keys are the same as the column names.
+        #(to avoid introducing bugs when adding new columns in the code)
+        assert self.dataframe_column_names == tuple(infodict.keys())
 
         return infodict
 

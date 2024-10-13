@@ -1,5 +1,5 @@
 '''
-Module for to handle the ase database
+Module to handle the ase database
 
 Four databases are used:
 - structures.db: Database with the initial structures
@@ -9,31 +9,19 @@ Four databases are used:
 
 '''
 
+import pandas as pd
 import ase.db
 from ase import Atoms
 
 from xsorb.structures import AdsorptionStructure
-from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
-
-#TODO: add option to remove entries from the database.
-#this is useful if the user is unstisfied with some of the generated structures.
+from xsorb.io.launch import get_running_jobs
 
 
-
-#DESIGN CHOICE: the database has ABSOLUTE PRIORITY over files.
-#When a new structure is created, it is ALWAYS written to the structures.db
-#If the user wants to play around a bit at the beginning to find the optimal parameters, they
-#can remove the structures.db file and start from scratch.
-#The other databases are updated only when not in generation mode.
-#The input files will be overwritten unless they are in their respective database.
-#In that case, the user will be asked if they want to overwrite the file or not.
-#If entry is in database and user wants to overwrite, check if the folder is present
-#and remove it before writing the new files.
-
+#TODO: convergence_info must contain a {'status': 'completed'/'incomplete'} key
 
 class Database:
     '''
-    Database class to read/write generated structures and calculations
+    Collection of functions to read/write generated structures and calculations
     results to ase db
     '''
 
@@ -45,13 +33,15 @@ class Database:
 
 
     @staticmethod
-    def add_structures(adsorption_structures : list [AdsorptionStructure]) -> None:
+    def add_structures(adsorption_structures : list [AdsorptionStructure],
+                       write_csv : bool = True) -> None:
         '''
         Adds the generated adsorption structures to the structures database,
         returning the corresponding calc_ids
 
         Args:
         - adsorption_structures: list of AdsorptionStructure objects
+        - write_csv: write the info to a csv file
 
         Returns:
         - list of integers with the calc_ids of the structures
@@ -71,12 +61,13 @@ class Database:
                 if not already_present:
                     calc_id = db.write(ads_struct.atoms,
                                        kwargs=ads_struct.to_info_dict(),
-                                       data=ads_struct.additional_data_arrays(),)
+                                       data=ads_struct.additional_data_arrays())
                     calc_ids.append(calc_id)
 
+        if write_csv:
+            Database.write_csvfile()
+
         return calc_ids
-
-
 
 
     @staticmethod
@@ -87,7 +78,7 @@ class Database:
 
         Args:
         - systems: list of dictionaries, each containing
-            'calc_id', 'atoms', 'in_file_path', 'out_file_path'
+            'calc_id', 'adsorption_structure', 'in_file_path', 'out_file_path'
         - calc_type: screening, relax or ml_opt
         '''
 
@@ -95,50 +86,159 @@ class Database:
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             for system in systems:
                 try:
-                    db.get_atoms(f'calc_id={system.get("calc_id")}')
+                    #if the calculation is already present in the database, remove it
+                    del db[db.get(f'calc_id={system.get("calc_id")}').id]
                 except KeyError:
-                    already_present = False
-                if not already_present:
-                    db.write(ads_struct.atoms,
-                            calc_id=calc_id,
-                            kwargs=ads_struct.to_info_dict(),
-                            in_filename=IN_FILE_PATHS[calc_type][program].format(calc_id),
-                            out_filename=OUT_FILE_PATHS[calc_type][program].format(calc_id),
-                            data=ads_struct.additional_data_arrays(),
-                               )
+                    #if the calculation is not present, do nothing
+                    pass
+
+                #write the new calculation in any case
+                ads_struct : AdsorptionStructure = system['adsorption_structure']
+                data=ads_struct.additional_data_arrays()
+                data.update({'initial_atoms': ads_struct.atoms, 'adsorption_structure': ads_struct})
+                db.write(ads_struct.atoms,
+                        calc_id=system['calc_id'],
+                        kwargs=ads_struct.to_info_dict(),
+                        status='incomplete',
+                        in_filename=system['in_file_path'],
+                        out_filename=system['out_file_path'],
+                        data=data)
 
 
     @staticmethod
-    def update(atoms_list : list[Atoms],
-               calc_ids : list[int],
-               convergence_info : dict,
-               calc_type : str) -> None:
+    def update_calculations(calc_type : str) -> None:
         '''
-        Update the database with the new results
+        Update the database with the new results.
+        Also update the job status
 
         Args:
-        - atoms_list: list of Atoms objects with the new results
-        - calc_ids: list of integers with the ids of the calculations
-        - convergence_info: dictionary with the convergence information
         - calc_type: string with the type of calculation
         '''
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
-            for atoms, calc_id in zip(atoms_list, calc_ids):
-                db.update(calc_id, atoms=atoms, **convergence_info)
+
+        #TODO: write here the code to retrieve the data from the output files
+
+        #- atoms_list: list of trajectories
+        #- calc_ids: list of integers with the ids of the calculations
+        #- convergence_info: list of dictionaries with the convergence information
+
+        # with ase.db.connect(Database.calc_types[calc_type]) as db:
+        #     for traj, calc_id, convergence_info in zip(traj_list, calc_ids, convergence_info_list):
+        #         row_id = db.get(f'calc_id={calc_id}').id
+        #         db.update(id=row_id, atoms=traj[-1], data={'trajectory': traj}, **convergence_info)
 
 
     @staticmethod
-    def get(calc_type : str, id :int = None) -> list[Atoms]:
+    def get_calculations(calc_type : str,
+                         selection : str | None = None,
+                         columns : list[str] | str = 'all',
+                         sort_key : str | None = None) -> list:
         '''
-        Get the atoms objects from the database
+        Get the rows corresponding to the calculations of a given type,
+        with the possibility to sort them by a given key
 
         Args:
         - calc_type: string with the type of calculation
-        - kwargs: keyword arguments to filter the results
+        - selection: string with the selection criteria (e.g. 'status=completed')
+        - columns: list of strings with the columns to be included
+        - sort_key: string with the key to sort the rows, e.g. 'energy'
 
         Returns:
-        - list of Atoms objects
+        - list: list of rows
         '''
-        db = ase.db.connect(Database.calc_types[calc_type])
+        with ase.db.connect(Database.calc_types[calc_type]) as db:
+            rows = db.select(selection=selection, columns=columns, sort=sort_key)
+
+        return rows
 
 
+    @staticmethod
+    def remove_calculations(calc_ids: list[int], calc_type: str) -> None:
+        '''
+        Remove entries from the database for a given list of calc_ids
+
+        Args:
+        - calc_ids: list of integers with the ids of the calculations to be removed
+        - calc_type: string with the type of calculation (screening, relax, or ml_opt)
+        '''
+        with ase.db.connect(Database.calc_types[calc_type]) as db:
+            for calc_id in calc_ids:
+                try:
+                    row_id = db.get(f'calc_id={calc_id}').id
+                    del db[row_id]
+                except KeyError:
+                    # If the calculation is not present, do nothing
+                    pass
+
+
+    @staticmethod
+    def write_csvfile():
+        '''
+        Reads the structures.db database and writes the info to a csv file
+        '''
+
+        df = pd.DataFrame(columns=['calc_id'] + AdsorptionStructure.dataframe_column_names)
+
+        with ase.db.connect('structures.db') as db:
+            for i, row in db.select():
+                info_dict = {'calc_id': row.id}
+                for key in AdsorptionStructure.dataframe_column_names:
+                    info_dict.update(key, row.get(key))
+                df_line = pd.Series(info_dict)
+                df.loc[i] = df_line
+
+        df.to_csv('results.csv', index=False)
+
+
+    @staticmethod
+    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[int]) -> None:
+        '''
+        Add the job ids to the corresponding database
+
+        Args:
+        - calc_type: string with the type of calculation
+        - calc_ids: list of integers with the calculation ids
+        - job_ids: list of integers with the job ids
+        '''
+        with ase.db.connect(Database.calc_types[calc_type]) as db:
+            for calc_id, job_id in zip(calc_ids, job_ids):
+                row_id = db.get(f'calc_id={calc_id}').id
+                db.update(id=row_id, job_id=job_id, job_status='submitted')
+
+
+    @staticmethod
+    def update_job_status(calc_type : str) -> None:
+        '''
+        Go over the database and update the job status,
+        for the calculations that are not already marked as completed,
+        by checking if the job_id is present in the scheduler output
+        '''
+
+        running_jobs = get_running_jobs()
+
+        with ase.db.connect(Database.calc_types[calc_type]) as db:
+            for row in db.select():
+                if row.status != 'completed':
+                    job_id = row.job_id
+                    if job_id in running_jobs:
+                        job_status='running'
+                    else:
+                        job_status='terminated'
+                    db.update(id=row.id, job_status=job_status)
+
+
+    @staticmethod
+    def get_all_job_ids() -> list:
+        '''
+        Get all the job ids from the databases
+
+        Returns:
+        - list of integers with the job ids
+        '''
+        job_ids = []
+        for calc_type in Database.calc_types.values():
+            with ase.db.connect(calc_type) as db:
+                for row in db.select():
+                    if row.status=='incomplete' and row.get('job_id') is not None:
+                        job_ids.append(row.job_id)
+
+        return job_ids

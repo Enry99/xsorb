@@ -16,39 +16,12 @@ from ase.io import read, write
 from ase.constraints import FixCartesian
 
 
-from xsorb.io_utils import launch_jobs, launch_jobs_ml, get_calculations_results, get_calculations_results_ml, _get_configurations_numbers
 from xsorb.settings import Settings
-from xsorb.dft_codes.calculator import Calculator
-from xsorb.dft_codes.override import override_settings
 from xsorb.dft_codes.definitions import OUT_FILE_PATHS, IN_FILE_PATHS
 from xsorb.common_definitions import *
 from xsorb.structures import AdsorptionStructuresGenerator, AdsorptionStructure
 from xsorb.io.inputs import write_inputs
-
-from xsorb import ase_custom
-
-
-class Calculation:
-    '''
-    Class to store the information of a single calculation
-    '''
-
-
-def write_csvfile(adsorption_structures : list[AdsorptionStructure]):
-    '''
-    Write info on the configurations to a csv file.
-
-    Args:
-    - adsorption_structures: list of AdsorptionStructure objects
-    '''
-
-    df = pd.DataFrame(columns=AdsorptionStructure.dataframe_column_names)
-
-    for i, structure in enumerate(adsorption_structures):
-        df_line = pd.Series(structure.to_info_dict(include_indices=False))
-        df.loc[i] = df_line
-
-    df.to_csv(labels_filename)
+from xsorb.io.launch import launch_jobs
 
 
 def regenerate_missing_sitelabels():
@@ -233,16 +206,10 @@ def generate(save_image : bool = False):
     settings=Settings()
 
     gen = AdsorptionStructuresGenerator(settings, verbose=True)
-    all_adsorption_structures = gen.generate_adsorption_structures(write_sites=False,
-                                                                   save_image=save_image)
+    adsorption_structures = gen.generate_adsorption_structures(write_sites=False,
+                                                               save_image=save_image)
 
-    write_csvfile(all_adsorption_structures)
-
-    write_inputs(settings,
-                 all_adsorption_structures,
-                 calc_type='SCREENING',
-                 OVERRIDE_SETTINGS=False,
-                 INTERACTIVE=True)
+    write_inputs(adsorption_structures=adsorption_structures, settings=settings)
 
 
 def preopt_ml(save_image : bool = False):
@@ -317,18 +284,15 @@ def launch_screening(from_preopt : bool = False, save_image : bool = False,):
         adsorption_structures = gen.generate_adsorption_structures(write_sites=True,
                                                                     save_image=save_image)
 
+    written_systems = write_inputs(adsorption_structures=adsorption_structures, settings=settings)
 
-    written_indices = write_inputs(settings,
-                                   adsorption_structures,
-                                   calc_type='screening',
-                                   interactive=True)
 
     launch_jobs(program=settings.program,
-                calc_type='SCREENING',
-                jobscript=settings.jobscript,
-                sbatch_command=settings.sbatch_command,
-                indices_list=written_indices,
-                jobname_prefix=settings.jobname_prefix)
+                calc_type='screening',
+                jobscript=settings.input.jobscript_path,
+                sbatch_command=settings.input.submit_command,
+                systems=written_systems,
+                jobname_prefix=settings.input.jobname_prefix)
 
 
 def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, from_preopt : bool = False, REGENERATE=False, BY_SITE = False):

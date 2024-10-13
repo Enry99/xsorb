@@ -9,6 +9,7 @@ import shutil
 import glob
 import os
 import warnings
+from pathlib import Path
 
 from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -19,9 +20,108 @@ from ase.calculators.vasp import Vasp
 
 
 from xsorb.settings import Settings
+from xsorb.io.utils import write
 from xsorb.dft_codes.definitions import IN_FILE_PATHS
 
 #TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
+
+
+class MLFakeCalculator:
+    '''
+    Fake calculator for the ML optimization,
+    which just writes the input files and does not perform any calculation
+    '''
+
+    def __init__(self, label : str, directory : str):
+        self.label = label
+        self.directory = Path(directory)
+
+
+    def write_input(self, atoms : Atoms):
+        '''
+        Function that writes the input file for the ML optimization
+        Works in the same way as the write_input function of the other calculators,
+        creating the directory if it does not exist
+        '''
+        self.directory.mkdir(exist_ok=True, parents=True)
+        write(atoms, self.directory / f'{self.label}.xyz')
+
+
+def setup_Espresso_calculator(atoms : Atoms,
+                              dftsettings : dict,
+                              label : str,
+                              directory : str) -> Espresso:
+
+    return Espresso(label = label,
+                    directory=directory,
+                    pseudopotentials=dftsettings['pseudopotentials'],
+                    kpts=dftsettings["kpts"],
+                    koffset=dftsettings["koffset"],
+                    input_data=dftsettings,
+                    additional_cards=dftsettings['additional_cards'])
+
+
+def setup_Vasp_calculator(atoms : Atoms,
+                          dftsettings : dict,
+                          label : str,
+                          directory : str):
+
+    preset_incar_settings = {}
+
+    if "pymatgen_set" in dftsettings:
+
+
+        sets_map = {'mprelaxset': MPRelaxSet,
+                    'mpmetalrelaxset': MPMetalRelaxSet,
+                    'mpscanrelaxset': MPScanRelaxSet,
+                    'mphserelaxset': MPHSERelaxSet,
+                    'mitrelaxset': MITRelaxSet}
+        RelaxSet = sets_map[dftsettings["pymatgen_set"]]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore") #to suppress constraints not supported in pymatgen
+            relax = RelaxSet(AseAtomsAdaptor.get_structure(atoms))
+
+        preset_incar_settings = {k.lower(): v for k, v in relax.incar.as_dict().items()}
+        preset_incar_settings.pop('@module')
+        preset_incar_settings.pop('@class')
+        relax.kpoints.write_file('_temp_kpts_')
+
+    preset_incar_settings["xc"] = dftsettings["vasp_xc_functional"]
+
+    adjust_constraints(atoms, 'vasp')
+
+    os.environ["VASP_PP_PATH"] = dftsettings["vasp_pp_path"]
+
+    calc = Vasp(directory=directory,
+                setups=dftsettings["vasp_pseudo_setups"],
+                **preset_incar_settings) #set here the default values from pymat recommended
+
+
+    #write user-defined settings to string, to be parsed by ASE, overriding the preset flags
+    if "incar_string" in dftsettings:
+        with open('_temp_incar_', 'w') as f:
+            f.write(dftsettings["incar_string"])
+        calc.read_incar('_temp_incar_')
+        os.remove('_temp_incar_')
+
+    if "kpoints_string" in dftsettings:
+        with open('_temp_kpts_', 'w') as f:
+            f.write(dftsettings["kpoints_string"])
+
+    if "kpoints_string" in dftsettings or "pymatgen_set" in dftsettings:
+        calc.read_kpoints('_temp_kpts_')
+        os.remove('_temp_kpts_')
+
+    return calc
+
+
+def setup_ML_calculator(atoms : Atoms,
+                        dftsettings : dict,
+                        label : str,
+                        directory : str):
+
+    return MLFakeCalculator(label, directory)
+
 
 
 def write_file_with_Calculator(atoms : Atoms,
@@ -30,63 +130,16 @@ def write_file_with_Calculator(atoms : Atoms,
                                label : str,
                                directory : str):
 
-    if program == 'espresso':
-        calc = Espresso(label = label,
-                        directory=directory,
-                        pseudopotentials=dftsettings['pseudopotentials'],
-                        kpts=dftsettings["kpts"],
-                        koffset=dftsettings["koffset"],
-                        input_data=dftsettings,
-                        additional_cards=dftsettings['additional_cards'])
-
-    elif program == 'vasp':
-
-        preset_incar_settings = {}
-
-        if "pymatgen_set" in dftsettings:
+    setup_functions = {'espresso': setup_Espresso_calculator,
+                       'vasp': setup_Vasp_calculator,
+                       'ml': setup_ML_calculator}
 
 
-            sets_map = {'mprelaxset': MPRelaxSet, 'mpmetalrelaxset': MPMetalRelaxSet, 'mpscanrelaxset': MPScanRelaxSet, 'mphserelaxset': MPHSERelaxSet, 'mitrelaxset': MITRelaxSet}
-            RelaxSet = sets_map[dftsettings["pymatgen_set"]]
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore") #to suppress the warning about constraints not supported in pymatgen
-                relax = RelaxSet(AseAtomsAdaptor.get_structure(atoms))
-
-            preset_incar_settings = {k.lower(): v for k, v in relax.incar.as_dict().items()}
-            if 'isif' in preset_incar_settings: preset_incar_settings['isif'] = 2 #OVERRIDE: we do not want a vc-relax, unless explicitly specified in &INCAR
-            preset_incar_settings.pop('@module')
-            preset_incar_settings.pop('@class')
-            relax.kpoints.write_file('_temp_kpts_')
-
-        preset_incar_settings["xc"] = dftsettings["vasp_xc_functional"]
-
-        adjust_constraints(atoms, 'vasp')
-
-        os.environ["VASP_PP_PATH"] = dftsettings["vasp_pp_path"]
-
-        calc = Vasp(directory=directory,
-                    setups=dftsettings["vasp_pseudo_setups"],
-                    **preset_incar_settings) #set here the default values from pymat recommended
+    if program not in setup_functions:
+        raise ValueError(f'Program {program} not supported')
 
 
-        #write user-defined settings to string, to be parsed by ASE, overriding the preset flags
-        if "incar_string" in dftsettings:
-            with open('_temp_incar_', 'w') as f:
-                f.write(dftsettings["incar_string"])
-            calc.read_incar('_temp_incar_')
-            os.remove('_temp_incar_')
-
-        if "kpoints_string" in dftsettings:
-            with open('_temp_kpts_', 'w') as f:
-                f.write(dftsettings["kpoints_string"])
-
-        if "kpoints_string" in dftsettings or "pymatgen_set" in dftsettings:
-            calc.read_kpoints('_temp_kpts_')
-            os.remove('_temp_kpts_')
-
-    else:
-        raise ValueError(f'Program {settings.program} not supported')
-
+    calc = setup_functions[program](atoms, dftsettings, label, directory)
     calc.write_input(atoms)
 
 

@@ -74,6 +74,8 @@ class Slab:
         if np.dot(np.cross(cell[0], cell[1]), cell[2]) < 0:
             self.slab_ase.set_cell(cell[[1, 0, 2], :])
 
+        #Make sure that pbc are set to True
+        self.slab_ase.pbc = True
 
         if translate_slab_from_below_cell_bottom:
             #translate slab so that the bottom layer is at least 1 angstrom from the bottom

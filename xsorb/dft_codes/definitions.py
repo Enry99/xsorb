@@ -82,17 +82,11 @@ LOG_FILE_PATHS = {
 }
 
 SBATCH_POSTFIX = {
-    'screening': {
-        'vasp': '',
-        'espresso': 'screening_{0}.pwi screening_{0}.pwo',
-    },
-
-    'relax': {
-        'vasp': '',
-        'espresso': 'relax_{0}.pwi relax_{0}.pwo',
-    },
-
+    'vasp': '',
+    'espresso': '{in_file} {out_file}',
+    'ml': '{in_file} {out_file} {log_file} {main_dir}'
 }
+
 
 
 FRAGMENTS_IN_FILE_PATHS = {

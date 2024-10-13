@@ -7,6 +7,7 @@ from dataclasses import asdict
 
 import numpy as np
 from ase import Atoms
+from ase.neighborlist import NeighborList
 from ase.geometry import get_distances
 from ase.data import covalent_radii
 from ase.data.vdw_alvarez import vdw_radii
@@ -134,10 +135,11 @@ class AdsorptionStructuresGenerator:
 
     def _mindistance_deltaz(self, mol: Atoms):
         '''
-        Returns the vertical translation required so that the closest mol-slab atom pair is at least
-        at least min_distance away from each other along the z axis, where min_distance can be
-        a value, the sum of the covalent radii, or the sum of the van der Waals radii.
-        It works by iteratively translating the molecule upwards until the condition is satisfied.
+        Returns the vertical translation required so that the molecule is not compenetrated
+        below the slab, and so that the each mol-slab pair is at least min_distance apart,
+        where min_distance can be a value, the sum of the covalent radii, or the sum of
+        the van der Waals radii. It works by iteratively translating the molecule upwards
+        until the condition is satisfied.
 
         Args:
         - mol: Atoms object for the molecule
@@ -151,28 +153,24 @@ class AdsorptionStructuresGenerator:
         dz_tot = 0
         molcopy = mol.copy()
 
+        #first, translate the molecule above the slab, making sure that each atom of the
+        #molecule has the z coordinate >= local max(atoms.z)
         while True:
-            #Iteratively translate the molecule upwards until the condition is satisfied
-            #The iterative procedure is necessary if part of the molecule is below the slab
 
-            vector_matrix, d_matrix = get_distances(slab.positions,mol.positions,slab.cell,pbc=True)
+            atoms : Atoms = slab + molcopy
+            #use large radii to find the neighbors for the compenetration check,
+            # regardless of the mode used for the min_distance, since in any case
+            # the atoms are not translated above the z of the slab atoms
+            cutoffs = [vdw_radii[atom.number]*1.2 for atom in atoms]
+            nl = NeighborList(cutoffs, skin=0, self_interaction=False, bothways=True)
+            nl.update(atoms)
+            cm = nl.get_connectivity_matrix()
+
             candidate_translations = []
-            for id1, at1 in enumerate(slab):
-                for id2, at2 in enumerate(mol):
-
-                    distance = d_matrix[id1, id2]
-                    h = np.dot(vector_matrix[id1, id2], [0,0,1])
-                    b = np.sqrt(distance**2 - h**2)
-
-                    if mode == 'covalent_radius':
-                        D = mult*(covalent_radii[at1.number] + covalent_radii[at2.number]) #pylint: disable=invalid-name
-                    elif mode == 'vdw_radius':
-                        D = mult*(vdw_radii[at1.number] + vdw_radii[at2.number]) #pylint: disable=invalid-name
-                    else:
-                        D = min_distance #pylint: disable=invalid-name
-
-                    if distance < D:
-                        dz = np.sqrt(D**2 - b**2) - h
+            for i, slab_atom in enumerate(slab):
+                for j, mol_atom in enumerate(molcopy):
+                    if cm[i, len(slab)+j] and mol_atom.z < slab_atom.z:
+                        dz = slab_atom.z - mol_atom.z
                         candidate_translations.append(dz)
 
             if candidate_translations:
@@ -181,6 +179,35 @@ class AdsorptionStructuresGenerator:
                 molcopy.translate([0,0,dz])
             else:
                 break
+
+        #Then, translate the molecule upwards by the target height
+        #This should require only one iteration, as the molecule is already above the slab
+        vector_matrix, d_matrix = get_distances(slab.positions,molcopy.positions,slab.cell,pbc=True)
+        candidate_translations = []
+        for id1, at1 in enumerate(slab):
+            for id2, at2 in enumerate(molcopy):
+
+                distance = d_matrix[id1, id2]
+
+                if mode == 'covalent_radius':
+                    D = mult*(covalent_radii[at1.number] + covalent_radii[at2.number]) #pylint: disable=invalid-name
+                elif mode == 'vdw_radius':
+                    D = mult*(vdw_radii[at1.number] + vdw_radii[at2.number]) #pylint: disable=invalid-name
+                else:
+                    D = min_distance #pylint: disable=invalid-name
+
+                if distance < D:
+                    h = np.dot(vector_matrix[id1, id2], [0,0,1])
+                    if h < 0:
+                        raise ValueError("The molecule is below the slab. This should not happen.")
+                    b = np.sqrt(distance**2 - h**2)
+                    dz = np.sqrt(D**2 - b**2) - h
+                    candidate_translations.append(dz)
+
+        if candidate_translations:
+            dz = np.max(candidate_translations)
+            dz_tot += dz
+            molcopy.translate([0,0,dz])
 
         return dz_tot
 
@@ -228,6 +255,7 @@ class AdsorptionStructuresGenerator:
             slab_indices = list(range(len(self.slab.slab_ase)))
             mol_indices = list(range(len(self.slab.slab_ase), len(self.slab.slab_ase)+len(mol)))
         atoms.cell = self.slab.slab_ase.cell
+        atoms.pbc = self.slab.slab_ase.pbc
 
         return AdsorptionStructure(atoms=atoms,
                                    adsite=adsite,
