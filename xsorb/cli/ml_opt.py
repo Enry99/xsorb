@@ -47,12 +47,12 @@ def main():
 
     #First, try with BFGSLinesearch for 500 steps
     opt = BFGSLineSearch(atoms, trajectory=out_file, logfile=log_file, maxstep=0.1)
-    converged = opt.run(fmax=0.05, steps=500)
+    converged = opt.run(fmax=0.01, steps=500)
 
     #If not converged, try with regular BFGS
     if not converged:
         opt = BFGS(atoms, trajectory=out_file, logfile=log_file, append_trajectory=True)
-        converged = opt.run(fmax=0.05, steps=500)
+        converged = opt.run(fmax=0.01, steps=500)
 
     with open(log_file, "a") as f:
         f.write(f"\nOptimization {'converged' if converged else 'NOT converged'}.\n")

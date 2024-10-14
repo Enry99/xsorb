@@ -19,7 +19,7 @@ from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
 
 
-from xsorb.settings import Settings
+from xsorb.io.settings import Settings
 from xsorb.io.utils import write
 from xsorb.dft_codes.definitions import IN_FILE_PATHS
 

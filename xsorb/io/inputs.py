@@ -5,7 +5,7 @@ Module for writing input files for the calculations
 import shutil
 from pathlib import Path
 
-from xsorb.settings import Settings
+from xsorb.io.settings import Settings
 from xsorb.structures import AdsorptionStructure, set_fixed_slab_constraints
 from xsorb.io.database import Database
 from xsorb.io.utils import overwrite_question

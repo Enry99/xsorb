@@ -12,7 +12,7 @@ from ase.geometry import get_distances
 from ase.data import covalent_radii
 from ase.data.vdw_alvarez import vdw_radii
 
-from xsorb.settings import Settings
+from xsorb.io.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
 from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteAmorphous, \

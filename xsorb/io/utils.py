@@ -5,8 +5,6 @@ General utility functions for the I/O module
 from ase.io import read, write
 
 from xsorb import ase_custom
-from xsorb.dft_codes.definitions import OUT_FILE_PATHS, LOG_FILE_PATHS, \
-    SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, OPTIMIZATION_COMPLETED_STRINGS
 
 
 def ase_custom_read(filename, **kwargs):
@@ -59,62 +57,40 @@ def continue_even_if_not_all_completed_question() -> bool:
             print('Value not recognized. Try again.')
 
 
-def check_optimization_completed(program : str, calc_type : str, calc_id : int):
-    '''
-    Check if the given calculation is completed, reading the output file
+#TODO: implement this function
+# def saveas(calc_type : str, i_or_f : str, saveas_format : str):
+#     '''
+#     Save all the configurations in a different format, e.g. xyz or cif.
 
-    Args:
-    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
-    - calc_type: 'SCREENING' or 'RELAX'
-    - calc_id: numeric index of the calculation
+#     Args:
+#     - calc_type: 'screening' or 'relax'
+#     - i_or_f: initial or final coordinates of the relaxation (both for screening and full relax)
+#     - saveas_format: file format, e.g. xyz
+#     '''
 
-    Returns:
-    True or False
-    '''
+#     settings = Settings(read_energies=False)
 
-    filename = LOG_FILE_PATHS[calc_type][program].format(calc_id)
-    searchfor = OPTIMIZATION_COMPLETED_STRINGS[program]
+#     if i_or_f == 'i':
+#         FILE_PATHS = IN_FILE_PATHS
+#     elif i_or_f == 'f':
+#         FILE_PATHS = OUT_FILE_PATHS
+#     else:
+#         raise RuntimeError(f"Wrong arguments: passed '{calc_type} {i_or_f}', expected 'screening i/f' or 'relax i/f'")
+#     if calc_type != 'screening' and calc_type != 'relax':
+#         raise RuntimeError(f"Wrong argument: passed '{calc_type}', expected 'screening' or 'relax'")
 
-    with open(filename, 'r') as f:
-        file_content = f.readlines()
+#     folder = f"{saveas_format}/{calc_type}"
 
-    completed = False
-    for line in file_content:
-        if searchfor in line:
-            completed = True
-            break
+#     print(f"Saving files to {folder}...")
+#     os.makedirs(folder, exist_ok=True)
 
-    return completed
+#     indices = _get_configurations_numbers()
+#     for i in indices:
+#         if os.path.isfile(FILE_PATHS[calc_type.upper()][settings.program].format(i)):
+#             atoms = read(FILE_PATHS[calc_type.upper()][settings.program].format(i))
+#             if(saveas_format == 'xyz'):
+#                 ase_custom.write_xyz_custom(f'{folder}/{calc_type}_{i}.{saveas_format}', atoms)
+#             else:
+#                 write(f'{folder}/{calc_type}_{i}.{saveas_format}', atoms)
 
-
-def scf_not_converged(program : str, calc_type : str, calc_id : int):
-    '''
-    Check if the given calculation has not reached SCF convergence, reading the output file
-
-    Args:
-    - program: DFT program. Possible values: 'ESPRESSO' or 'VASP'
-    - calc_type: 'SCREENING' or 'RELAX'
-    - calc_id: numeric index of the calculation
-
-    Returns:
-    True or False
-    '''
-
-    filename = OUT_FILE_PATHS[calc_type][program].format(calc_id)
-    searchfor = SCF_NONCONVERGED_STRINGS[program]
-    convergence_string = SCF_CONVERGED_STRINGS[program]
-
-    with open(filename, 'r') as f:
-        file_content = f.readlines()
-
-    # we might encounter the situation where a first loop is not converged,
-    # but the last one is, so we need to check all the lines:
-    # the last one (conv or not conv) determines the status
-    nonconv = False
-    for line in file_content:
-        if searchfor in line:
-            nonconv = True
-        elif convergence_string in line:
-            nonconv = False
-
-    return nonconv
+#     print("All files saved.")

@@ -3,8 +3,14 @@ xsorb/settings:                 OK
 xsorb/structures/*:             OK
 
 
-
-
 TODO: add final distance dz in the results
+
+TODO: make sure that settings are passes only from top-level, i.e. only to the functions in launcher.py, but not further.
 TODO: bump to ase 3.23 (need to modify ase_custom and also the constraints everywhere in the code, also read OUTCAR instead of vasprun.xml)
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
+
+
+NOW: do the results(+update db), then do the writing of csv file, then isolated mol and slab.
+THEN: do images, then do parser(subparser).
+THEN: check if everything works, bump ase to 3.23
+FINALLY: xfrag.

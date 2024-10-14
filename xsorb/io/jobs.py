@@ -8,7 +8,7 @@ import shutil
 import subprocess
 
 from xsorb import common_definitions
-from xsorb.settings import Settings
+from xsorb.io.settings import Settings
 from xsorb.dft_codes.definitions import SBATCH_POSTFIX,IN_FILE_PATHS,OUT_FILE_PATHS,LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import edit_files_for_restart
 from xsorb.io.database import Database

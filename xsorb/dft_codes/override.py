@@ -1,5 +1,5 @@
 
-from xsorb.settings import Settings
+from xsorb.io.settings import Settings
 
 def override_dft_settings(dftsettings : dict, program : str, calc_type : str):
     '''

@@ -119,7 +119,7 @@ class MoleculeParams:
     adsorption_distance_mode: str = 'value'
     target_distance: float = 2.0
     min_distance: float = 1.5
-    radius_scale_factor: float = 1.0
+    radius_scale_factor: float = 1.1
 
     def __post_init__(self):
         if 'mode' not in self.molecule_axis or 'values' not in self.molecule_axis:
@@ -128,28 +128,25 @@ class MoleculeParams:
                               {mode = "vector", values = [1,0,0]}.')
         if self.molecule_axis['mode'] not in ['atom_indices', 'vector']:
             raise ValueError('molecule_axis mode must be either atom_indices or vector.')
-        if self.molecule_axis['mode'] == 'atom_indices':
-            if len(self.molecule_axis['values']) != 2:
-                raise ValueError('molecule_axis values must be a list of two atom indices \
-                                 when mode is atom_indices.')
-        elif self.molecule_axis['mode'] == 'vector':
-            if len(self.molecule_axis['values']) != 3:
-                raise ValueError('molecule_axis values must be a list of three floats \
-                                 when mode is vector.')
+        if self.molecule_axis['mode'] == 'atom_indices' and len(self.molecule_axis['values']) != 2:
+            raise ValueError('molecule_axis values must be a list of two atom indices \
+                                when mode is atom_indices.')
+        if self.molecule_axis['mode'] == 'vector' and len(self.molecule_axis['values']) != 3:
+            raise ValueError('molecule_axis values must be a list of three floats \
+                                when mode is vector.')
 
-        if self.adsorption_distance_mode is not None:
-            if self.adsorption_distance_mode not in ['value', 'covalent_radius', 'vdw_radius']:
-                raise ValueError('adsorption_distance_mode must be either value, \
-                                 covalent_radius or vdw_radius.')
+        if self.adsorption_distance_mode is not None and \
+            self.adsorption_distance_mode not in ['value', 'covalent_radius', 'vdw_radius']:
+            raise ValueError('adsorption_distance_mode must be either value, \
+                                covalent_radius or vdw_radius.')
 
         if self.target_distance < self.min_distance:
             raise ValueError('target_distance must be greater than min_distance.')
 
-        if isinstance(self.vertical_angles, list):
-            if len(self.vertical_angles) == 0:
-                raise ValueError('vertical_angles given as a list has to contain at least 1 angle.')
+        if isinstance(self.vertical_angles, list) and len(self.vertical_angles) == 0:
+            raise ValueError('vertical_angles given as a list has to contain at least 1 angle.')
 
-        elif isinstance(self.vertical_angles, str):
+        if isinstance(self.vertical_angles, str):
             if self.vertical_angles not in ['x', 'z', 'none']:
                 raise ValueError('vertical_angles, when not given as a list, must be either \
                                  "x", "z", "none".')
