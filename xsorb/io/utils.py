@@ -42,6 +42,23 @@ def overwrite_question(file_path : str) -> str:
             print('Value not recognized. Try again.')
 
 
+def continue_even_if_not_all_completed_question() -> bool:
+    '''
+    Asks the user if they want to continue even if not all calculations are completed.
+
+    Returns:
+    - bool, True if the user wants to continue, False otherwise
+    '''
+
+    while True:
+        answer = input('Not all calculations are completed. '\
+                       'Continue anyway with those that are present? (y/n): ')
+        if answer.lower() in ['y', 'n']:
+            return answer.lower() == 'y'
+        else:
+            print('Value not recognized. Try again.')
+
+
 def check_optimization_completed(program : str, calc_type : str, calc_id : int):
     '''
     Check if the given calculation is completed, reading the output file

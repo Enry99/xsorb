@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 from xsorb.settings import Settings
-from xsorb.structures import AdsorptionStructure
+from xsorb.structures import AdsorptionStructure, set_fixed_slab_constraints
 from xsorb.io.database import Database
 from xsorb.io.utils import overwrite_question
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS
@@ -31,7 +31,7 @@ def write_inputs(adsorption_structures : list[AdsorptionStructure],
     - settings: Settings object, containing all the parameters
     - calc_type: 'screening', 'relax' or 'ml_opt', or None (only generate input files)
     - calc_ids: list of the calculation IDs. If None, the IDs are automatically assigned
-        They will be None when called from the generation mode, from scratch
+        They will be None when called from the generation mode (from scratch)
     - override_settings: override some specifc settings (e.g. conv tresholds)
     - interactive: interactive mode: ask before overwriting files that are already present
 
@@ -57,6 +57,10 @@ def write_inputs(adsorption_structures : list[AdsorptionStructure],
     written_systems = []
     ANSWER_ALL = False #pylint: disable=invalid-name
     for i, ads_structure in zip(calc_ids, adsorption_structures):
+
+        #possibly apply constraints to slab in case of ml_opt
+        if calc_type is 'ml_opt' and settings.structure.constraints.fix_slab_preopt:
+            set_fixed_slab_constraints(ads_structure.atoms, ads_structure.slab_indices)
 
         file_label = f'{calc_type_for_writing.lower()}_{i}'  #e.g. screening_i or relax_i
         in_file_path = IN_FILE_PATHS[calc_type_for_writing][settings.program].format(i)
@@ -92,3 +96,13 @@ def write_inputs(adsorption_structures : list[AdsorptionStructure],
     if verbose: print('All input files written.') #pylint: disable=multiple-statements
 
     return written_systems
+
+
+
+def write_slab_mol_ml(slab, mol):
+    os.makedirs(preopt_outdir, exist_ok=True)
+    os.makedirs(preopt_outdir+'/slab', exist_ok=True)
+    os.makedirs(preopt_outdir+'/mol', exist_ok=True)
+
+    write(preopt_outdir+'/slab/slab.xyz', slab)
+    write(preopt_outdir+'/mol/mol.xyz', mol)

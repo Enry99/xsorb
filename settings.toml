@@ -50,8 +50,7 @@
         #fixed_indices_mol              = [3]                   # fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
         #fix_slab_xyz                   = [0, 0, 0]             # coordinates (x,y,z) to fix for the selected atoms in slab (as in QE, so 0 = fix)
         #fix_mol_xyz                    = [0, 0, 1]             # coordinates (x,y,z) to fix for the selected atoms in molecule
-        #fix_bondlengths_preopt         = false                 # fix all bond lengths in the molecule in the preoptimization
-        #fix_slab_preopt                = false                 # fix all slab atoms in the preoptimization (for now this is mutually exclusive with fix_bondlengths_preopt)
+        #fix_slab_preopt                = false                 # fix all slab atoms in the preoptimization
 
     #[Structure.misc]
         #mol_before_slab                = false                 # put molecule before slab in the order of atoms (only for xyz and pwi, not VASP)

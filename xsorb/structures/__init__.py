@@ -9,4 +9,4 @@ User-exposed classes and functions:
 """
 
 from xsorb.structures.generation import AdsorptionStructuresGenerator, AdsorptionStructure
-from xsorb.structures.utils import slab_mol_bonds
+from xsorb.structures.utils import slab_mol_bonds, set_fixed_slab_constraints

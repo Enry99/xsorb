@@ -175,15 +175,12 @@ class ConstraintsParams:
     layers_height: float = 0.5
     fix_slab_xyz: list[int] = field(default_factory=lambda: [0, 0, 0])
     fix_mol_xyz: list[int] = field(default_factory=lambda: [0, 0, 1])
-    fix_bondlengths_preopt: bool = False
     fix_slab_preopt: bool = False
 
     def __post_init__(self):
         if self.fixed_layers_slab is not None and self.fixed_indices_slab is not None:
             raise ValueError('You can use either fixed_layers_slab or fixed_indices_slab, \
                              not both at the same time.')
-        if self.fix_bondlengths_preopt and self.fix_slab_preopt:
-            raise ValueError('fix_bondlengths_preopt and fix_slab_preopt cannot be used together.')
 
 @dataclass
 class MiscParams:

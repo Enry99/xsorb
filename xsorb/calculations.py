@@ -6,67 +6,47 @@ Main functions to generate the adsorption configurations and set up the calculat
 
 """
 
-import os
 import sys
 from operator import itemgetter
 
 import numpy as np
-import pandas as pd
-from ase.io import read, write
-from ase.constraints import FixCartesian
+from ase import Atoms
 
 
 from xsorb.settings import Settings
-from xsorb.dft_codes.definitions import OUT_FILE_PATHS, IN_FILE_PATHS
 from xsorb.common_definitions import *
 from xsorb.structures import AdsorptionStructuresGenerator, AdsorptionStructure
 from xsorb.io.inputs import write_inputs
 from xsorb.io.launch import launch_jobs
+from xsorb.io.database import Database
+from xsorb.io.utils import continue_even_if_not_all_completed_question
 
 
-def regenerate_missing_sitelabels():
+
+
+
+def obtain_calc_indices(calc_type : str,
+                        n_configs: int = None,
+                        threshold : float = None,
+                        excluded_calc_ids : list= None,
+                        by_site : bool = False) -> list[int]:
     '''
-    Re-generate the site_labels.csv file if it was accidentally deleted, using the info from settings.in
-    '''
-
-    settings=Settings()
-
-    _, full_labels, _, _ = adsorption_configurations(settings, save_image=False, VERBOSE=True)
-
-    write_labels_csvfile(full_labels, labels_filename=labels_filename)
-
-
-
-
-def write_slab_mol_ml(slab, mol):
-    os.makedirs(preopt_outdir, exist_ok=True)
-    os.makedirs(preopt_outdir+'/slab', exist_ok=True)
-    os.makedirs(preopt_outdir+'/mol', exist_ok=True)
-
-    write(preopt_outdir+'/slab/slab.xyz', slab)
-    write(preopt_outdir+'/mol/mol.xyz', mol)
-
-
-def obtain_fullrelax_indices(settings : Settings,
-                             n_configs: int = None,
-                             threshold : float = None,
-                             exclude : list= None,
-                             BY_SITE = False,
-                             from_preopt : bool = False):
-    '''
-    Returns a list with the indices of the configurations for the final relaxation,
-    chosen according to the given parameters
+    Returns a list with the indices of the configurations to be relaxed, according to the specified criteria.
 
     Args:
-    - settings: Settings object, containing the program type
-    - n_configs: nubmer of configurations to be relaxed, starting from the one with lowest energy
-    - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration. The configuration with E - Emin < threshold will be selected
-    - exclude: indices of the configurations to be excluded
-    - BY_SITE: do the configuration identification separately for each site. One or more configuration for each site will be produced
+    - calc_type: type of calculation to get the indices from. Can be 'screening', 'ml_opt'
+    - n_configs: number of configurations to be relaxed, starting from the one with lowest energy
+    - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration.
+        The configuration with E - Emin < threshold will be selected
+    - excluded_calc_ids: indices of the configurations to be excluded
+    - by_site: do the configuration identification separately for each site.
+
+    Returns:
+    - calculations_indices: list of indices of the configurations to be relaxed
     '''
 
 
-    print('Collecting energies from screening...')
+    print(f'Collecting results from {calc_type}...')
     if from_preopt:
         screening_results = get_calculations_results_ml()
     else:
@@ -135,61 +115,44 @@ def obtain_fullrelax_indices(settings : Settings,
     return calculations_indices
 
 
-def obtain_fullrelax_structures(settings : Settings, calculations_indices : list, REGENERATE : bool = False, from_preopt : bool = False):
+def get_adsorption_structures(calc_ids : list[int] | None = None,
+                              get_structures_from : bool = False) -> list[AdsorptionStructure]:
     '''
-    Returns a list with the adsorption configurations for the full relax, either reading the final coordinates
-    of the screening, or re-generating them from scratch according to settings.in
+    Returns the a list of AdsorptionStructure objects, but with the atoms
+    substituted with the ones from the previous calculation.
+    If from ml_opt, the the original constraints are set, important when
+    the ml_opt was performed by fixing the slab.
 
     Args:
-    - settings: Settings object, containing the slab and molecule parameters
-    - calculations_indices: indices of the configurations
-    - REGENERATE: re-generate the configurations from scratch, starting from isolated slab and molecule. Can be used to change the initial distance
-    and repeat the relax from the beginning
+    - calc_ids: list of indices of the configurations to be retrieved. If None, all are retrieved
+    - get_structures_from: type of calculation to get the structures from.
+        Can be 'screening', 'ml_opt', 'structures'
+
+    Returns:
+    - adsorption_structures: list of AdsorptionStructure objects
     '''
 
-    all_mol_on_slab_configs_ase, _, _, _ = adsorption_configurations(settings=settings)
+    #get structures from database
+    rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
 
-    if REGENERATE:
-        return all_mol_on_slab_configs_ase
-    else:
-        #Read slab and molecule for constraints
-        #Slab import from file
-        slab = Slab(slab_filename=settings.slab_filename,
-                    layers_threshold=settings.layers_height,
-                    surface_sites_height=settings.surface_height,
-                    fixed_layers_slab=settings.fixed_layers_slab,
-                    fixed_indices_slab=settings.fixed_indices_slab,
-                    fix_slab_xyz=settings.fix_slab_xyz,
-                    sort_atoms_by_z=settings.sort_atoms_by_z,
-                    translate_slab_from_below_cell_bottom=settings.translate_slab)
-        #Molecule import from file
-        mol = Molecule(molecule_filename=settings.molecule_filename,
-                    atom_index=settings.selected_atom_index,
-                    molecule_axis_atoms=settings.molecule_axis_atoms,
-                    axis_vector=settings.axis_vector,
-                    atoms_subset=settings.mol_subset_atoms,
-                    fixed_indices_mol=settings.fixed_indices_mol,
-                    fix_mol_xyz=settings.fix_mol_xyz)
+    if get_structures_from == 'ml_opt':
+        rows_original = Database.get_calculations(calc_type='structures', calc_ids=calc_ids)
+        constraints = [row.constraints for row in rows_original]
 
-        new_all_mol_on_slab_configs_ase = []
-        for index in calculations_indices:
-            atoms = read(OUT_FILE_PATHS['SCREENING' if not from_preopt else 'PREOPT'][settings.program if not from_preopt else 'ML'].format(index))
-            #set constraints from mol and slab if when we are reading the whole pre-relaxed structure
+    # prepare the structures by substituting the atoms with the one from the
+    # previous calculation
+    adsorption_structures : list [AdsorptionStructure] = []
+    for row in rows:
+        ads_struct : AdsorptionStructure = row.data.adsorption_structure
+        atoms : Atoms = row.toatoms()
 
-            if settings.mol_before_slab:
-                c = [constraint for constraint in mol.mol_ase.constraints] + \
-                    [FixCartesian(constraint.a + mol.natoms, ~constraint.mask) for constraint in slab.slab_ase.constraints]
-                #for some obscure reason FixCartesian wants the mask in the form 1=Fix, 0=Free, but then it negates in internally, so we first need to negate the mask to construct a new object
-            else:
-                c = [constraint for constraint in slab.slab_ase.constraints] + \
-                    [FixCartesian(constraint.a + slab.natoms, ~constraint.mask) for constraint in mol.mol_ase.constraints]
+        if get_structures_from == 'ml_opt':
+            atoms.set_constraint(constraints.pop(0))
 
-            origatoms = all_mol_on_slab_configs_ase[index]
-            origatoms.set_constraint(c)
-            origatoms.positions = atoms.positions
-            new_all_mol_on_slab_configs_ase.append(origatoms)
+        ads_struct.atoms = atoms
+        adsorption_structures.append(ads_struct)
 
-        return new_all_mol_on_slab_configs_ase
+    return adsorption_structures
 
 
 def generate(save_image : bool = False):
@@ -212,58 +175,45 @@ def generate(save_image : bool = False):
     write_inputs(adsorption_structures=adsorption_structures, settings=settings)
 
 
-def preopt_ml(save_image : bool = False):
+def launch_isolated_slab_and_molecule(program_type : str):
+    '''
+    Launch the calculations for the isolated slab and molecule.
+
+    Args:
+    - program_type: 'dft' or 'ml'
+    '''
+    pass
+
+
+def launch_ml_opt(save_image : bool = False,):
+    '''
+    Generates adsorption configurations, writes inputs
+    and launches calculations for the machine learning optimization.
+    Args:
+    - save_image: save an image of the adsorption sites
+    and of the molecular rotations when generating the configurations
+    '''
 
     settings=Settings()
 
+    gen = AdsorptionStructuresGenerator(settings, verbose=True)
+    adsorption_structures = gen.generate_adsorption_structures(write_sites=True,
+                                                                save_image=save_image)
 
-    all_mol_on_slab_configs_ase, full_labels, slab, mol = adsorption_configurations(settings, save_image, VERBOSE=True)
-
-    write_labels_csvfile(full_labels, labels_filename=labels_filename)
-
-    write_slab_mol_ml(slab=slab, mol=mol)
-
-    written_indices = write_inputs_ml(settings,
-                                    all_mol_on_slab_configs_ase,
-                                    calc_indices=np.arange(len(all_mol_on_slab_configs_ase))
-                                    )
-
-    #slab and molecule
-    launch_jobs_ml(jobscript_ml=settings.jobscript_ml,
-                   sbatch_command=settings.sbatch_command_ml,
-                    explicit_labels=['slab', 'mol'],
-                    fix_bondlengths=settings.fix_bondlengths_preopt,
-                    fix_slab=settings.fix_slab_preopt,
-                    slab_indices=[0 + settings.mol_before_slab * len(mol), len(slab) + settings.mol_before_slab * len(mol)],
-                    jobname_prefix=settings.jobname_prefix)
-
-    #adsorption structures
-    launch_jobs_ml(jobscript_ml=settings.jobscript_ml,
-                sbatch_command=settings.sbatch_command_ml,
-                indices_list=written_indices,
-                fix_bondlengths=settings.fix_bondlengths_preopt,
-                fix_slab=settings.fix_slab_preopt,
-                slab_indices=[0 + settings.mol_before_slab * len(mol), len(slab) + settings.mol_before_slab * len(mol)],
-                jobname_prefix=settings.jobname_prefix)
+    written_systems = write_inputs(adsorption_structures=adsorption_structures,
+                                   settings=settings,
+                                   calc_type='ml_opt')
 
 
-def get_preopt_structures():
-    '''
-    Reads the preopt structures from the output files of the preopt calculations
-    '''
-    #settings=Settings()
-
-    config_indices = _get_configurations_numbers()
-
-    all_mol_on_slab_configs_ase = []
-    for index in config_indices:
-        atoms = read(OUT_FILE_PATHS['PREOPT']['ML'].format(index))
-        all_mol_on_slab_configs_ase.append(atoms)
-
-    return all_mol_on_slab_configs_ase
+    launch_jobs(program=settings.program,
+                calc_type='ml_opt',
+                jobscript=settings.input.jobscript_path,
+                sbatch_command=settings.input.submit_command,
+                systems=written_systems,
+                jobname_prefix=settings.input.jobname_prefix)
 
 
-def launch_screening(from_preopt : bool = False, save_image : bool = False,):
+def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     '''
     Generates adsorption configurations, writes inputs
     and launches calculations for the preliminary screening.
@@ -277,14 +227,21 @@ def launch_screening(from_preopt : bool = False, save_image : bool = False,):
 
     settings=Settings()
 
-    if from_preopt:
-        adsorption_structures = get_preopt_structures()
+    if from_ml_opt:
+        calc_ids = #TODO:WRITE
+        adsorption_structures = get_adsorption_structures(calc_ids=calc_ids,
+                                                          get_structures_from='ml_opt')
     else:
         gen = AdsorptionStructuresGenerator(settings, verbose=True)
         adsorption_structures = gen.generate_adsorption_structures(write_sites=True,
                                                                     save_image=save_image)
+        calc_ids = None
 
-    written_systems = write_inputs(adsorption_structures=adsorption_structures, settings=settings)
+
+    written_systems = write_inputs(adsorption_structures=adsorption_structures,
+                                   settings=settings,
+                                   calc_type='screening',
+                                   calc_ids=calc_ids)
 
 
     launch_jobs(program=settings.program,
@@ -295,46 +252,78 @@ def launch_screening(from_preopt : bool = False, save_image : bool = False,):
                 jobname_prefix=settings.input.jobname_prefix)
 
 
-def final_relax(n_configs: int = None, threshold : float = None, exclude : list= None, required_indices : list = None, from_preopt : bool = False, REGENERATE=False, BY_SITE = False):
+def launch_final_relax(*,
+                       n_configs: int = None,
+                       threshold : float = None,
+                       calc_ids : list[int] = None,
+                       excluded_calc_ids : list[int] = None,
+                       take_from : str = 'screening',
+                       relax_from_initial : bool = False,
+                       by_site : bool = False):
     '''
-    Reads/generates adsorption configurations, writes inputs and launches calculations for the final relax.
+    Reads/generates adsorption configurations, writes inputs and launches the
+    calculations for the final relax. If neither n_configs, threshold, required_calc_ids
+    is specified, the n_configs mode is used with default values.
 
     Args:
     - n_configs: nubmer of configurations to be relaxed, starting from the one with lowest energy
-    - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration. The configuration with E - Emin < threshold will be selected
-    - exclude: indices of the configurations to be excluded
-    - required_indices: user-specified indices, instead of identifying them according to energys
-    - REGENERATE: re-generate the configurations from scratch, starting from isolated slab and molecule. Can be used to change the initial distance
-    and repeat the relax from the beginning
-    - BY_SITE: do the configuration identification separately for each site. One or more configuration for each site will be produced
+    - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration.
+        The configuration with E - Emin < threshold will be selected
+    - required_calc_ids: user-specified indices, instead of identifying them according to energy
+    - excluded_calc_ids: indices of the configurations to be excluded
+    - take_from: type of calculation for the selection. Can be 'screening', 'ml_opt'
+    - relax_from_initial: use the initial configuration as starting point for the relaxation
+    - by_site: do the configuration identification separately for each site.
+        One or more configuration for each site will be produced
     '''
 
-    #Check input parameters and set n_configs accordingly
-    if n_configs is None and threshold is None: n_configs = N_relax_default if not BY_SITE else 1
+    #Initial setup of parameters
 
+    if take_from not in ('screening', 'ml_opt'):
+        raise ValueError('Invalid value for take_from. Must be "screening" or "ml_opt".')
+
+    #check that only one between n_configs, threshold, required_calc_ids is specified,
+    if np.sum([n_configs is not None, threshold is not None, calc_ids is not None]) > 1:
+        raise RuntimeError('Only one between n_configs, threshold, '\
+                           'required_calc_ids can be specified.')
+    elif n_configs is None and threshold is None and calc_ids is None:
+        #none specified, use n_configs method, with default values
+        if by_site:
+            n_configs = 1
+        else:
+            n_configs = N_relax_default
+
+
+    #Retrieve the structures
     settings=Settings()
 
-    if required_indices: calculations_indices = required_indices
+    if not Database.all_completed(calc_type=take_from) and \
+        not continue_even_if_not_all_completed_question():
+        print('Quitting.')
+        sys.exit(0)
+
+    if not calc_ids:
+        #retrieve the indices of the configurations to be relaxed
+
+        calc_ids = [] #TODO:WRITE
     else:
-        calculations_indices = obtain_fullrelax_indices(settings=settings,
-                                                        n_configs=n_configs,
-                                                        threshold=threshold,
-                                                        exclude=exclude,
-                                                        BY_SITE=BY_SITE,
-                                                        from_preopt=from_preopt)
+        #use the user-specified indices, exclude unwanted calculations
+        if excluded_calc_ids:
+            calc_ids = [calc_id for calc_id in calc_ids if calc_id not in excluded_calc_ids]
 
-    all_mol_on_slab_configs_ase = obtain_fullrelax_structures(settings, calculations_indices, REGENERATE, from_preopt=from_preopt)
+    get_structures_from = 'structures' if relax_from_initial else take_from
+    adsorption_structures = get_adsorption_structures(calc_ids, get_structures_from)
 
 
-    write_inputs(settings,
-                all_mol_on_slab_configs_ase,
-                calculations_indices,
-                calc_type='RELAX',
-                INTERACTIVE=True)
+    written_systems = write_inputs(adsorption_structures=adsorption_structures,
+                                   settings=settings,
+                                   calc_type='relax',
+                                   calc_ids=calc_ids)
+
 
     launch_jobs(program=settings.program,
-                calc_type='RELAX',
-                jobscript=settings.jobscript,
-                sbatch_command=settings.sbatch_command,
-                indices_list=calculations_indices,
-                jobname_prefix=settings.jobname_prefix)
+                calc_type='relax',
+                jobscript=settings.input.jobscript_path,
+                sbatch_command=settings.input.submit_command,
+                systems=written_systems,
+                jobname_prefix=settings.input.jobname_prefix)

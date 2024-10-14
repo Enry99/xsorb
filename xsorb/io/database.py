@@ -9,9 +9,10 @@ Four databases are used:
 
 '''
 
+import numpy as np
 import pandas as pd
 import ase.db
-from ase import Atoms
+import ase.db.core
 
 from xsorb.structures import AdsorptionStructure
 from xsorb.io.launch import get_running_jobs
@@ -31,6 +32,18 @@ class Database:
         'relax': 'relaxations.db',
     }
 
+
+    # @staticmethod
+    # def db_getter(func):
+    #     '''
+    #     Decorator to get that updates the database before calling the function,
+    #     and passing the open db connection to the function
+    #     '''
+    #     def wrapper(**kwargs):
+    #         db = Database.update_calculations(kwargs['calc_type'])
+    #         kwargs.update({'db': db})
+    #         return func(**kwargs)
+    #     return wrapper
 
     @staticmethod
     def add_structures(adsorption_structures : list [AdsorptionStructure],
@@ -95,7 +108,7 @@ class Database:
                 #write the new calculation in any case
                 ads_struct : AdsorptionStructure = system['adsorption_structure']
                 data=ads_struct.additional_data_arrays()
-                data.update({'initial_atoms': ads_struct.atoms, 'adsorption_structure': ads_struct})
+                data.update({'adsorption_structure': ads_struct})
                 db.write(ads_struct.atoms,
                         calc_id=system['calc_id'],
                         kwargs=ads_struct.to_info_dict(),
@@ -106,7 +119,7 @@ class Database:
 
 
     @staticmethod
-    def update_calculations(calc_type : str) -> None:
+    def update_calculations(calc_type : str) -> ase.db.core.Database:
         '''
         Update the database with the new results.
         Also update the job status
@@ -114,7 +127,6 @@ class Database:
         Args:
         - calc_type: string with the type of calculation
         '''
-
         #TODO: write here the code to retrieve the data from the output files
 
         #- atoms_list: list of trajectories
@@ -126,10 +138,14 @@ class Database:
         #         row_id = db.get(f'calc_id={calc_id}').id
         #         db.update(id=row_id, atoms=traj[-1], data={'trajectory': traj}, **convergence_info)
 
+        pass
+        #return db
 
+    #@db_getter
     @staticmethod
     def get_calculations(calc_type : str,
                          selection : str | None = None,
+                         calc_ids : list[int] | None = None,
                          columns : list[str] | str = 'all',
                          sort_key : str | None = None) -> list:
         '''
@@ -139,14 +155,22 @@ class Database:
         Args:
         - calc_type: string with the type of calculation
         - selection: string with the selection criteria (e.g. 'status=completed')
+        - calc_ids: list of integers with the ids of the calculations to be included
         - columns: list of strings with the columns to be included
         - sort_key: string with the key to sort the rows, e.g. 'energy'
 
         Returns:
         - list: list of rows
         '''
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
-            rows = db.select(selection=selection, columns=columns, sort=sort_key)
+        if selection is not None and calc_ids is not None:
+            raise ValueError('Cannot use both selection and calc_ids')
+
+        #Make sure that the database is up to date
+        db = Database.update_calculations(calc_type)
+
+        rows = db.select(selection=selection, columns=columns, sort=sort_key)
+        if calc_ids:
+            rows = [row for row in rows if row.calc_id in calc_ids]
 
         return rows
 
@@ -235,10 +259,45 @@ class Database:
         - list of integers with the job ids
         '''
         job_ids = []
-        for calc_type in Database.calc_types.values():
+        calc_types = Database.calc_types.copy()
+        calc_types.pop('structures')
+        for calc_type in calc_types.values():
             with ase.db.connect(calc_type) as db:
                 for row in db.select():
                     if row.status=='incomplete' and row.get('job_id') is not None:
                         job_ids.append(row.job_id)
 
         return job_ids
+
+
+    @staticmethod
+    def get_adsorption_sites(calc_type : str) -> list:
+        '''
+        Get the unique adsorption sites from the database
+
+        Args:
+        - calc_type: string with the type of calculation
+
+        Returns:
+        - list of strings with the adsorption sites
+        '''
+        with ase.db.connect(Database.calc_types[calc_type]) as db:
+            return np.unique([row.get('site') for row in db.select()])
+
+    #@db_getter
+    @staticmethod
+    def all_completed(calc_type : str) -> bool:
+        '''
+        Check if all the calculations in the database are completed
+
+        Args:
+        - calc_type: string with the type of calculation
+
+        Returns:
+        - bool: True if all the calculations are completed, False otherwise
+        '''
+
+        #Make sure that the database is up to date
+        db = Database.update_calculations(calc_type)
+
+        return np.all([row.status == 'completed' for row in db.select()])
