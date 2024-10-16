@@ -1,7 +1,8 @@
 '''
 Module for launching the calculations
 '''
-
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import os
 from pathlib import Path
 import shutil
@@ -9,15 +10,16 @@ import subprocess
 
 from xsorb.io.settings import Settings
 from xsorb.io.database import Database
-from xsorb.io.inputs import WrittenSystem
 from xsorb.dft_codes.definitions import SBATCH_POSTFIX
 from xsorb.dft_codes.calculator import edit_files_for_restart
+if TYPE_CHECKING:
+    from xsorb.io.inputs import WrittenSystem
 
 
 TEST = True
 
 
-def launch_jobs(program : str,
+def launch_jobs(*,program : str,
                 calc_type : str,
                 jobscript : str,
                 sbatch_command : str,
@@ -94,7 +96,6 @@ def restart_jobs(calc_type : str):
 
     settings = Settings()
 
-    Database.update_calculations(calc_type)
     rows = Database.get_calculations(calc_type,
                                      selection='status="incomplete",job_status="terminated"')
     indices_to_restart = [row.calc_id for row in rows]
@@ -158,11 +159,12 @@ def scancel():
     submitted_job_ids = Database.get_all_job_ids()
 
     #also add jobs from .submitted_jobs.txt
-    with open(".submitted_jobs.txt", "r") as f:
-        submitted_jobs = f.readlines()
-        submitted_job_ids.extend([job.strip() for job in submitted_jobs])
+    if Path(".submitted_jobs.txt").exists():
+        with open(".submitted_jobs.txt", "r") as f:
+            submitted_jobs = f.readlines()
+            submitted_job_ids.extend([job.strip() for job in submitted_jobs])
 
-    running_jobs = _get_running_jobs()
+    running_jobs = get_running_jobs()
     running_job_ids = [job.split()[0] for job in running_jobs]
 
     print(f"Cancelling jobs {running_job_ids}.")

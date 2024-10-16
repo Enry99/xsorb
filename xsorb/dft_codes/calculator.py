@@ -19,7 +19,6 @@ from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
 
 from xsorb.io.utils import write
-from xsorb.dft_codes.definitions import IN_FILE_PATHS
 
 
 class MLFakeCalculator:

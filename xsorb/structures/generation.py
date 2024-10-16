@@ -150,64 +150,53 @@ class AdsorptionStructuresGenerator:
         min_distance = self.settings.structure.molecule.min_distance
         mult = self.settings.structure.molecule.radius_scale_factor
 
+        if mode == 'value':
+            radii = [min_distance]*len(covalent_radii)
+        elif mode == 'covalent_radius':
+            radii = covalent_radii*mult
+        elif mode == 'vdw_radius':
+            radii = vdw_radii*mult
+        else:
+            raise ValueError(f"mode must be one of 'value', 'covalent_radius', 'vdw_radius'")
+
         dz_tot = 0
         molcopy = mol.copy()
 
-        #first, translate the molecule above the slab, making sure that each atom of the
-        #molecule has the z coordinate >= local max(atoms.z)
         while True:
 
-            atoms : Atoms = slab + molcopy
-            #use large radii to find the neighbors for the compenetration check,
-            # regardless of the mode used for the min_distance, since in any case
-            # the atoms are not translated above the z of the slab atoms
-            cutoffs = [vdw_radii[atom.number]*1.2 for atom in atoms]
-            nl = NeighborList(cutoffs, skin=0, self_interaction=False, bothways=True)
-            nl.update(atoms)
-            cm = nl.get_connectivity_matrix()
+            # First, find the closest slab-molecule pair, not in absolute sense but
+            # according to their covalent or van der Waals radii.
+            d_matrix = get_distances(slab.positions,molcopy.positions,slab.cell,pbc=True)[1]
 
-            candidate_translations = []
-            for i, slab_atom in enumerate(slab):
-                for j, mol_atom in enumerate(molcopy):
-                    if cm[i, len(slab)+j] and mol_atom.z < slab_atom.z:
-                        dz = slab_atom.z - mol_atom.z
-                        candidate_translations.append(dz)
+            diff_matrix = d_matrix.copy()
+            for id1, at1 in enumerate(slab):
+                for id2, at2 in enumerate(molcopy):
+                    diff_matrix[id1,id2] -= mult*(radii[at1.number] + radii[at2.number])
 
-            if candidate_translations:
-                dz = np.max(candidate_translations)
-                dz_tot += dz
-                molcopy.translate([0,0,dz])
-            else:
-                break
+            i_slab, j_mol, *_ = np.unravel_index(np.argmin(diff_matrix), diff_matrix.shape)
 
-        #Then, translate the molecule upwards by the target height
-        #This should require only one iteration, as the molecule is already above the slab
-        vector_matrix, d_matrix = get_distances(slab.positions,molcopy.positions,slab.cell,pbc=True)
-        candidate_translations = []
-        for id1, at1 in enumerate(slab):
-            for id2, at2 in enumerate(molcopy):
+            if diff_matrix[i_slab,j_mol] >= 0:
+                break #already above target distance
 
-                distance = d_matrix[id1, id2]
+            #Then, translate the mol upwards so that the z coordinate of the mol atom
+            # is equal to the closest slab atom. In this way we can exploit the right triangle
+            h = molcopy[j_mol].z - slab[i_slab].z
+            if h < 0:
+                molcopy.translate([0,0,h])
+                dz_tot += h
+                h = 0
 
-                if mode == 'covalent_radius':
-                    D = mult*(covalent_radii[at1.number] + covalent_radii[at2.number]) #pylint: disable=invalid-name
-                elif mode == 'vdw_radius':
-                    D = mult*(vdw_radii[at1.number] + vdw_radii[at2.number]) #pylint: disable=invalid-name
-                else:
-                    D = min_distance #pylint: disable=invalid-name
+            #Finally, translate so that the distance between the two atoms is equal
+            # to the target distance
+            target_dist = mult * (radii[slab[i_slab].number] + radii[molcopy[j_mol].number])
+            distance = get_distances(slab[i_slab].position,
+                                     molcopy[j_mol].position,
+                                     slab.cell,pbc=True)[1][0,0]
+            b = np.sqrt(distance**2 - h**2)
+            dz = np.sqrt(target_dist**2 - b**2) - h
 
-                if distance < D:
-                    h = np.dot(vector_matrix[id1, id2], [0,0,1])
-                    if h < 0:
-                        raise ValueError("The molecule is below the slab. This should not happen.")
-                    b = np.sqrt(distance**2 - h**2)
-                    dz = np.sqrt(D**2 - b**2) - h
-                    candidate_translations.append(dz)
-
-        if candidate_translations:
-            dz = np.max(candidate_translations)
-            dz_tot += dz
             molcopy.translate([0,0,dz])
+            dz_tot += dz
 
         return dz_tot
 

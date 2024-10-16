@@ -3,10 +3,14 @@ Module with the functions to select the configurations for subsequent calculatio
 (both from the screening and from the ML optimization)
 '''
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from ase import Atoms
 
 from xsorb.io.database import Database
-from xsorb.structures import AdsorptionStructure
+if TYPE_CHECKING:
+    from xsorb.structures import AdsorptionStructure
 
 
 def select_calculations(rows : list, n_configs : int = None, threshold : float = None) -> list:

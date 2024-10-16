@@ -3,6 +3,9 @@ Module to plot the adsorption sites and molecule rotations
 
 '''
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.patheffects as PathEffects
@@ -13,8 +16,10 @@ from pymatgen.core import Structure
 from pymatgen.analysis.adsorption import plot_slab, get_rot
 from ase.visualize.plot import plot_atoms
 
-from xsorb.structures.slab import AdsorptionSite
-from xsorb.structures.molecule import MoleculeRotation
+
+if TYPE_CHECKING:
+    from xsorb.structures.slab import AdsorptionSite
+    from xsorb.structures.molecule import MoleculeRotation
 
 
 

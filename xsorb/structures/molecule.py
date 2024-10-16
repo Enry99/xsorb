@@ -198,7 +198,8 @@ class Molecule:
             mol_rotations_ase.append(MoleculeRotation(mol,
                                                       str(x_angle),
                                                       str(y_angle),
-                                                      str(z_angle)))
+                                                      str(z_angle),
+                                                      self.reference_atom_index))
 
         if verbose:
             print('All molecular configurations generated.')

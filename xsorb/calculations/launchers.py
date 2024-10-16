@@ -10,14 +10,16 @@ import sys
 
 import numpy as np
 
-from xsorb.common_definitions import N_relax_default
-from xsorb.structures import AdsorptionStructuresGenerator, Slab, Molecule
+from xsorb.structures import AdsorptionStructuresGenerator
 from xsorb.io.settings import Settings
+from xsorb.io.utils import ase_custom_read as read
 from xsorb.io.inputs import write_inputs, write_slab_mol_inputs
 from xsorb.io.jobs import launch_jobs
 from xsorb.io.database import Database
 from xsorb.io.utils import continue_even_if_not_all_completed_question
 from xsorb.calculations.selection import obtain_calc_indices, get_adsorption_structures
+
+N_RELAX_DEFAULT = 5
 
 
 def generate(save_image : bool = False):
@@ -149,7 +151,7 @@ def launch_final_relax(*,
         if by_site:
             n_configs = 1
         else:
-            n_configs = N_relax_default
+            n_configs = N_RELAX_DEFAULT
 
 
     #Retrieve the structures
@@ -200,37 +202,10 @@ def launch_isolated_slab_and_molecule(ml : bool, mol_only : bool = False):
 
     settings = Settings()
 
-    if not mol_only:
-        print('Loading slab...')
-        slab = Slab(slab_filename=settings.input.slab_filename,
-                surface_thickness=settings.structure.adsorption_sites.surface_thickness,
-                layers_threshold=settings.structure.constraints.layers_height,
-                fixed_layers_slab=settings.structure.constraints.fixed_layers_slab,
-                fixed_indices_slab=settings.structure.constraints.fixed_indices_slab,
-                fix_slab_xyz=settings.structure.constraints.fix_slab_xyz,
-                sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,
-                translate_slab_from_below_cell_bottom=settings.structure.misc.translate_slab)
+    slab = read(settings.input.slab_filename) if not mol_only else None
+    mol = read(settings.input.molecule_filename)
 
-        print('Slab loaded.')
-    else:
-        slab = None
-
-
-    #Molecule import from file
-    print('Loading molecule...')
-    mol = Molecule(molecule_filename=settings.input.molecule_filename,
-            atom_index=settings.structure.molecule.selected_atom_index,
-            molecule_axis_atoms=settings.structure.molecule.molecule_axis["values"] \
-                if settings.structure.molecule.molecule_axis["mode"] == "atom_indices" \
-                    else None,
-            axis_vector=settings.structure.molecule.molecule_axis["values"] \
-                if settings.structure.molecule.molecule_axis["mode"] == "vector" \
-                    else None,
-            fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
-            fix_mol_xyz=settings.structure.constraints.fix_mol_xyz)
-    print('Molecule loaded.')
-
-    written_systems = write_slab_mol_inputs(slab, mol, settings, ml)
+    written_systems = write_slab_mol_inputs(slab=slab, molecule=mol, settings=settings, ml=ml)
 
     launch_jobs(program=settings.program,
                 calc_type='isolated',
@@ -240,4 +215,3 @@ def launch_isolated_slab_and_molecule(ml : bool, mol_only : bool = False):
                     else settings.input.submit_command_ml,
                 systems=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)
-

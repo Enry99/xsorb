@@ -23,6 +23,7 @@ class MoleculeRotation:
     - xrot: string with the x rotation angle
     - yrot: string with the y rotation angle
     - zrot: string with the z rotation angle
+    - reference_atom: int, index of the reference atom in the moelcule
 
     Properties:
     - unique_id: string that fully identifies the rotation
@@ -33,6 +34,7 @@ class MoleculeRotation:
     xrot: str
     yrot: str
     zrot: str
+    ref_idx: int
 
     @property
     def unique_id(self):
@@ -181,7 +183,7 @@ class AdsorptionStructure:
         '''
         Returns the names of the columns of the AdsorptionStructure object
         '''
-        return ("site", "site_info", "x", "y", "z", "distance", "xrot", "yrot", "zrot")
+        return ("site", "site_info", "x", "y", "z", "initial_dz", "xrot", "yrot", "zrot")
 
     def to_info_dict(self):
         """
@@ -192,7 +194,7 @@ class AdsorptionStructure:
                     "x": self.adsite.coords[0],
                     "y": self.adsite.coords[1],
                     "z": self.adsite.coords[2],
-                    "distance": self.distance,
+                    "initial_dz": self.distance,
                     "xrot": self.mol_rot.xrot,
                     "yrot": self.mol_rot.yrot,
                     "zrot": self.mol_rot.zrot}

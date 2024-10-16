@@ -8,10 +8,11 @@ from dataclasses import dataclass
 
 from ase import Atoms
 
+from xsorb.structures.generation import AdsorptionStructure
+from xsorb.structures.utils import set_fixed_slab_constraints
 from xsorb.io.settings import Settings
-from xsorb.structures import AdsorptionStructure, set_fixed_slab_constraints
 from xsorb.io.database import Database
-from xsorb.io.utils import overwrite_question
+from xsorb.io.utils import overwrite_question, write, write_xyz_custom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import write_file_with_Calculator
 from xsorb.dft_codes.override import override_dft_settings
@@ -27,9 +28,12 @@ class WrittenSystem:
     in_file_path: str
     out_file_path: str
     log_file_path: str
+    job_id: int | None = None
+    adsite_z: float | None = None
+    mol_ref_idx: int | None = None
 
 
-def write_inputs(adsorption_structures : list[AdsorptionStructure],
+def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
                  settings : Settings,
                  calc_type : str | None = None,
                  calc_ids : list[int] | None = None,
@@ -102,6 +106,7 @@ def write_inputs(adsorption_structures : list[AdsorptionStructure],
                                    directory=file_dir)
 
         written_systems.append(WrittenSystem(calc_id=i,
+                                             adsorption_structure=ads_structure,
                                              in_file_path=in_file_path,
                                              out_file_path=out_file_path,
                                              log_file_path=log_file_path))
@@ -121,7 +126,7 @@ def write_inputs(adsorption_structures : list[AdsorptionStructure],
     return written_systems
 
 
-def write_slab_mol_inputs(slab : Atoms | None,
+def write_slab_mol_inputs(*,slab : Atoms | None,
                           molecule : Atoms | None,
                           settings : Settings,
                           ml : bool,
@@ -198,3 +203,39 @@ def write_slab_mol_inputs(slab : Atoms | None,
     if verbose: print('All input files written.') #pylint: disable=multiple-statements
 
     return written_systems
+
+
+def saveas(calc_type : str, i_or_f : str, saveas_format : str):
+    '''
+    Save all the configurations in a different format, e.g. xyz or cif.
+    If initial, the configurations are read from structures.db, and correspond
+    to the initial generated ones. Otherwise, the final configurations for
+    the given mode are written.
+
+    Args:
+    - calc_type: 'initial','screening','relax','ml_opt'
+    - saveas_format: file format, e.g. xyz
+    '''
+
+    if calc_type not in ('initial','screening', 'relax', 'ml_opt'):
+        raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'ml_opt'")
+    if i_or_f not in ('i', 'f'):
+        raise RuntimeError(f"Wrong '{i_or_f}', expected 'i' or 'f'")
+
+    folder = Path(f"{calc_type}/{saveas_format}")
+
+    print(f"Saving files to {folder}...")
+    folder.mkdir(folder, exist_ok=True, parents=True)
+
+    if calc_type == 'initial':
+        rows = Database.get_structures()
+    else:
+        rows = Database.get_calculations(calc_type)
+
+    for row in rows:
+        if saveas_format == 'xyz':
+            write_xyz_custom(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.atoms)
+        else:
+            write(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.atoms)
+
+    print("All files saved.")
