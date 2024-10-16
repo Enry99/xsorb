@@ -71,7 +71,7 @@ class AdsorptionStructuresGenerator:
         if verbose:
             print('Loading molecule...')
         self.mol = Molecule(molecule_filename=settings.input.molecule_filename,
-                    atom_index=settings.structure.molecule.selected_atom_index,
+                    atom_indexes=settings.structure.molecule.selected_atom_indexes,
                     molecule_axis_atoms=settings.structure.molecule.molecule_axis["values"] \
                         if settings.structure.molecule.molecule_axis["mode"] == "atom_indices" \
                             else None,
@@ -87,6 +87,7 @@ class AdsorptionStructuresGenerator:
 
     def _generate_molecule_rotations(self,
                                      rot_mode : str = 'standard',
+                                     which_index : int = 0,
                                      adsite : AdsorptionSiteAmorphous | None = None,
                                      save_image : bool = False,
                                      verbose : bool = True):
@@ -95,6 +96,7 @@ class AdsorptionStructuresGenerator:
 
         Args:
         - rot_mode: 'standard' for the standard mode, 'surrounding' for the surrounding mode
+        - which_index: index of the atom to be used as reference for the rotations in the list of indexes
         - adsite: for the surrounding mode, AdsorptionSiteAmorphous object that contains info to
             rotate the molecule towards the surrounding sites
         - save_image: save an image of the molecule rotations
@@ -117,6 +119,7 @@ class AdsorptionStructuresGenerator:
             verbose = False
 
         molecule_rotations = self.mol.generate_molecule_rotations(
+            which_index=which_index,
             x_rot_angles=structure_settings.molecule.x_rot_angles,
             y_rot_angles=structure_settings.molecule.y_rot_angles,
             z_rot_angles=z_rot_angles,
@@ -340,20 +343,22 @@ class AdsorptionStructuresGenerator:
             rot_mode = 'standard'
 
         adsorption_structures : list[AdsorptionStructure] = []
-        for adsite in adsites:
-            molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
-                                                                  adsite=adsite,
-                                                                  save_image=save_image,
-                                                                  verbose=verbose)
-            for mol_rot in molecule_rotations:
-                structure = self._put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
-                adsorption_structures.append(structure)
+        for mol_ref_index in self.mol.reference_atom_indices:
+            for adsite in adsites:
+                molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
+                                                                    which_index=mol_ref_index,
+                                                                    adsite=adsite,
+                                                                    save_image=save_image,
+                                                                    verbose=verbose)
+                for mol_rot in molecule_rotations:
+                    structure = self._put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
+                    adsorption_structures.append(structure)
 
 
-            #handle the case of vertical molecule on surrounding sites
-            if rot_mode == 'surrounding':
-                adsorption_structures.extend(
-                    self._get_structures_for_vertical_surrounding_sites(adsite))
+                #handle the case of vertical molecule on surrounding sites
+                if rot_mode == 'surrounding':
+                    adsorption_structures.extend(
+                        self._get_structures_for_vertical_surrounding_sites(adsite))
 
 
         if verbose:

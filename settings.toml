@@ -30,7 +30,7 @@
 
     [Structure.molecule]
         molecule_axis                   = {mode = "atom_indices", values = [3, 14]}  # indices of the two atoms to define the x-axis direction, or vector to take as x-axis, e.g. {mode = "vector", values = [1,0,0]}
-        selected_atom_index             = 0                     # selected atom in molecule file, to be placed in all adsorption sites. If -1, use the geometric center of the molecule
+        selected_atom_indexes           = [0]                   # list of selected atom in molecule file, to be placed in all adsorption sites. If -1, use the geometric center of the molecule.
 
         x_rot_angles                    = [0, 90, 180]          # rotation angles (in deg) about x axis (performed first)
         y_rot_angles                    = [0, 90]               # rotation about y axis (performed secondly)

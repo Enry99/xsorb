@@ -29,7 +29,7 @@ class Molecule:
 
         Initialization parameters:
         - molecule_filename: file containing the structure of the molecule
-        - atom_index: index of the reference atom (indexing starting from 0,
+        - atom_indexes: list of indices of the reference atom (indexing starting from 0,
             in the order of the input file)
         - molecule_axis_atoms: indices of the two atoms defining the x-axis
             of the molecule (a = r2 - r1)
@@ -46,13 +46,13 @@ class Molecule:
 
 
     def __init__(self, molecule_filename : str,
-                 atom_index: int,
-                 molecule_axis_atoms : list | None = None,
-                 axis_vector: list | None = None,
-                 atoms_subset : list | None = None,
-                 break_bond_indices : list | None = None,
-                 fixed_indices_mol : list | None = None,
-                 fix_mol_xyz : list | None = None):
+                 atom_indexes: list[int],
+                 molecule_axis_atoms : list[int] | None = None,
+                 axis_vector: list[float] | None = None,
+                 atoms_subset : list[int] | None = None,
+                 break_bond_indices : list[int] | None = None,
+                 fixed_indices_mol : list[int] | None = None,
+                 fix_mol_xyz : list[int] | None = None):
 
 
         self.mol_ase = read(molecule_filename)
@@ -78,14 +78,9 @@ class Molecule:
         else: self.mol_ase.set_constraint() #clean possible constraints read from file
         ###############################################################
 
-        #Translate reference atom to origin
-        if atom_index != -1:
-            self.mol_ase.translate(-self.mol_ase.get_positions()[atom_index])
-        else:
-            #center of positions (not of mass)
-            self.mol_ase.translate(-self.mol_ase.positions.mean(axis=0))
-
         #select atoms subset
+        atom_indexes_positions = [self.mol_ase.positions[idx] \
+                                  if idx != -1 else None for idx in atom_indexes]
         if atoms_subset:
             self.mol_ase = self.mol_ase[atoms_subset]
 
@@ -110,15 +105,26 @@ class Molecule:
 
             self.mol_ase = self.mol_ase[included_indices]
 
-        #set correctly the reference atom index (even after subset selection),
-        # since it will be at the origin
-        if atom_index != -1:
-            ref_idx = [atom.index for atom in self.mol_ase if np.allclose(atom.position, [0,0,0])]
-            if len(ref_idx) != 1:
-                raise ValueError('Reference atom index not found.')
-            self.reference_atom_index = ref_idx[0]
-        else:
-            self.reference_atom_index = -1
+        #retrieve the correct index of the reference atoms after subsetting
+        for i, atom_pos in enumerate(atom_indexes_positions):
+            if atom_pos is not None:
+                atom_indexes[i] = [atom.index for atom in self.mol_ase \
+                                   if np.allclose(atom.position, atom_pos)][0]
+            else:
+                atom_indexes[i] = -1
+
+        self.reference_atom_indices = atom_indexes
+
+        #Translate reference atom to origin
+        self.translated_mols = []
+        for atom_index in self.reference_atom_indices:
+            mol = self.mol_ase.copy()
+            if atom_index != -1:
+                mol.translate(-self.mol_ase.get_positions()[atom_index])
+            else:
+                #center of positions (not of mass)
+                mol.translate(-self.mol_ase.positions.mean(axis=0))
+            self.translated_mols.append(mol)
 
         #set other useful attributes
         self.constrained_indices = [constr.a for constr in self.mol_ase.constraints]
@@ -126,6 +132,7 @@ class Molecule:
 
 
     def generate_molecule_rotations(self,
+            which_index : int,
             x_rot_angles : list[float],
             y_rot_angles : list[float],
             z_rot_angles : list[float] | list[SurroundingSite],
@@ -139,6 +146,7 @@ class Molecule:
         Returns list (of ase Atoms) of all the rotated configurations and their labels.
 
         Args:
+        - which_index: index of the reference atom to use as pivot for the rotations
         - x_rot_angles: list of angles to rotate around the x axis
         - y_rot_angles: list of angles to rotate around the y axis
         - z_rot_angles: list of angles to rotate around the z axis
@@ -149,6 +157,9 @@ class Molecule:
 
         if verbose:
             print('Generating molecular configurations...')
+
+        if which_index not in self.reference_atom_indices:
+            raise ValueError('The index of the reference atom is not valid.')
 
         mol_rotations_ase : list[MoleculeRotation] = []
 
@@ -181,7 +192,7 @@ class Molecule:
         #perform the rotations
         for (x_angle, y_angle, z_angle) in rotations_list:
 
-            mol = self.mol_ase.copy()
+            mol = self.translated_mols[which_index].copy()
 
             mol.rotate(x_angle, 'x')
             mol.rotate(y_angle, '-y')
@@ -199,7 +210,7 @@ class Molecule:
                                                       str(x_angle),
                                                       str(y_angle),
                                                       str(z_angle),
-                                                      self.reference_atom_index))
+                                                      which_index))
 
         if verbose:
             print('All molecular configurations generated.')

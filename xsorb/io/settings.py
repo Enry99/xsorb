@@ -111,7 +111,7 @@ class MoleculeParams:
     molecule card of the settings file.
     '''
     molecule_axis: dict
-    selected_atom_index: int
+    selected_atom_indexes: list[int]
     x_rot_angles: list[float]
     y_rot_angles: list[float]
     z_rot_angles: list[float]
