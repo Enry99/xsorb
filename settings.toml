@@ -2,7 +2,7 @@
 [Input]
     slab_filename                       = "./slab/OUTCAR"       # path of file containing the slab atomic coordinates. The list of supported file types can be found on ASE website
     molecule_filename                   = "./mol/OUTCAR"        # path of file containing the molecule atomic coordinates. The list of supported file types can be found on ASE website
-    #E_slab_mol                         = [0.0, 0.0]            # slab and isolated molecule energies (in the default energy units of the DFT program, i.e. Ry for QE, eV for VASP).
+    #E_slab_mol                         = [0.0, 0.0]            # slab and isolated molecule energies ***in eV !***
     jobscript_path                      = "jobscript.sh"        # path of a jobscript for running Quantum Espresso
     #jobscript_ml_path                  = "jobscript_ml.sh"     # path of a jobscript for running the machine learning model
     submit_command                      = "sbatch"              # command for submitting the jobscript to the job scheduler
@@ -41,7 +41,7 @@
         adsorption_distance_mode        = "value"               # options: 'value', 'covalent_radius', 'vdw_radius'
         target_distance                 = 2.0                   # if adsorption_distance_mode is "value", DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
         min_distance                    = 1.5                   # if adsorption_distance_mode is "value", minimum distance (in A) of ANY mol atom from ANY slab atom, must be < target_distance. The molecule is translated upwards if necessary, in order to meet this requirement.
-        #radius_scale_factor            = 1.1                   # scaling factor for the covalent or vdW radii of the atoms in the molecule
+        #radius_scale_factor            = 1.1                   # scaling factor for the covalent radii to determine bonding, and for the covalent/vdw radii when adsoption_distance_mode is "covalent_radius" or "vdw_radius"
 
     #[Structure.constraints]
         #layers_height                  = 0.5                   # delta_z within which atoms are considered to be part of the same layer (for fixing atoms). This is different from the surface_height flag, used for surface adsorption sites.

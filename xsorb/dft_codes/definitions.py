@@ -1,29 +1,119 @@
-from ase.units import create_units
-from xsorb.common_definitions import screening_outdir, relax_outdir, preopt_outdir
+'''
+Constants related to DFT codes and their usage in the workflow,
+such as file paths, completion checks, etc.
+'''
 
-SUPPORTED_PROGRAMS = ['vasp', 'espresso']
+SUPPORTED_PROGRAMS = ['vasp', 'espresso', 'ml']
+
+SCREENING_OUTDIR            = 'screening_outdirs'
+RELAX_OUTDIR                = 'relax_outdirs'
+ML_OPT_OUTDIR               = 'ml_opt_outdirs'
+
 
 HYBRID_SCREENING_THRESHOLDS = {
-    'vasp' : -0.5, # ~ -2e-2 Ry/Bohr
-    'espresso' : [5e-3, 5e-2]
+    'vasp' : -0.5,              # eV/A, ~ -2e-2 Ry/Bohr
+    'espresso' : [5e-3, 5e-2]   # [Ry, Ry/Bohr]
 }
 
-UNITS_TO_EV_FACTOR = {
-    'vasp' : 1,
-    'espresso': create_units('2006')['Rydberg'],
-    'ML': 1
+
+# File paths #######################################################
+#use pwi also for ml since they retain constraint, while xyz does not
+
+IN_FILE_PATHS = {
+    'screening': {
+        'vasp': SCREENING_OUTDIR+'/{0}/POSCAR',
+        'espresso': SCREENING_OUTDIR+'/{0}/screening_{0}.pwi',
+    },
+
+    'relax': {
+        'vasp': RELAX_OUTDIR+'/{0}/POSCAR',
+        'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwi',
+    },
+
+    'preopt': {
+        'ml': ML_OPT_OUTDIR+'/{0}/preopt_{0}.pwi'
+    },
+
+    'slab': {
+        'vasp': 'slab/DFT/POSCAR',
+        'espresso': 'slab/DFT/slab.pwi',
+        'ml': 'slab/ML/slab.pwi'
+    },
+
+    'mol': {
+        'vasp': 'mol/DFT/POSCAR',
+        'espresso': 'mol/DFT/mol.pwi',
+        'ml': 'mol/ML/mol.pwi'
+    },
+
 }
 
+OUT_FILE_PATHS = {
+    'screening': {
+        'vasp': SCREENING_OUTDIR+'/{0}/vasprun.xml',
+        'espresso': SCREENING_OUTDIR+'/{0}/screening_{0}.pwo',
+    },
+
+    'relax': {
+        'vasp': RELAX_OUTDIR+'/{0}/vasprun.xml',
+        'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwo',
+    },
+
+    'preopt': {
+        'ml': ML_OPT_OUTDIR+'/{0}/preopt_{0}.traj'
+    },
+
+    'slab': {
+        'vasp': 'slab/DFT/vasprun.xml',
+        'espresso': 'slab/DFT/slab.pwo',
+        'ml': 'slab/ML/slab.traj'
+    },
+
+    'mol': {
+        'vasp': 'mol/DFT/vasprun.xml',
+        'espresso': 'mol/DFT/mol.pwo',
+        'ml': 'mol/ML/mol.traj'
+    }
+}
+
+LOG_FILE_PATHS = {
+    'screening': {
+        'vasp': SCREENING_OUTDIR+'/{0}/vasprun.xml',
+        'espresso': SCREENING_OUTDIR+'/{0}/screening_{0}.pwo',
+    },
+
+    'relax': {
+        'vasp': RELAX_OUTDIR+'/{0}/vasprun.xml',
+        'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwo',
+    },
+
+    'preopt': {
+        'ml' : ML_OPT_OUTDIR+'/{0}/preopt_{0}.log'
+    },
+
+    'slab': {
+        'vasp': 'slab/DFT/vasprun.xml',
+        'espresso': 'slab/DFT/slab.pwo',
+        'ml': 'slab/ML/slab.log'
+    },
+
+    'mol': {
+        'vasp': 'mol/DFT/vasprun.xml',
+        'espresso': 'mol/DFT/mol.pwo',
+        'ml': 'mol/ML/mol.log'
+    }
+}
+
+# Completion checks #########################################
 OPTIMIZATION_COMPLETED_STRINGS = {
-        #'vasp' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
-        'vasp' : 'finalpos', #in vasprun.xml
-        'espresso': 'Begin final coordinates',
-        'ML': 'Optimization completed.'
+    #'vasp' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
+    'vasp' : 'finalpos', #in vasprun.xml
+    'espresso': 'Begin final coordinates',
+    'ml': 'Optimization completed.'
 }
-
 
 SCF_NONCONVERGED_STRINGS = {
-    'vasp': 'abcdefgxyz', #TODO: vasp does not stop the relax if one scf does not converge, so not necessary
+    'vasp': 'abcdefgxyz', #TODO: update
     'espresso': 'convergence NOT achieved'
 }
 
@@ -33,78 +123,31 @@ SCF_CONVERGED_STRINGS = {
 }
 
 
-OUT_FILE_PATHS = {
-    'screening': {
-        'vasp': screening_outdir+'/{0}/vasprun.xml',
-        'espresso': screening_outdir+'/{0}/screening_{0}.pwo',
-    },
-
-    'relax': {
-        'vasp': relax_outdir+'/{0}/vasprun.xml',
-        'espresso': relax_outdir+'/{0}/relax_{0}.pwo',
-    },
-
-    'preopt': {
-        'ML': preopt_outdir+'/{0}/preopt_{0}.traj'
-    }
-}
-
-IN_FILE_PATHS = {
-    'screening': {
-        'vasp': screening_outdir+'/{0}/POSCAR',
-        'espresso': screening_outdir+'/{0}/screening_{0}.pwi',
-    },
-
-    'relax': {
-        'vasp': relax_outdir+'/{0}/POSCAR',
-        'espresso': relax_outdir+'/{0}/relax_{0}.pwi',
-    },
-
-    'preopt': {
-        'ML': preopt_outdir+'/{0}/preopt_{0}.xyz'
-    }
-}
-
-LOG_FILE_PATHS = {
-    'screening': {
-        'vasp': screening_outdir+'/{0}/vasprun.xml',
-        'espresso': screening_outdir+'/{0}/screening_{0}.pwo',
-    },
-
-    'relax': {
-        'vasp': relax_outdir+'/{0}/vasprun.xml',
-        'espresso': relax_outdir+'/{0}/relax_{0}.pwo',
-    },
-
-    'preopt': {
-        'ML' : preopt_outdir+'/{0}/preopt_{0}.log'
-    }
-}
-
+#Job submission #############################################
 SBATCH_POSTFIX = {
     'vasp': '',
     'espresso': '{in_file} {out_file}',
     'ml': '{in_file} {out_file} {log_file} {main_dir}'
 }
 
-
-
+#TODO: update these
+#Fragments ###################################################
 FRAGMENTS_IN_FILE_PATHS = {
     'vasp': 'fragments/{0}/POSCAR',
     'espresso': 'fragments/{0}/{0}.pwi',
-    'ML': 'fragments/{0}/{0}_ml.xyz'
+    'ml': 'fragments/{0}/{0}_ml.pwi'
 }
 
 FRAGMENTS_OUT_FILE_PATHS = {
     'vasp': 'fragments/{0}/vasprun.xml',
     'espresso': 'fragments/{0}/{0}.pwo',
-    'ML': 'fragments/{0}/{0}_ml.traj'
+    'ml': 'fragments/{0}/{0}_ml.traj'
 }
 
 FRAGMENTS_LOG_FILE_PATHS = {
     'vasp': 'fragments/{0}/vasprun.xml',
     'espresso': 'fragments/{0}/{0}.pwo',
-    'ML': 'fragments/{0}/{0}_ml.log'
+    'ml': 'fragments/{0}/{0}_ml.log'
 }
 
 SBATCH_POSTFIX_FRAGS = {

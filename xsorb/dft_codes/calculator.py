@@ -1,7 +1,6 @@
 """
-@author: Enrico Pedretti
-
-DFT CODE-specific functions (all others must be code-agnostic)
+DFT CODE (and ML)-specific functions
+to write the input files for the calculations
 
 """
 
@@ -11,19 +10,16 @@ import os
 import warnings
 from pathlib import Path
 
-from pymatgen.io.vasp.sets import MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
+from pymatgen.io.vasp.sets import \
+    MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
 from pymatgen.io.ase import AseAtomsAdaptor
 from ase import Atoms
 from ase.constraints import FixScaled
 from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
 
-
-from xsorb.io.settings import Settings
 from xsorb.io.utils import write
 from xsorb.dft_codes.definitions import IN_FILE_PATHS
-
-#TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 
 
 class MLFakeCalculator:
@@ -151,29 +147,28 @@ def adjust_constraints(atoms : Atoms, program : str):
         atoms.set_constraint(c)
 
 
-def edit_files_for_restart(program : str, calc_type : str, indices : list):
+def edit_files_for_restart(program : str, paths : list[str]):
     '''
     Edit the input files, setting the correct flags for restart.
 
     Args:
     - program: DFT program. Possible values: 'espresso' or 'vasp'
-    - calc_type: 'SCREENING' or 'RELAX'
-    - indices_list: indices of the calculations
+    - paths: list of paths of the input files to be edited
     '''
 
-    for index in indices:
+    for path in paths:
         if program == 'espresso':
-            with open(IN_FILE_PATHS[calc_type][program].format(index), 'r') as f:
+            with open(path, 'r') as f:
                 lines = f.readlines()
                 for i, line in enumerate(lines):
                     if 'from_scratch' in line:
                         lines[i] = lines[i].replace('from_scratch','restart')
                         break
-            with open(IN_FILE_PATHS[calc_type][program].format(index), 'w') as f:
+            with open(path, 'w') as f:
                 f.writelines(lines)
 
         elif program == 'vasp':
-            poscar = IN_FILE_PATHS[calc_type][program].format(index)
+            poscar = path
             contcar = poscar.replace('POSCAR', 'CONTCAR')
             incar = poscar.replace('POSCAR', 'INCAR')
             outcar = poscar.replace('POSCAR', 'OUTCAR')

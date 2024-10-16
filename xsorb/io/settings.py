@@ -37,11 +37,14 @@ class InputParams:
     jobscript_ml_path: Optional[str]
     submit_command_ml: Optional[str]
     jobname_prefix: str = ''
+    total_e_slab_mol = None
 
     def __post_init__(self):
         if self.E_slab_mol is not None:
             if len(self.E_slab_mol) != 2:
                 raise ValueError("E_slab_mol must be a list of two floats.")
+            self.total_e_slab_mol = self.E_slab_mol[0] + self.E_slab_mol[1]
+
 
         if self.jobscript_ml_path is not None and self.submit_command_ml is None:
             raise ValueError("jobscript_ml_path is provided but submit_command_ml is not.")

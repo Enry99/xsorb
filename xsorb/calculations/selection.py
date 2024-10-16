@@ -67,7 +67,7 @@ def obtain_calc_indices(*,
 
     if n_configs is None and threshold is None:
         #just return the indices of all the configurations
-        rows = Database.get_calculations(calc_type=calc_type,
+        rows, _ = Database.get_calculations(calc_type=calc_type,
                                         exclude_ids=excluded_calc_ids,
                                         columns=['calc_id'],
                                         include_data=False)
@@ -86,7 +86,7 @@ def obtain_calc_indices(*,
     #select only rows that have energy
     selections = ['energy,bonds!=None', 'energy,bonds=None'] if separate_chem_phys else ['energy']
     for selection in selections:
-        rows = Database.get_calculations(calc_type=calc_type,
+        rows, _ = Database.get_calculations(calc_type=calc_type,
                                         selection=selection,
                                         exclude_ids=excluded_calc_ids,
                                         columns=['energy', 'calc_id', 'site'],
@@ -124,10 +124,10 @@ def get_adsorption_structures(calc_ids : list[int] | None = None,
     '''
 
     #get structures from database
-    rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
+    rows, _ = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
 
     if get_structures_from == 'ml_opt':
-        rows_original = Database.get_calculations(calc_type='structures',
+        rows_original, _ = Database.get_calculations(calc_type='structures',
                                                   calc_ids=calc_ids,
                                                   include_data=False)
         constraints = [row.constraints for row in rows_original]
