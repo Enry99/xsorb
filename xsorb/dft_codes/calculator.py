@@ -142,7 +142,9 @@ def write_file_with_Calculator(atoms : Atoms,
 def adjust_constraints(atoms : Atoms, program : str):
 
     if program == 'vasp':
-        c = [FixScaled(atoms.cell, constr.a, ~constr.mask) for constr in atoms.constraints] #atoms.constraints are FixCartesian
+        #convert from FixCartesian to FixScaled
+        c = [FixScaled(a=constr.a, mask=constr.mask) \
+             for constr in atoms.constraints]
         atoms.set_constraint(c)
 
 

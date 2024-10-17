@@ -72,8 +72,8 @@ class Molecule:
         if fixed_indices_mol:
             if -1 in fixed_indices_mol:
                 fixed_indices_mol = list(range(len(self.mol_ase)))
-            c = [FixCartesian(idx, mask=[not x for x in fix_mol_xyz]) for idx in fixed_indices_mol]
-                #we need to negate: in qe 0 = fix, here 1(true)=fix
+            c = [FixCartesian(idx, mask=fix_mol_xyz) for idx in fixed_indices_mol]
+                #True = fixed, False = free
             self.mol_ase.set_constraint(c)
         else: self.mol_ase.set_constraint() #clean possible constraints read from file
         ###############################################################

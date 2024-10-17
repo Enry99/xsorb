@@ -8,13 +8,11 @@ xsorb/dft_codes:                sistemare tutto
 
 xsorb/io/*:                     OK
 
-xsorb/structures/*:             sistema dz
+xsorb/structures/*:             OK
 
 xsorb/visualize:                aggiungi modulo generazione immagini
 
 
-
-TODO: bump to ase 3.23 (need to modify ase_custom and also the constraints everywhere in the code, also read OUTCAR instead of vasprun.xml)
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
 #TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 

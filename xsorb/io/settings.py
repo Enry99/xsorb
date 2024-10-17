@@ -173,8 +173,8 @@ class ConstraintsParams:
     fixed_indices_slab: Optional[list[int]]
     fixed_indices_mol: Optional[list[int]]
     layers_height: float = 0.5
-    fix_slab_xyz: list[int] = field(default_factory=lambda: [0, 0, 0])
-    fix_mol_xyz: list[int] = field(default_factory=lambda: [0, 0, 1])
+    fix_slab_xyz: list[bool] = field(default_factory=lambda: [True,True,True])
+    fix_mol_xyz: list[bool] = field(default_factory=lambda: [True,True,False])
     fix_slab_preopt: bool = False
 
     def __post_init__(self):

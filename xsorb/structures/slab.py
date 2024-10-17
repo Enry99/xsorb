@@ -95,8 +95,8 @@ class Slab:
                 fixed_atoms_indices = list(range(self.natoms))
             fixed_atoms_indices = fixed_indices_slab
 
-        c = [FixCartesian(atom_index, mask=[not x for x in fix_slab_xyz]) \
-             for atom_index in fixed_atoms_indices]  #negate: in qe 0 = fix, here 1(true)=fix
+        c = [FixCartesian(atom_index, mask=fix_slab_xyz) \
+             for atom_index in fixed_atoms_indices] #True = fix, False = free
         self.slab_ase.set_constraint(c) #if no user-defined constraints, c is empty.
         #This is necessary to clean possible constraints read from file
         ###############################################################
