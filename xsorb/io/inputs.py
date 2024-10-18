@@ -208,7 +208,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
     return written_systems
 
 
-def saveas(calc_type : str, i_or_f : str, saveas_format : str):
+def saveas(calc_type : str, saveas_format : str):
     '''
     Save all the configurations in a different format, e.g. xyz or cif.
     If initial, the configurations are read from structures.db, and correspond
@@ -222,8 +222,6 @@ def saveas(calc_type : str, i_or_f : str, saveas_format : str):
 
     if calc_type not in ('initial','screening', 'relax', 'ml_opt'):
         raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'ml_opt'")
-    if i_or_f not in ('i', 'f'):
-        raise RuntimeError(f"Wrong '{i_or_f}', expected 'i' or 'f'")
 
     folder = Path(f"{calc_type}/{saveas_format}")
 

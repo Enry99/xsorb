@@ -10,10 +10,10 @@ xsorb/io/*:                     OK
 
 xsorb/structures/*:             OK
 
-xsorb/visualize:                aggiungi modulo generazione immagini
+xsorb/visualize/*:              OK
 
 
-THEN: images, dftcodes, parser(subparser).
+THEN: dftcodes, parser(subparser).
 FINALLY: xfrag.
 
 

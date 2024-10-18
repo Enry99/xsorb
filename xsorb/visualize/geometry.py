@@ -1,5 +1,7 @@
 '''
-Module to plot the adsorption sites and molecule rotations
+Module to plot the adsorption sites and molecule rotations.
+Not to be called directly, but during the generation of the structures
+or by other "launcher" functions that are directly called by the cli commands.
 
 '''
 

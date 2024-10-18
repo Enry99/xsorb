@@ -15,6 +15,7 @@ The calculation databases have the following columns:
 - constraints (list): list of constraints applied to the structure. May not be there
 - energy (float): total energy of the structure. May not be there
 - status (str): status of the calculation (incomplete, completed)
+- scf_nonconverged (bool): True if the SCF did not converge
 - job_id (int): id of the job in the scheduler
 - job_status (str): status of the job in the scheduler
 - in_file_path (str): path to the input file
@@ -26,7 +27,10 @@ The calculation databases have the following columns:
 - bonds (list): list of bonds in the structure
 - final_dz (float): final vertical distance between the reference atom of the molecule
     and the adsorption site
-- data (dict): dictionary with additional data, namely the AdsorptionStructure object
+- data (dict): dictionary with additional data, namely
+    -the AdsorptionStructure object,
+    -the 'trajectory'
+    -the 'adsorption_energy_evolution'
     and the AdsorptionStructure.additional_data_arrays():
     - slab_indices
     - mol_indices
@@ -233,12 +237,14 @@ class Database:
             Database.write_csvfile()
 
     @staticmethod
-    def get_structures(calc_ids : list[int] | None = None) -> list:
+    def get_structures(calc_ids : list[int] | int | None = None) -> list:
         '''
         Get the structures from the structures database
 
         Args:
-        - calc_ids: list of integers with the ids of the structures to be included
+        - calc_ids: list of integers with the ids of the structures to be included,
+            or a single integer with the id of the structure to be included.
+            If None, all the structures are included
 
         Returns:
         - list of rows
@@ -246,6 +252,8 @@ class Database:
         with ase.db.connect('structures.db') as db:
             rows = db.select(include_data=False)
         if calc_ids:
+            if isinstance(calc_ids, int):
+                calc_ids = [calc_ids]
             rows = [row for row in rows if row.id in calc_ids]
 
         return rows
@@ -254,7 +262,7 @@ class Database:
     @staticmethod
     def get_calculations(calc_type : str,
                          selection : str | None = None,
-                         calc_ids : list[int] | None = None,
+                         calc_ids : list[int] | int | None = None,
                          exclude_ids : list[int] | None = None,
                          columns : list[str] | str = 'all',
                          sort_key : str | None = None,
@@ -266,7 +274,9 @@ class Database:
         Args:
         - calc_type: string with the type of calculation
         - selection: string with the selection criteria (e.g. 'status=completed')
-        - calc_ids: list of integers with the ids of the calculations to be included
+        - calc_ids: list of integers with the ids of the calculations to be included,
+            or a single integer with the id of the calculation to be included.
+            If None, all the calculations are included
         - exclude_ids: list of integers with the ids of the calculations to be excluded
         - columns: list of strings with the columns to be included
         - sort_key: string with the key to sort the rows, e.g. 'energy'
@@ -286,6 +296,8 @@ class Database:
                              sort=sort_key,
                              include_data=include_data)
         if calc_ids:
+            if isinstance(calc_ids, int):
+                calc_ids = [calc_ids]
             rows = [row for row in rows if row.calc_id in calc_ids]
         if exclude_ids:
             rows = [row for row in rows if row.calc_id not in exclude_ids]
