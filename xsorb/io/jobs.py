@@ -1,6 +1,12 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 '''
 Module for launching the calculations
 '''
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import os

@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 '''
 Module that contains the class AdsorptionStructuresGenerator,
 used to generate the adsorption structures

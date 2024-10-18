@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
+
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 

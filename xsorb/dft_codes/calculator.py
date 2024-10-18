@@ -1,8 +1,15 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 """
 DFT CODE (and ML)-specific functions
 to write the input files for the calculations
 
 """
+
+from __future__ import annotations
 
 import shutil
 import glob
@@ -39,7 +46,7 @@ class MLFakeCalculator:
         creating the directory if it does not exist
         '''
         self.directory.mkdir(exist_ok=True, parents=True)
-        write(atoms, self.directory / f'{self.label}.xyz')
+        write(self.directory / f'{self.label}.xyz', atoms)
 
 
 def setup_Espresso_calculator(atoms : Atoms,

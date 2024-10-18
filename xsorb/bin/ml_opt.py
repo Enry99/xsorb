@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 '''
 Script to optimize a structure using a ML calculator.
 '''

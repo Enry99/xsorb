@@ -1,7 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 '''
 General utility functions for the I/O module
 '''
 
+from __future__ import annotations
 import time
 import math
 

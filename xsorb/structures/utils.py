@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 '''
 Small module with utility functions for structures
 '''
 
 from __future__ import annotations
-from typing import Iterable, TYPE_CHECKING
 
 from ase import Atoms
 from ase.constraints import FixCartesian

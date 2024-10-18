@@ -1,5 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+# Credit to original ASE code: https://wiki.fysik.dtu.dk/ase/
+
 '''
-Custom module to handle arrows in ase.io.pov
+Custom module to handle arrows in ase.io.pov, and to change fog and color styles
 '''
 
 import os
@@ -26,7 +32,7 @@ def POVRAYInit(self, cell, cell_vertices, positions, diameters, colors,
                  depth_cueing=False, cue_density=5e-3,
                  celllinewidth=0.05, bondlinewidth=0.10, bondatoms=[],
                  exportconstraints=False,
-                 arrows : list = None):
+                 arrows=None):
     """
     Mod to ase.io.pov.POVRAY.__init__ with arrows
 
@@ -200,7 +206,7 @@ def from_PlottingVariables(cls, pvars, **kwargs):
 def PlottingVariablesInit(self, atoms, rotation='', show_unit_cell=2,
                  radii=None, bbox=None, colors=None, scale=20,
                  maxwidth=500, extra_offset=(0., 0.),
-                arrows_type : str = None):
+                arrows_type=None):
     '''
     Custom init to ase.io.utils.PlottingVariables
     to handle arrows

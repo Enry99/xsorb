@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 '''
 Constants related to DFT codes and their usage in the workflow,
 such as file paths, completion checks, etc.

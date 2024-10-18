@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 """
 Created on Tue 28 Feb 2023
 @author: Enrico Pedretti
@@ -6,6 +11,7 @@ Main functions to launch the various types of calculations.
 
 """
 
+from __future__ import annotations
 import sys
 
 import numpy as np

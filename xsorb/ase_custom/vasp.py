@@ -1,4 +1,13 @@
-#add resorting for poscar if ase-sort.dat is preset
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+# Credit to original ASE code: https://wiki.fysik.dtu.dk/ase/
+
+
+'''
+Mod to ase.io.vasp.read_vasp to add resorting for poscar if ase-sort.dat is preset
+'''
 
 from pathlib import Path
 import re

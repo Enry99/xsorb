@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+# Credit to original ASE code: https://wiki.fysik.dtu.dk/ase/
+
 '''
 Redefinition of the ase.Atoms class to:
 - include custom labels for the atoms, obtainable with get_custom_labels()

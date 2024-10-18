@@ -18,7 +18,7 @@ from pymatgen.core.bonds import CovalentBond
 from ase.constraints import FixCartesian
 
 from xsorb.io.utils import ase_custom_read as read
-from xsorb.visualize.geometry import save_rotations_images
+from xsorb.visualize.plot import plot_rotations_images
 from xsorb.structures.properties import MoleculeRotation, SurroundingSite
 
 
@@ -217,6 +217,6 @@ class Molecule:
             print('All molecular configurations generated.')
 
         if save_image:
-            save_rotations_images(mol_rotations_ase, verbose=True)
+            plot_rotations_images(mol_rotations_ase, verbose=True)
 
         return mol_rotations_ase

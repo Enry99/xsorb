@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# Author: Enrico Pedretti
+
 """
 Collection of functions for generating images that
 are called from the command line.
@@ -17,7 +19,8 @@ from ase.visualize import view
 from xsorb.io import Settings, Database
 from xsorb.structures import Slab
 from xsorb.visualize.render import render_image
-from xsorb.visualize.utils import get_centered_mol_and_slab, plot_overview_grid, read_custom_colors
+from xsorb.visualize.plot import plot_overview_grid
+from xsorb.visualize.utils import get_centered_mol_and_slab, read_custom_colors
 from xsorb.io.utils import progressbar
 
 
@@ -208,6 +211,12 @@ def view_config(calc_type : str, calc_id : int):
 
 
 def plot_energy_evolution(calc_type : str):
+    '''
+    Plot the energy evolution during optimization for all the configurations
+
+    Args:
+    - calc_type: 'screening','preopt','relax','ml_opt'
+    '''
 
     from matplotlib import pyplot as plt
     import numpy as np

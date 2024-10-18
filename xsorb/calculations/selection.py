@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+
 '''
 Module with the functions to select the configurations for subsequent calculations
 (both from the screening and from the ML optimization)

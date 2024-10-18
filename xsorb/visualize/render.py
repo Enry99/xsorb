@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# Author: Enrico Pedretti
+
 #This is a modified version of the render_image function from the xplot package,
 #and will be sometimes updated/syncronized with it (they are basically the same).
 #Now by putting this render_image as an isolated function it is very easy to

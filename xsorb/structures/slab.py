@@ -26,7 +26,7 @@ from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
 from xsorb.io.utils import ase_custom_read as read
-from xsorb.visualize.geometry import save_adsites_image
+from xsorb.visualize.plot import plot_adsites_image
 from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteCrystal, \
     AdsorptionSiteAmorphous, SurroundingSite
 
@@ -343,7 +343,7 @@ class Slab:
             print('Adsorption sites found.')
 
         if save_image: #save png to visualize the identified sites
-            save_adsites_image(mode='high_symmetry',
+            plot_adsites_image(mode='high_symmetry',
                                adsites=all_adsites,
                                slab_pymat=self.slab_pymat,
                                figname=figname,
@@ -607,7 +607,7 @@ class Slab:
 
 
         if save_image: #save png to visualize the identified sites
-            save_adsites_image(
+            plot_adsites_image(
                 mode='coord_number_surrounding' if include_surrounding_sites else 'coord_number',
                 adsites=all_adsites,
                 slab_pymat=self.slab_pymat,

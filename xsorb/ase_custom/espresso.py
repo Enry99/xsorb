@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Author: Enrico Pedretti
+# Credit to original ASE code: https://wiki.fysik.dtu.dk/ase/
+
 '''
 Module to customize the ASE interface to Quantum Espresso.
 It includes custom labels for atoms, and the ability to pass through pseudopotentials.
