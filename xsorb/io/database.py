@@ -71,7 +71,7 @@ class Database:
 
     @staticmethod
     def add_structures(adsorption_structures : list [AdsorptionStructure],
-                       write_csv : bool = True) -> None:
+                       write_csv : bool = True) -> list[int]:
         '''
         Adds the generated adsorption structures to the structures database,
         returning the corresponding calc_ids
@@ -111,8 +111,8 @@ class Database:
     def add_calculations(systems : list [WrittenSystem],
                          program : str,
                          mult : float,
-                         total_e_slab_mol : float | None = None,
-                         calc_type : str = None) -> None:
+                         total_e_slab_mol : float | None,
+                         calc_type : str) -> None:
         '''
         Write new calculations to corresponding database
 
@@ -202,7 +202,7 @@ class Database:
                                      log_file_path=row.get('log_file_path'),
                                      job_id=row.get('job_id'),
                                      adsite_z=row.data.adsorption_structure.adsite.coords[2],
-                                     mol_ref_idx=row.data.adsorption_structure.mol_rot.ref_idx)
+                                     mol_ref_idx=row.data.adsorption_structure.mol_rot.mol_atom)
                                         for row in rows]
 
             #Get the results of the calculations
@@ -313,7 +313,7 @@ class Database:
 
 
     @staticmethod
-    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[int]) -> None:
+    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[str]) -> None:
         '''
         Add the job ids to the corresponding database
 
@@ -401,12 +401,12 @@ class Database:
         print('Writing results file...')
 
         # Get the data from the database
-        info_dicts = []
+        info_dicts : list[dict] = []
         with ase.db.connect('structures.db') as db:
             for i, row in db.select(include_data=False):
                 info_dict = {'calc_id': row.id}
-                for key in AdsorptionStructure.dataframe_column_names:
-                    info_dict.update(key, row.get(key))
+                for key in AdsorptionStructure.dataframe_column_names():
+                    info_dict.update({key: row.get(key)})
                 info_dicts.append(info_dict)
 
         last_calc_e_column_name = None
@@ -434,14 +434,14 @@ class Database:
                                     print(f'Warning! {calc_type} {info_dict["calc_id"]} '\
                                           'has not reached final configuration. '\
                                             'The energy will be marked with a *')
-                            info_dicts[i].update(f'Eads_{calc_type[:3]}(eV)', eads)
-                            info_dicts[i].update('bonds', row.get('bonds'))
-                            info_dicts[i].update('final_dz', row.get('final_dz'))
+                            info_dicts[i].update({f'Eads_{calc_type[:3]}(eV)': eads})
+                            info_dicts[i].update({'bonds': row.get('bonds')})
+                            info_dicts[i].update({'final_dz': row.get('final_dz')})
 
                     last_calc_e_column_name = f'Eads_{calc_type[:3]}(eV)'
 
         # Write csv file
-        df = pd.DataFrame(columns=['calc_id'] + AdsorptionStructure.dataframe_column_names)
+        df = pd.DataFrame(columns=['calc_id'] + AdsorptionStructure.dataframe_column_names())
         for info_dict in info_dicts:
             df_line = pd.Series(info_dict)
             df.loc[i] = df_line

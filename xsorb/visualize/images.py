@@ -9,49 +9,60 @@ Collection of functions for generating images
 """
 
 import numpy as np
-import glob, os, shutil
+import os
+import shutil
+from dataclasses import asdict
+
 from ase import Atoms
 from ase.visualize import view
 from ase.io.pov import get_bondpairs
 from ase.io import read, write
-from xsorbed.slab import Slab
-from xsorbed.molecule import Molecule
-from xsorbed.settings import Settings
-from xsorbed.io_utils import get_calculations_results, _get_configurations_numbers, get_calculations_results_ml
-from xsorbed.dftcode_specific import IN_FILE_PATHS, OUT_FILE_PATHS
-from xsorbed.common_definitions import *
+
+from xsorb.io import Settings
+from xsorb.structures import Slab, Molecule
 
 
-def plot_adsorption_sites(ALL : bool = False):
+def plot_adsorption_sites(all_sites : bool = False):
     '''
-    Plot an image of the surface with the adsorption sites, with parameters
-    according to settings.in
+    Plot an image of the surface with the adsorption sites.
 
     Args:
-    - ALL: if True, plot all sites ignoring symm_reduce  
+    - all_sites: if True, plot all sites ignoring symm_reduce and selected_sites
     '''
 
-    settings = Settings(read_energies=False)
+    settings = Settings()
 
-    slab = Slab(slab_filename=settings.slab_filename, 
-                surface_sites_height=settings.surface_height, 
-                sort_atoms_by_z=settings.sort_atoms_by_z,
-                translate_slab_from_below_cell_bottom=settings.translate_slab)
+    slab = Slab(slab_filename=settings.input.slab_filename,
+            surface_thickness=settings.structure.adsorption_sites.surface_thickness,
+            layers_threshold=settings.structure.constraints.layers_height,
+            sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,
+            translate_slab_from_below_cell_bottom=settings.structure.misc.translate_slab)
 
-    import copy
-    sites_find_args = copy.deepcopy(settings.sites_find_args)
-    if ALL and 'symm_reduce' in sites_find_args: sites_find_args['symm_reduce'] = 0
-    
-    slab.find_adsorption_sites(crystal = not settings.amorphous_site_finding,
-                               **settings.sites_find_args,
-                               selected_sites = None if ALL else settings.selected_sites,
-                               save_image = True,
-                               figname = 'adsorption_sites_all.png' if ALL else 'adsorption_sites.png',
-                               VERBOSE = True)
+    #Find adsorption sites and labels (site type and x,y coords.)
+    sites_settings = settings.structure.adsorption_sites
+
+    if all_sites:
+        if sites_settings.high_symmetry_params:
+            sites_settings.high_symmetry_params.symm_reduce = 0.0
+        sites_settings.selected_sites = None
+
+    mode_params = {
+        'high_symmetry': sites_settings.high_symmetry_params,
+        'coord_number': sites_settings.coord_number_params,}
+    mode = sites_settings.mode
+    if mode not in mode_params:
+        raise ValueError(f"mode must be one of {mode_params.keys()}")
+
+    slab.find_adsorption_sites(
+        mode=mode,
+        **asdict(mode_params[mode]),
+        selected_sites=sites_settings.selected_sites,
+        save_image=True,
+        verbose=True)
 
 
 def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : bool = False):
-    
+
     settings = Settings()
 
     print('Reading files...')
@@ -61,7 +72,7 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
     else: index='-1'
 
     if i_or_f == 'i': #read from input file
-        
+
         results = None
         calc_indices = [i for i in _get_configurations_numbers() if os.path.isfile(IN_FILE_PATHS[calc_type][settings.program].format(i))]
         configs = [read(IN_FILE_PATHS[calc_type][settings.program].format(i)) for i in calc_indices]
@@ -78,25 +89,25 @@ def get_data_for_config_images(calc_type : str, i_or_f = 'f', read_evolution : b
         else:
             configs = [read(OUT_FILE_PATHS[calc_type][settings.program].format(i), index=index) for i in calc_indices]
 
-    
-    #read slab and mol 
-    slab = Slab(slab_filename=settings.slab_filename, 
-                layers_threshold=settings.layers_height, 
-                surface_sites_height=settings.surface_height, 
-                fixed_layers_slab=settings.fixed_layers_slab, 
-                fixed_indices_slab=settings.fixed_indices_slab, 
+
+    #read slab and mol
+    slab = Slab(slab_filename=settings.slab_filename,
+                layers_threshold=settings.layers_height,
+                surface_sites_height=settings.surface_height,
+                fixed_layers_slab=settings.fixed_layers_slab,
+                fixed_indices_slab=settings.fixed_indices_slab,
                 fix_slab_xyz=settings.fix_slab_xyz,
                 sort_atoms_by_z=settings.sort_atoms_by_z,
                 translate_slab_from_below_cell_bottom=settings.translate_slab)
 
     mol = Molecule(molecule_filename=settings.molecule_filename,
                    atom_index=settings.selected_atom_index,
-                   molecule_axis_atoms=settings.molecule_axis_atoms, 
-                   axis_vector=settings.axis_vector, 
-                   atoms_subset=settings.mol_subset_atoms, 
-                   fixed_indices_mol=settings.fixed_indices_mol, 
+                   molecule_axis_atoms=settings.molecule_axis_atoms,
+                   axis_vector=settings.axis_vector,
+                   atoms_subset=settings.mol_subset_atoms,
+                   fixed_indices_mol=settings.fixed_indices_mol,
                    fix_mol_xyz=settings.fix_mol_xyz)
-    
+
 
     mol_atoms_indices = np.arange(mol.natoms) if settings.mol_before_slab else np.arange(mol.natoms) + slab.natoms
     slab_atoms_indices = np.arange(slab.natoms) if not settings.mol_before_slab else np.arange(slab.natoms) + mol.natoms
@@ -171,7 +182,7 @@ def get_centered_mol_and_slab(mol : Atoms, slab : Atoms):
     n_components, component_list = sparse.csgraph.connected_components(cmatrix)
     molecules_indices = [ [ atom_id for atom_id in range(len(component_list)) if component_list[atom_id] == molecule_id ] \
                             for molecule_id in range(n_components) ]
-    
+
     #find the molecule with the highest number of atoms (which is therefore fully connected)
     max_molecule_idx = np.argmax([len(molecule) for molecule in molecules_indices])
     mol_replicated = mol_replicated[molecules_indices[max_molecule_idx]]
@@ -191,17 +202,17 @@ def get_centered_mol_and_slab(mol : Atoms, slab : Atoms):
     return mol, slab, mol_center
 
 
-def get_decorated_structures(configs : list, 
-                             mol_atoms_indices : list, 
+def get_decorated_structures(configs : list,
+                             mol_atoms_indices : list,
                              slab_atoms_indices : list,
                              ATOM_COLORS_SLAB : list,
-                             ATOM_COLORS_MOL : list, 
-                             center_molecule : bool = False, 
+                             ATOM_COLORS_MOL : list,
+                             center_molecule : bool = False,
                              depth_cueing : float = None,
                              cut_vacuum : bool = False):
 
     cut_height = 3 #cut empty cell to this height above the highest atom
-    
+
     newconfigs = []
     colors_list = []
     colors_depthcued_list = []
@@ -211,15 +222,15 @@ def get_decorated_structures(configs : list,
     for config in configs:
 
         if isinstance(config, list): #for full evolution
-        
+
             newconfigs.append([])
             first_frame = True
 
             for config_j in config:
-            
+
                 mol = config_j[mol_atoms_indices]
                 slab = config_j[slab_atoms_indices]
-                if cut_vacuum: 
+                if cut_vacuum:
                     slab.cell[2][2] = np.max(config_j.positions[:,2]) + cut_height
                     if not center_molecule: first_frame = False
                 Nslab = len(slab)
@@ -236,27 +247,27 @@ def get_decorated_structures(configs : list,
                     mol.wrap()
                     slab.wrap()
 
-                newconfigs[-1].append(slab + mol) 
-    
+                newconfigs[-1].append(slab + mol)
+
         else: #for just single configurations
 
             mol = config[mol_atoms_indices]
             slab = config[slab_atoms_indices]
-            if cut_vacuum: 
+            if cut_vacuum:
                 slab.cell[2][2] = np.max([atom.z for atom in config]) + cut_height
             Nslab = len(slab)
 
-            if(center_molecule): 
+            if(center_molecule):
                 mol, slab, _ = get_centered_mol_and_slab(mol, slab)
-                
+
             newconfigs.append(slab + mol)
 
-        
+
         colors = [ ATOM_COLORS_SLAB[atom.number] if atom.index < Nslab else ATOM_COLORS_MOL[atom.number] for atom in config]
         colors_depthcued = colors.copy()
-        textures = ['ase3'] * (len(config))  
-        textures_depthcued = textures.copy() 
-    
+        textures = ['ase3'] * (len(config))
+        textures_depthcued = textures.copy()
+
 
         #fading color for lower layers in top view
         if (depth_cueing):
@@ -265,19 +276,19 @@ def get_decorated_structures(configs : list,
             delta = zmax - zmin
             if depth_cueing < 0:
                 raise ValueError("depth_cueing_intensity must be >=0.")
-            for atom in config[np.arange(Nslab)]:       
+            for atom in config[np.arange(Nslab)]:
                 r,g,b = colors[atom.index] + (np.array([1,1,1]) - colors[atom.index])*(zmax - atom.z)/delta * depth_cueing
                 if r>1: r=1
                 if g>1: g=1
                 if b>1: b=1
                 colors_depthcued[atom.index] = [r,g,b]
-            
+
             textures_depthcued = ['pale'] * Nslab + ['ase3'] * (len(config)-Nslab)
 
         colors_list.append(colors)
         colors_depthcued_list.append(colors_depthcued)
         textures_list.append(textures)
-        textures_depthcued_list.append(textures_depthcued) 
+        textures_depthcued_list.append(textures_depthcued)
 
     return newconfigs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list
 
@@ -288,7 +299,7 @@ def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, po
     import matplotlib.image as mpimg
 
     #calculate aspect ratio for one image:
-    img = mpimg.imread(f"{calc_type.lower()}_{calc_indices[0]}_{rot_label}{'_pov' if povray else ''}.png") 
+    img = mpimg.imread(f"{calc_type.lower()}_{calc_indices[0]}_{rot_label}{'_pov' if povray else ''}.png")
     ar = float(img.shape[1]) / float(img.shape[0]) #width/height
 
 
@@ -315,19 +326,19 @@ def plot_overview_grid(calc_type : str, rot_label : str, calc_indices : list, po
         #axes[i].add_artist(rect)
         #axes[i].text(0.04, 0.985 ...
         axes[i].text(0.045, 0.988, calc_index, fontsize = 3.5, transform=axes[i].transAxes, horizontalalignment="left", verticalalignment="top",
-            bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),) 
+            bbox=dict(boxstyle='square', linewidth=0.5, fc="w", ec="k"),)
             #fontsize = 4, color="black",horizontalalignment="left", verticalalignment="top")
         axes[i].set_xticks([])
         axes[i].set_yticks([])
     fig.savefig(f"{calc_type.lower()}_overview{'_pov' if povray else ''}.png", dpi=700, bbox_inches='tight')
 
 
-def config_images(calc_type : str, 
-                  i_or_f = 'f', 
-                  povray : bool = False, 
-                  width_res : int = None, 
-                  rotations : str = None, 
-                  center_molecule: bool = True, 
+def config_images(calc_type : str,
+                  i_or_f = 'f',
+                  povray : bool = False,
+                  width_res : int = None,
+                  rotations : str = None,
+                  center_molecule: bool = True,
                   depth_cueing : float = None,
                   cut_vacuum : bool = False):
 
@@ -336,12 +347,12 @@ def config_images(calc_type : str,
 
     configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
         CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images(calc_type, i_or_f)
-    
+
 
     if not configs:
         print("First step not completed for any configurations.")
         return
-    
+
 
     configs, colors_list, colors_depthcued_list, \
           textures_list, textures_depthcued_list = get_decorated_structures(configs=configs,
@@ -352,25 +363,25 @@ def config_images(calc_type : str,
                                                            center_molecule=center_molecule,
                                                            depth_cueing=depth_cueing,
                                                            cut_vacuum=cut_vacuum)
-    
+
 
     print('Saving images...')
 
     main_dir = os.getcwd()
-    
-    figures_dir = f"{calc_type.lower()}_{images_dirname}/{'initial' if i_or_f == 'i' else 'final'}"    
+
+    figures_dir = f"{calc_type.lower()}_{images_dirname}/{'initial' if i_or_f == 'i' else 'final'}"
     os.makedirs(figures_dir, exist_ok=True)
-    
-    os.chdir(figures_dir)     
+
+    os.chdir(figures_dir)
 
     import xsorbed.ase_custom #monkey patching
-    
+
     for i, config, colors, colors_depthcued, textures, textures_depthcued \
          in zip(calc_indices, configs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list):
 
 
-        if not rotations: #lateral, top, 
-            rot_list = ['-5z,-85x', ''] 
+        if not rotations: #lateral, top,
+            rot_list = ['-5z,-85x', '']
             rotations_labels = ['lateral', 'top', ]
             color_list = [colors, colors_depthcued]
             textures_list = [textures, textures_depthcued]
@@ -379,31 +390,31 @@ def config_images(calc_type : str,
             rotations_labels = [rotations.replace(',','_')]
             color_list = [colors_depthcued]
             textures_list = [textures_depthcued]
-        
+
         for rot, rot_label, color, texture in zip(rot_list, rotations_labels, color_list, textures_list):
 
             file_label = f"{calc_type.lower()}_{i}_{rot_label}{'_pov' if povray else ''}"
-            
+
             if(povray): #use POVray renderer (high quality, CPU intensive)
                 config_copy = config.copy()
                 #config_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
 
-                write(f'{file_label}.pov', 
-                    config, 
+                write(f'{file_label}.pov',
+                    config,
                     format='pov',
-                    radii = ATOMIC_RADIUS, 
+                    radii = ATOMIC_RADIUS,
                     rotation=rot,
                     colors=color,
-                    povray_settings=dict(canvas_width=width_res, 
-                                        celllinewidth=CELLLINEWIDTH, 
-                                        transparent=False, 
+                    povray_settings=dict(canvas_width=width_res,
+                                        celllinewidth=CELLLINEWIDTH,
+                                        transparent=False,
                                         camera_type='orthographic',
                                         textures = texture,
-                                        camera_dist=1, 
+                                        camera_dist=1,
                                         bondatoms=get_bondpairs(config_copy, radius=BOND_RADIUS),
                                         bondlinewidth=BOND_LINE_WIDTH,
                                         #area_light=[(2., 3., 40.), 'White', .7, .7, 3, 3],
-                                        )                                
+                                        )
                 ).render()
                 os.remove(f'{file_label}.pov')
                 os.remove(f'{file_label}.ini')
@@ -432,7 +443,7 @@ def view_config(calc_type : str, index : int, in_or_out : str):
     '''
 
     settings = Settings(read_energies=False)
-    
+
     if in_or_out == 'in':
         FILE_PATHS = IN_FILE_PATHS
     elif in_or_out == 'out':
@@ -448,18 +459,18 @@ def view_config(calc_type : str, index : int, in_or_out : str):
         view(config)
     except:
         print('It was not possible to read the requested configuration.')
-            
+
 
 def relax_animations(calc_type : str,
-                     povray : bool = False, 
-                     width_res : int = None, 
-                     center_molecule: bool = True, 
+                     povray : bool = False,
+                     width_res : int = None,
+                     center_molecule: bool = True,
                      depth_cueing : float = None,
                      cut_vacuum : bool = False):
 
 
     if width_res is None and povray: width_res = 500
-    
+
 
     if calc_type == 'PREOPT':
         configs, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
@@ -469,7 +480,7 @@ def relax_animations(calc_type : str,
             CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images('SCREENING', read_evolution=True)
     else: #screening + relax
         configs_scr, calc_indices_scr, _, _, _, _, _, _, _, _, _ = get_data_for_config_images('SCREENING', read_evolution=True)
-        
+
         configs_rel, calc_indices, results, ATOM_COLORS_SLAB, ATOM_COLORS_MOL, ATOMIC_RADIUS, BOND_RADIUS, BOND_LINE_WIDTH,\
             CELLLINEWIDTH, mol_atoms_indices, slab_atoms_indices = get_data_for_config_images('RELAX', read_evolution=True)
 
@@ -492,22 +503,22 @@ def relax_animations(calc_type : str,
                                                            center_molecule=center_molecule,
                                                            depth_cueing=depth_cueing,
                                                            cut_vacuum=cut_vacuum)
-    
+
 
 
 
     print('Generating animation(s)...')
 
-    
+
     savedir = f'relax_{images_dirname}' if calc_type != 'PREOPT' else f'preopt_{images_dirname}'
     os.makedirs(savedir, exist_ok=True)
 
-   
+
     os.chdir(savedir)
     cwd = os.getcwd()
 
     import xsorbed.ase_custom #monkey patching
-    
+
     for i, config, colors, colors_depthcued, textures, textures_depthcued \
         in zip(calc_indices, configs, colors_list, colors_depthcued_list, textures_list, textures_depthcued_list):
 
@@ -516,33 +527,33 @@ def relax_animations(calc_type : str,
 
             if os.path.isfile(f'relax_{config}_pov.mp4'):
                 print(f'relax_{config}_pov.mp4 already present. Skipping.')
-                continue      
-            
+                continue
+
             if os.path.exists('temp'):
                 shutil.rmtree('temp')
-            os.mkdir('temp')  
+            os.mkdir('temp')
             os.chdir('temp')
 
             for j, step in enumerate(config[:]):
-                
+
                 step_copy = step.copy()
                 #step_copy.set_pbc([0,0,0]) #to avoid drawing bonds with invisible replicas
-                write(f'step_{j:04d}.pov', 
-                    step_copy, 
+                write(f'step_{j:04d}.pov',
+                    step_copy,
                     format='pov',
-                    radii = ATOMIC_RADIUS, 
+                    radii = ATOMIC_RADIUS,
                     colors=colors,
-                    rotation='-5z,-85x', 
-                    povray_settings=dict(canvas_width=width_res, 
-                                        celllinewidth=CELLLINEWIDTH, 
-                                        transparent=False, 
+                    rotation='-5z,-85x',
+                    povray_settings=dict(canvas_width=width_res,
+                                        celllinewidth=CELLLINEWIDTH,
+                                        transparent=False,
                                         camera_type='orthographic',
                                         textures = textures,
-                                        camera_dist=1, 
+                                        camera_dist=1,
                                         bondatoms=get_bondpairs(step_copy, radius=BOND_RADIUS),
                                         bondlinewidth=BOND_LINE_WIDTH,
                                         #area_light=[(2., 3., 40.), 'White', .7, .7, 3, 3],
-                                        )   
+                                        )
                 ).render()
 
             os.chdir(cwd)
@@ -562,19 +573,19 @@ def plot_energy_evolution(calc_type : str):
 
     from matplotlib import pyplot as plt
     import numpy as np
-    
+
     settings = Settings()
 
     if calc_type == 'PREOPT':
         results = get_calculations_results_ml(
                                         full_evolution=True)
     else:
-        results = get_calculations_results(program=settings.program, 
+        results = get_calculations_results(program=settings.program,
                                         calc_type=calc_type,
                                         E_slab_mol=settings.E_slab_mol,
                                         full_evolution=True)
 
-    
+
     if 0 not in settings.E_slab_mol and calc_type != 'PREOPT':
         plt.axhline(y=0, linestyle='--', color='black', linewidth=1)
     for i_config, energy_array in results['energies'].items():
@@ -585,25 +596,25 @@ def plot_energy_evolution(calc_type : str):
                 status = ''
             elif calc_type != 'PREOPT' and results['scf_nonconverged'][i_config]:
                 status = '**'
-            else: 
+            else:
                 status = '*' #relax not completed, but scf converged
-            
+
             plt.plot(energy_array, '-', label=f'{i_config}: {energy_array[-1]:.2f}{status} eV')
 
-            if ('*' in status): 
+            if ('*' in status):
                 symbol = 'x' if status == '*' else '^'
                 color = 'black' if status == '*' else 'red'
                 plt.plot(len(energy_array)-1, energy_array[-1], symbol, color=color)
         else:
             print(f'Config. {i_config} job has not reached the first scf convergence. It will be skipped.')
-            
-    
+
+
     plt.title('Energy evolution during optimization')
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')
-    plt.legend(title="Config, energy", 
-               ncols=np.ceil(len([x for x in results['energies'].values() if x is not None])/10), 
+    plt.legend(title="Config, energy",
+               ncols=np.ceil(len([x for x in results['energies'].values() if x is not None])/10),
                prop={'size': 6  if (calc_type == 'SCREENING' or calc_type=='PREOPT') else 8})
     energy_plot_filename = f'{calc_type.lower()}_energies.png'
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')

@@ -9,6 +9,7 @@ Module that contains the class Molecule, used to read a molecule from file and
 generate the rotations
 """
 
+from __future__ import annotations
 import warnings
 
 import numpy as np
@@ -52,7 +53,7 @@ class Molecule:
                  atoms_subset : list[int] | None = None,
                  break_bond_indices : list[int] | None = None,
                  fixed_indices_mol : list[int] | None = None,
-                 fix_mol_xyz : list[int] | None = None):
+                 fix_mol_xyz : list[bool] | None = None):
 
 
         self.mol_ase = read(molecule_filename)
@@ -135,7 +136,7 @@ class Molecule:
             which_index : int,
             x_rot_angles : list[float],
             y_rot_angles : list[float],
-            z_rot_angles : list[float] | list[SurroundingSite],
+            z_rot_angles : list[float|SurroundingSite],
             vert_angles_list : list[float] | None,
             individual_rotations : list[float] | None = None,
             surrounding_exclude_main : bool = False,
@@ -167,14 +168,14 @@ class Molecule:
         #just to enter the loop and generate the (only one) unmodified configuration,
         # useful if the argument was []
         if not x_rot_angles:
-            x_rot_angles = [0] #x_rot
+            x_rot_angles = [0.] #x_rot
         if not y_rot_angles:
-            y_rot_angles = [0] #y_rot
+            y_rot_angles = [0.] #y_rot
         if not z_rot_angles:
-            z_rot_angles = [0] #z_rot
+            z_rot_angles = [0.] #z_rot
 
         #build list of rotations (all combinations of x,y,z)
-        rotations_list = []
+        rotations_list : list[list[float|SurroundingSite]] = []
         for y_angle in y_rot_angles:
             if (int(y_angle) in [90, -90]): #special case, no further loops with x and z angles
                 # z rotation is equivalent to x rotation
@@ -210,7 +211,7 @@ class Molecule:
                                                       str(x_angle),
                                                       str(y_angle),
                                                       str(z_angle),
-                                                      which_index))
+                                                      mol_atom=which_index))
 
         if verbose:
             print('All molecular configurations generated.')

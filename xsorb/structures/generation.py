@@ -3,11 +3,11 @@ Module that contains the class AdsorptionStructuresGenerator,
 used to generate the adsorption structures
 '''
 
+from __future__ import annotations
 from dataclasses import asdict
 
 import numpy as np
 from ase import Atoms
-from ase.neighborlist import NeighborList
 from ase.geometry import get_distances
 from ase.data import covalent_radii
 from ase.data.vdw_alvarez import vdw_radii
@@ -16,8 +16,7 @@ from xsorb.io.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
 from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteAmorphous, \
-    MoleculeRotation, AdsorptionStructure
-
+    MoleculeRotation, AdsorptionStructure, SurroundingSite
 
 
 class AdsorptionStructuresGenerator:
@@ -108,7 +107,7 @@ class AdsorptionStructuresGenerator:
         if rot_mode == 'standard':
             if self.molecule_rotations is not None:
                 return self.molecule_rotations
-            z_rot_angles = structure_settings.molecule.z_rot_angles
+            z_rot_angles : list[float | SurroundingSite] = structure_settings.molecule.z_rot_angles
             surrounding_exclude_main = False
         else:
             if adsite is None:
@@ -154,13 +153,13 @@ class AdsorptionStructuresGenerator:
         mult = self.settings.structure.molecule.radius_scale_factor
 
         if mode == 'value':
-            radii = [min_distance]*len(covalent_radii)
+            radii = np.array([min_distance]*len(covalent_radii))
         elif mode == 'covalent_radius':
             radii = covalent_radii*mult
         elif mode == 'vdw_radius':
             radii = vdw_radii*mult
         else:
-            raise ValueError(f"mode must be one of 'value', 'covalent_radius', 'vdw_radius'")
+            raise ValueError("mode must be one of 'value', 'covalent_radius', 'vdw_radius'")
 
         dz_tot = 0
         molcopy = mol.copy()
@@ -220,7 +219,7 @@ class AdsorptionStructuresGenerator:
 
 
         mol = mol_rot.atoms.copy()
-        distance = 0
+        distance = 0.
 
         #place the molecule in the adsorption site, then translate it upwards by the target height
         mol.translate(adsite.coords)
@@ -243,7 +242,7 @@ class AdsorptionStructuresGenerator:
             slab_indices = list(range(len(mol), len(mol)+len(self.slab.slab_ase)))
             mol_indices = list(range(len(mol)))
         else:
-            atoms : Atoms = self.slab.slab_ase + mol
+            atoms = self.slab.slab_ase + mol
             slab_indices = list(range(len(self.slab.slab_ase)))
             mol_indices = list(range(len(self.slab.slab_ase), len(self.slab.slab_ase)+len(mol)))
         atoms.cell = self.slab.slab_ase.cell

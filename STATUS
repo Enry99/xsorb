@@ -13,9 +13,10 @@ xsorb/structures/*:             OK
 xsorb/visualize:                aggiungi modulo generazione immagini
 
 
-TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
-#TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
-
-THEN: do images, then do parser(subparser).
-THEN: check if everything works, bump ase to 3.23
+THEN: images, dftcodes, parser(subparser).
 FINALLY: xfrag.
+
+
+TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
+TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
+TODO: in xfrag, mettere plot istogrammi con tutte le combinazioni e colore dei bonds.

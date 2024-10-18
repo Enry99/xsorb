@@ -10,10 +10,12 @@ from ase import Atoms
 
 from xsorb.io.database import Database
 if TYPE_CHECKING:
-    from xsorb.structures import AdsorptionStructure
+    from xsorb.structures.properties import AdsorptionStructure
 
 
-def select_calculations(rows : list, n_configs : int = None, threshold : float = None) -> list:
+def select_calculations(rows : list,
+                        n_configs : int | None = None,
+                        threshold : float | None = None) -> list:
     '''
     Returns the indices of the configurations to be relaxed, according to the specified criteria.
 
@@ -43,10 +45,11 @@ def select_calculations(rows : list, n_configs : int = None, threshold : float =
 
 def obtain_calc_indices(*,
                         calc_type : str,
-                        n_configs: int = None,
-                        threshold : float = None,
-                        excluded_calc_ids : list = None,
+                        n_configs: int | None = None,
+                        threshold : float | None = None,
+                        excluded_calc_ids : list | None = None,
                         by_site : bool = False,
+                        by_mol_atom : bool = False,
                         separate_chem_phys : bool = False,
                         verbose : bool = True) -> list[int]:
     '''
@@ -61,6 +64,7 @@ def obtain_calc_indices(*,
         The configuration with E - Emin < threshold will be selected
     - excluded_calc_ids: indices of the configurations to be excluded
     - by_site: do the configuration identification separately for each site.
+    - by_mol_atom: do the configuration identification separately for each ref. atom of the molecule
     - separate_chem_phys: do the configuration identification separately
         for physisorption and chemisorption
     - verbose: print messages
@@ -97,21 +101,31 @@ def obtain_calc_indices(*,
                                         sort_key='energy',
                                         include_data=False)
 
-        if by_site:
-            for site in set(row.site for row in rows):
-                rows_site = [row for row in rows if row.site == site]
-                selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
+        if by_mol_atom:
+            for mol_atom in set(row.mol_atom for row in rows):
+                rows_mol_atom = [row for row in rows if row.mol_atom  == mol_atom]
 
+                if by_site:
+                    for site in set(row.site for row in rows_mol_atom):
+                        rows_site = [row for row in rows_mol_atom if row.site == site]
+                        selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
+                else:
+                    selected_calc_ids += select_calculations(rows_mol_atom, n_configs, threshold)
         else:
-            selected_calc_ids += select_calculations(rows, n_configs, threshold)
+            if by_site:
+                for site in set(row.site for row in rows):
+                    rows_site = [row for row in rows if row.site == site]
+                    selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
+            else:
+                selected_calc_ids += select_calculations(rows, n_configs, threshold)
 
     print(f'{calc_type} results collected.')
 
     return selected_calc_ids
 
 
-def get_adsorption_structures(calc_ids : list[int] | None = None,
-                              get_structures_from : bool = False) -> list[AdsorptionStructure]:
+def get_adsorption_structures(get_structures_from : str,
+                              calc_ids : list[int] | None = None) -> list[AdsorptionStructure]:
     '''
     Returns the a list of AdsorptionStructure objects, but with the atoms
     substituted with the ones from the previous calculation.

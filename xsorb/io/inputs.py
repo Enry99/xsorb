@@ -2,6 +2,7 @@
 Module for writing input files for the calculations
 '''
 
+from __future__ import annotations
 import shutil
 from pathlib import Path
 from dataclasses import dataclass
@@ -70,8 +71,10 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
     #Write the input files
     calc_type_for_writing = calc_type if calc_type is not None else 'screening'
-    if override_settings and program != 'ml':
-        dftsettings = override_dft_settings(settings, program=program, calc_type=calc_type)
+    if override_settings and program != 'ml' and calc_type is not None:
+        dftsettings = override_dft_settings(settings.dftprogram_settings_dict,
+                                            program=program,
+                                            calc_type=calc_type)
     else:
         dftsettings = settings.dftprogram_settings_dict
 
@@ -87,9 +90,9 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
         in_file_path = IN_FILE_PATHS[calc_type_for_writing][program].format(i)
         out_file_path = OUT_FILE_PATHS[calc_type_for_writing][program].format(i)
         log_file_path = LOG_FILE_PATHS[calc_type_for_writing][program].format(i)
-        file_dir = Path(in_file_path).parent
+        file_dir = Path(in_file_path).parent.as_posix()
 
-        if ask_before_overwrite and Path.exists(in_file_path) or Path.exists(out_file_path) \
+        if ask_before_overwrite and Path(in_file_path).exists() or Path(out_file_path).exists() \
             and not answer_all:
             answer = overwrite_question(f'{in_file_path} or {out_file_path}')
             if answer in ('yall', 'nall'): answer_all = True #pylint: disable=multiple-statements,invalid-name
@@ -179,12 +182,12 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
         if ml and system.calc_id is 'slab' and settings.structure.constraints.fix_slab_preopt:
             set_fixed_slab_constraints(atoms)
 
-        file_label = system.calc_id
+        file_label : str = system.calc_id
         in_file_path = system.in_file_path
         out_file_path = system.out_file_path
-        file_dir = Path(in_file_path).parent
+        file_dir = Path(in_file_path).parent.as_posix()
 
-        if ask_before_overwrite and Path.exists(in_file_path) or Path.exists(out_file_path) \
+        if ask_before_overwrite and Path(in_file_path).exists() or Path(out_file_path).exists() \
             and not answer_all:
             answer = overwrite_question(f'{in_file_path} or {out_file_path}')
             if answer in ('yall', 'nall'): answer_all = True #pylint: disable=multiple-statements,invalid-name
@@ -225,7 +228,7 @@ def saveas(calc_type : str, i_or_f : str, saveas_format : str):
     folder = Path(f"{calc_type}/{saveas_format}")
 
     print(f"Saving files to {folder}...")
-    folder.mkdir(folder, exist_ok=True, parents=True)
+    folder.mkdir(exist_ok=True, parents=True)
 
     if calc_type == 'initial':
         rows = Database.get_structures()

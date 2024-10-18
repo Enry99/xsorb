@@ -3,6 +3,7 @@ Module to store all the dataclasses that describe adsorption structures, sites a
 
 '''
 
+from __future__ import annotations
 from dataclasses import dataclass
 
 from ase import Atoms
@@ -34,7 +35,7 @@ class MoleculeRotation:
     xrot: str
     yrot: str
     zrot: str
-    ref_idx: int
+    mol_atom: int
 
     @property
     def unique_id(self):
@@ -44,7 +45,9 @@ class MoleculeRotation:
         return f"{self.xrot},{self.yrot},{self.zrot}"
 
     #define equality as the equality of the unique_id
-    def __eq__(self, other : 'MoleculeRotation') -> bool:
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, MoleculeRotation):
+            return NotImplemented
         return self.unique_id == other.unique_id
 
 
@@ -76,7 +79,9 @@ class AdsorptionSite:
         return "{0:.2f},{1:.2f},{2:.2f}".format(*self.coords) #pylint: disable=consider-using-f-string
 
     #define equality as the equality of the unique_id
-    def __eq__(self, other : 'AdsorptionSite') -> bool:
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, AdsorptionSite):
+            return NotImplemented
         return self.unique_id == other.unique_id
 
 
@@ -178,12 +183,11 @@ class AdsorptionStructure:
 
 
     @staticmethod
-    @property
     def dataframe_column_names():
         '''
         Returns the names of the columns of the AdsorptionStructure object
         '''
-        return ("site", "site_info", "x", "y", "z", "initial_dz", "xrot", "yrot", "zrot")
+        return ("site", "site_info", "mol_atom", "initial_dz", "xrot", "yrot", "zrot")
 
     def to_info_dict(self):
         """
@@ -191,9 +195,7 @@ class AdsorptionStructure:
         """
         infodict = {"site": self.adsite.label,
                     "site_info": self.adsite.info,
-                    "x": self.adsite.coords[0],
-                    "y": self.adsite.coords[1],
-                    "z": self.adsite.coords[2],
+                    "mol_atom": self.mol_rot.mol_atom,
                     "initial_dz": self.distance,
                     "xrot": self.mol_rot.xrot,
                     "yrot": self.mol_rot.yrot,
@@ -201,7 +203,7 @@ class AdsorptionStructure:
 
         #check that the keys are the same as the column names.
         #(to avoid introducing bugs when adding new columns in the code)
-        assert self.dataframe_column_names == tuple(infodict.keys())
+        assert self.dataframe_column_names() == tuple(infodict.keys())
 
         return infodict
 

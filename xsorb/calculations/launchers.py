@@ -110,13 +110,14 @@ def launch_ml_opt(save_image : bool = False,):
 
 
 def launch_final_relax(*,
-                       n_configs: int = None,
-                       threshold : float = None,
-                       calc_ids : list[int] = None,
-                       excluded_calc_ids : list[int] = None,
+                       n_configs: int | None = None,
+                       threshold : float | None = None,
+                       calc_ids : list[int] | None = None,
+                       excluded_calc_ids : list[int] | None = None,
                        take_from : str = 'screening',
                        relax_from_initial : bool = False,
                        by_site : bool = False,
+                       by_mol_idx : bool = False,
                        separate_chem_phys : bool = False):
     '''
     Reads/generates adsorption configurations, writes inputs and launches the
@@ -133,6 +134,7 @@ def launch_final_relax(*,
     - relax_from_initial: use the initial configuration as starting point for the relaxation
     - by_site: do the configuration identification separately for each site.
         One or more configuration for each site will be produced
+    - by_mol_atom: do the configuration identification separately for each molecule ref. atom.
     - separate_chem_phys: do the configuration identification separately
         for physisorption and chemisorption
     '''
@@ -170,6 +172,7 @@ def launch_final_relax(*,
                                        threshold=threshold,
                                        excluded_calc_ids=excluded_calc_ids,
                                        by_site=by_site,
+                                       by_mol_atom=by_mol_idx,
                                        separate_chem_phys=separate_chem_phys)
     else:
         #use the user-specified indices, exclude unwanted calculations
@@ -177,7 +180,7 @@ def launch_final_relax(*,
             calc_ids = [calc_id for calc_id in calc_ids if calc_id not in excluded_calc_ids]
 
     get_structures_from = 'structures' if relax_from_initial else take_from
-    adsorption_structures = get_adsorption_structures(calc_ids, get_structures_from)
+    adsorption_structures = get_adsorption_structures(get_structures_from, calc_ids)
 
     written_systems = write_inputs(adsorption_structures=adsorption_structures,
                                    settings=settings,

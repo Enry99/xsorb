@@ -2,6 +2,8 @@
 Small module with utility functions for structures
 '''
 
+from __future__ import annotations
+from typing import Iterable, TYPE_CHECKING
 
 from ase import Atoms
 from ase.constraints import FixCartesian

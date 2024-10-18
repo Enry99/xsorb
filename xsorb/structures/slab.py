@@ -9,6 +9,8 @@ Module that contains the Slab class, with the methods to find adsorption sites
 
 """
 
+from __future__ import annotations
+from typing import Callable
 import warnings
 from pathlib import Path
 
@@ -127,8 +129,10 @@ class Slab:
         - list of AdsorptionSite objects, containing the information about the adsorption sites.
         '''
 
-        modes = {'high_symmetry': self.find_adsorption_sites_high_symmetry,
-                 'coord_number': self.find_adsorption_sites_coord_number,}
+        modes: dict[str, Callable[..., list[AdsorptionSiteCrystal | AdsorptionSiteAmorphous]]] = {
+            'high_symmetry': self.find_adsorption_sites_high_symmetry,
+            'coord_number': self.find_adsorption_sites_coord_number,
+        }
 
         if mode not in modes:
             raise ValueError(f"mode must be one of {modes.keys()}")
@@ -137,7 +141,7 @@ class Slab:
 
 
     @staticmethod
-    def read_sites() -> list[AdsorptionSite]:
+    def read_sites() -> list[AdsorptionSiteCrystal | AdsorptionSiteAmorphous]:
         """
         Read already existing sites from previous calculations, stored in a sites.npy file
 
@@ -273,7 +277,7 @@ class Slab:
                 else:
                     raise ValueError('Invalid site type.')
 
-                all_adsites.append(AdsorptionSiteCrystal(label=i_site,
+                all_adsites.append(AdsorptionSiteCrystal(label=str(i_site),
                                                          coords=site_coords,
                                                          info=info))
                 i_site += 1

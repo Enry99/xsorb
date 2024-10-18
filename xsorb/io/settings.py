@@ -9,6 +9,7 @@ used to read the settings file and store the parameters.
 
 """
 
+from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 from pathlib import Path
@@ -202,7 +203,7 @@ class StructureParams:
     molecule: MoleculeParams
     constraints: ConstraintsParams = field(
         default_factory=lambda: ConstraintsParams(None, None, None))
-    misc: MiscParams = field(default_factory=MiscParams())
+    misc: MiscParams = MiscParams()
 
 
 
