@@ -13,7 +13,7 @@ import math
 
 from ase.io import read, write
 
-from xsorb.ase_custom import write_xyz_custom, AtomsCustom
+from xsorb.ase_custom import AtomsCustom
 
 
 def ase_custom_read(filename, **kwargs):

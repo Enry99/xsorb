@@ -14,12 +14,12 @@ import re
 
 import numpy as np
 import ase.io.espresso
-from ase.io.espresso import read_fortran_namelist, get_cell_parameters, ibrav_error_message, \
-    get_atomic_positions, get_atomic_species, convert_constraint_flags, label_to_symbol, units, \
-    kspacing_to_grid, kpts2sizeandoffsets, kpts2ndarray, Namelist, parse_position_line,\
-    _PW_START,_PW_END,_PW_CELL,_PW_POS,_PW_MAGMOM,_PW_FORCE, _PW_TOTEN,_PW_STRESS,_PW_FERMI,\
-    _PW_HIGHEST_OCCUPIED,_PW_HIGHEST_OCCUPIED_LOWEST_FREE,_PW_KPTS,_PW_BANDS,_PW_BANDSTRUCTURE,\
-    _PW_DIPOLE, _PW_DIPOLE_DIRECTION, kpoint_convert
+from ase.io.espresso import (read_fortran_namelist, get_cell_parameters, ibrav_error_message,
+    get_atomic_positions, get_atomic_species, convert_constraint_flags, label_to_symbol, units,
+    kspacing_to_grid, kpts2sizeandoffsets, kpts2ndarray, Namelist, parse_position_line,
+    _PW_START,_PW_END,_PW_CELL,_PW_POS,_PW_MAGMOM,_PW_FORCE, _PW_TOTEN,_PW_STRESS,_PW_FERMI,
+    _PW_HIGHEST_OCCUPIED,_PW_HIGHEST_OCCUPIED_LOWEST_FREE,_PW_KPTS,_PW_BANDS,_PW_BANDSTRUCTURE,
+    _PW_DIPOLE, _PW_DIPOLE_DIRECTION, kpoint_convert)
 from ase.calculators.singlepoint import SinglePointDFTCalculator,SinglePointKPoint
 from ase.utils import reader
 from ase import Atom

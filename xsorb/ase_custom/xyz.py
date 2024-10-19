@@ -11,8 +11,8 @@ Module to read and write extended XYZ files with custom labels
 import numpy as np
 import ase.io.extxyz
 from ase.constraints import FixAtoms, FixCartesian
-from ase.io.extxyz import XYZError, set_calc_and_arrays, key_val_str_to_dict, parse_properties, \
-    output_column_format, save_calc_results, voigt_6_to_full_3x3_stress
+from ase.io.extxyz import (XYZError, set_calc_and_arrays, key_val_str_to_dict, parse_properties,
+    output_column_format, save_calc_results, voigt_6_to_full_3x3_stress)
 from ase.utils import writer
 
 from xsorb.ase_custom.atoms import AtomsCustom

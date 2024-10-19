@@ -201,20 +201,43 @@ def launch_final_relax(*,
                 jobname_prefix=settings.input.jobname_prefix)
 
 
-def launch_isolated_slab_and_molecule(ml : bool, mol_only : bool = False):
+def launch_isolated_slab_and_molecule(ml : bool, mol_only : bool = False, samecell : bool = False):
     '''
     Launch the calculations for the isolated slab and molecule.
 
     Args:
     - ml: for machine learning calculations
+    - mol_only: only the molecule is launched
+    - samecell: use the same slab cell also for the molecule (to remove coverage effects)
     '''
 
     settings = Settings()
 
-    slab = read(settings.input.slab_filename) if not mol_only else None
+    slab = read(settings.input.slab_filename)
     mol = read(settings.input.molecule_filename)
 
-    written_systems = write_slab_mol_inputs(slab=slab, molecule=mol, settings=settings, ml=ml)
+    if slab.cell is None:
+        raise ValueError('The slab cell is not defined.')
+
+    if samecell:
+        mol.cell = slab.cell
+    elif not mol.cell:
+        positions = mol.positions
+        deltax = np.max(positions[:,0]) - np.min(positions[:,0])
+        deltay = np.max(positions[:,1]) - np.min(positions[:,1])
+        deltaz = np.max(positions[:,2]) - np.min(positions[:,2])
+
+        #large orthorombic cell
+        mol.cell = np.array([deltax, deltay, deltaz]) + np.array([10,10,10])
+
+    slab.pbc = True
+    mol.pbc = True
+
+
+    written_systems = write_slab_mol_inputs(slab=slab if not mol_only else None,
+                                            molecule=mol,
+                                            settings=settings,
+                                            ml=ml)
 
     launch_jobs(program=settings.program,
                 calc_type='isolated',

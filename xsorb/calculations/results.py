@@ -16,8 +16,8 @@ from ase import Atoms
 from xsorb.structures.utils import slab_mol_bonds
 from xsorb.io.utils import ase_custom_read as read
 from xsorb.io.jobs import get_running_jobs
-from xsorb.dft_codes.definitions import OUT_FILE_PATHS, \
-    SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, OPTIMIZATION_COMPLETED_STRINGS
+from xsorb.dft_codes.definitions import (OUT_FILE_PATHS,
+    SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, OPTIMIZATION_COMPLETED_STRINGS)
 if TYPE_CHECKING:
     from xsorb.io.inputs import WrittenSystem
 

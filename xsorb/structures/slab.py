@@ -27,8 +27,8 @@ from ase.geometry.geometry import get_layers
 
 from xsorb.io.utils import ase_custom_read as read
 from xsorb.visualize.plot import plot_adsites_image
-from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteCrystal, \
-    AdsorptionSiteAmorphous, SurroundingSite
+from xsorb.structures.properties import (AdsorptionSite, AdsorptionSiteCrystal,
+    AdsorptionSiteAmorphous, SurroundingSite)
 
 
 class Slab:

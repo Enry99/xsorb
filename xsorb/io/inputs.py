@@ -20,7 +20,7 @@ from xsorb.io.settings import Settings
 from xsorb.io.database import Database
 from xsorb.io.utils import overwrite_question, write, write_xyz_custom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
-from xsorb.dft_codes.calculator import write_file_with_Calculator
+from xsorb.dft_codes.calculator import write_file_with_calculator
 from xsorb.dft_codes.override import override_dft_settings
 
 
@@ -107,7 +107,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             shutil.rmtree(file_dir)
 
         #initialize the Calculator and write input files
-        write_file_with_Calculator(atoms=ads_structure.atoms,
+        write_file_with_calculator(atoms=ads_structure.atoms,
                                    program=program,
                                    dftsettings=dftsettings,
                                    label=file_label,
@@ -202,7 +202,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
             shutil.rmtree(file_dir)
 
         #initialize the Calculator and write input files
-        write_file_with_Calculator(atoms=atoms,
+        write_file_with_calculator(atoms=atoms,
                                    program=program,
                                    dftsettings=dftsettings,
                                    label=file_label,

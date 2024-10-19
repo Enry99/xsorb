@@ -10,15 +10,15 @@ to write the input files for the calculations
 """
 
 from __future__ import annotations
-
+from typing import Callable
 import shutil
 import glob
 import os
 import warnings
 from pathlib import Path
 
-from pymatgen.io.vasp.sets import \
-    MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet
+from pymatgen.io.vasp.sets import (MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet,
+                                   MPHSERelaxSet, MITRelaxSet)
 from pymatgen.io.ase import AseAtomsAdaptor
 from ase import Atoms
 from ase.constraints import FixScaled
@@ -28,10 +28,13 @@ from ase.calculators.vasp import Vasp
 from xsorb.io.utils import write
 
 
-class MLFakeCalculator:
+class MLFakeCalculator():
     '''
     Fake calculator for the ML optimization,
-    which just writes the input files and does not perform any calculation
+    which just writes the input files and does not perform any calculation.
+    Its structure is made to be compatible with the other calculators,
+    so that the write_input function can be called in the same way,
+    and has the same initialization parameters.
     '''
 
     def __init__(self, label : str, directory : str):
@@ -49,10 +52,29 @@ class MLFakeCalculator:
         write(self.directory / f'{self.label}.xyz', atoms)
 
 
-def setup_Espresso_calculator(atoms : Atoms,
-                              dftsettings : dict,
-                              label : str,
-                              directory : str) -> Espresso:
+def setup_ML_calculator(**kwargs) -> MLFakeCalculator:
+    '''
+    Setup the ML calculator for the optimization and returns the calculator,
+    to be used in a code-agnostic way in the write_file_with_calculator function.
+    Must have this signature to be compatible with the other calculators.
+    '''
+
+    label : str = kwargs.get("label")
+    directory : str = kwargs.get("directory")
+
+    return MLFakeCalculator(label, directory)
+
+
+def setup_Espresso_calculator(**kwargs) -> Espresso:
+    '''
+    Setup the Espresso calculator for the DFT calculation
+    and returns the calculator, to be used in a code-agnostic way in
+    the write_file_with_calculator function.
+    '''
+
+    dftsettings : dict = kwargs.get("dftsettings")
+    label : str = kwargs.get("label")
+    directory : str = kwargs.get("directory")
 
     return Espresso(label = label,
                     directory=directory,
@@ -63,16 +85,20 @@ def setup_Espresso_calculator(atoms : Atoms,
                     additional_cards=dftsettings['additional_cards'])
 
 
-def setup_Vasp_calculator(atoms : Atoms,
-                          dftsettings : dict,
-                          label : str,
-                          directory : str):
+def setup_Vasp_calculator(**kwargs) -> Vasp:
+    '''
+    Setup the Vasp calculator for the DFT calculation
+    and returns the calculator, to be used in a code-agnostic way in
+    the write_file_with_calculator function.
+    '''
+
+    atoms : Atoms = kwargs.get("atoms")
+    dftsettings : dict = kwargs.get("dftsettings")
+    directory : str = kwargs.get("directory")
 
     preset_incar_settings = {}
 
     if "pymatgen_set" in dftsettings:
-
-
         sets_map = {'mprelaxset': MPRelaxSet,
                     'mpmetalrelaxset': MPMetalRelaxSet,
                     'mpscanrelaxset': MPScanRelaxSet,
@@ -86,7 +112,9 @@ def setup_Vasp_calculator(atoms : Atoms,
         preset_incar_settings = {k.lower(): v for k, v in relax.incar.as_dict().items()}
         preset_incar_settings.pop('@module')
         preset_incar_settings.pop('@class')
-        relax.kpoints.write_file('_temp_kpts_')
+
+        if "kpoints_string" not in dftsettings:
+            relax.kpoints.write_file('_temp_kpts_')
 
     preset_incar_settings["xc"] = dftsettings["vasp_xc_functional"]
 
@@ -117,24 +145,19 @@ def setup_Vasp_calculator(atoms : Atoms,
     return calc
 
 
-def setup_ML_calculator(atoms : Atoms,
-                        dftsettings : dict,
-                        label : str,
-                        directory : str):
-
-    return MLFakeCalculator(label, directory)
-
-
-
-def write_file_with_Calculator(atoms : Atoms,
+def write_file_with_calculator(atoms : Atoms,
                                program: str,
                                dftsettings : dict,
                                label : str,
                                directory : str):
+    '''
+    Write the input files for the DFT calculation, using the specified calculator.
+    '''
 
-    setup_functions = {'espresso': setup_Espresso_calculator,
-                       'vasp': setup_Vasp_calculator,
-                       'ml': setup_ML_calculator}
+    setup_functions : dict[str, Callable[...,Vasp|Espresso|MLFakeCalculator]] = {
+        'espresso': setup_Espresso_calculator,
+        'vasp': setup_Vasp_calculator,
+        'ml': setup_ML_calculator}
 
 
     if program not in setup_functions:
@@ -145,8 +168,11 @@ def write_file_with_Calculator(atoms : Atoms,
     calc.write_input(atoms)
 
 
-
 def adjust_constraints(atoms : Atoms, program : str):
+    '''
+    Convert the constraints from the FixScaled format to the FixCartesian format
+    for the VASP calculator. The constraints are set in the Atoms object (inplace)
+    '''
 
     if program == 'vasp':
         #convert from FixCartesian to FixScaled
@@ -197,7 +223,7 @@ def edit_files_for_restart(program : str, paths : list[str]):
                 f.writelines(lines)
 
             #copy files for the first part of the relaxation, to avoid overwriting
-            last_i = len( glob.glob( outcar.replace('OUTCAR', 'OUTCAR*') ) ) - 1
+            last_i = len( glob.glob( outcar.replace('OUTCAR', 'OUTCAR_') ) )
             shutil.copyfile(outcar, outcar.replace('OUTCAR', f'OUTCAR_{last_i}'))
             shutil.copyfile(vasprun, vasprun.replace('vasprun.xml', f'vasprun_{last_i}.xml'))
             shutil.copyfile(poscar, poscar.replace('POSCAR', f'POSCAR_{last_i}'))

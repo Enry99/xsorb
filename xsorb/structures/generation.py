@@ -20,8 +20,8 @@ from ase.data.vdw_alvarez import vdw_radii
 from xsorb.io.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
-from xsorb.structures.properties import AdsorptionSite, AdsorptionSiteAmorphous, \
-    MoleculeRotation, AdsorptionStructure, SurroundingSite
+from xsorb.structures.properties import (AdsorptionSite, AdsorptionSiteAmorphous,
+    MoleculeRotation, AdsorptionStructure, SurroundingSite)
 
 
 class AdsorptionStructuresGenerator:

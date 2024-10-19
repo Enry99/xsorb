@@ -17,7 +17,7 @@ ML_OPT_OUTDIR               = 'ml_opt_outdirs'
 
 HYBRID_SCREENING_THRESHOLDS = {
     'vasp' : -0.5,              # eV/A, ~ -2e-2 Ry/Bohr
-    'espresso' : [5e-3, 5e-2]   # [Ry, Ry/Bohr]
+    'espresso' : (5e-3, 5e-2)   # [Ry, Ry/Bohr]
 }
 
 
