@@ -23,6 +23,8 @@ from xsorb.structures.slab import Slab
 from xsorb.structures.properties import (AdsorptionSite, AdsorptionSiteAmorphous,
     MoleculeRotation, AdsorptionStructure, SurroundingSite)
 
+TOL = 0.01 #tolerance for checking if an atom is outside the cell (scaled positions)
+
 
 class AdsorptionStructuresGenerator:
     '''
@@ -363,6 +365,12 @@ class AdsorptionStructuresGenerator:
                 if rot_mode == 'surrounding':
                     adsorption_structures.extend(
                         self._get_structures_for_vertical_surrounding_sites(adsite))
+
+
+        #Exclude configs outside cell if requested
+        if self.settings.structure.misc.inside_only:
+            adsorption_structures = [ads for ads in adsorption_structures if \
+                np.all(0-TOL < ads.atoms.get_scaled_positions(wrap=False).flatten() < 1+TOL)]
 
 
         if verbose:

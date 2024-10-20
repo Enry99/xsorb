@@ -189,6 +189,7 @@ class MiscParams:
     Dataclass to store the parameters in the
     misc card of the settings file.
     '''
+    inside_only: bool = False
     mol_before_slab: bool = False
     sort_atoms_by_z: bool = True
     translate_slab: bool = True

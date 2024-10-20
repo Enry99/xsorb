@@ -53,6 +53,7 @@
         #fix_slab_preopt                = false                 # fix all slab atoms in the preoptimization
 
     #[Structure.misc]
+        #inside_only                    = false                 # only include adsorption configurations with coordinates inside the cell (neglecting pbcs), with a tolerance of 1% in fractional coordinates
         #mol_before_slab                = false                 # put molecule before slab in the order of atoms (only for xyz and pwi, not VASP)
         #sort_atoms_by_z                = true                  # sort atoms by z coordinate in the input files (only for xyz and pwi, not VASP)
         #translate_slab                 = true                  # translate the slab upwards so that the lowest atom is exactly 1 Angstrom above the cell bottom
