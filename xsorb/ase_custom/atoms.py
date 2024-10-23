@@ -10,6 +10,8 @@ Redefinition of the ase.Atoms class to:
 - add constraints when summing two Atoms objects.
 '''
 
+import re
+
 from ase import Atoms, Atom
 from ase.constraints import FixAtoms, FixCartesian, FixScaled
 
@@ -43,7 +45,7 @@ class AtomsCustom(Atoms):
             #strip possible custom labels:
             for i, symbol in enumerate(symbols):
                 if isinstance(symbol, str):
-                    symbols[i] = symbol.translate(None, '0123456789')
+                    symbols[i] = re.sub(r'\d+', '', symbol) #remove numbers
 
         super().__init__(symbols=symbols,positions=positions,numbers=numbers,tags=tags,
                          momenta=momenta,masses=masses,magmoms=magmoms,charges=charges,

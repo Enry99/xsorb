@@ -29,7 +29,7 @@ def POVRAYInit(self, cell, cell_vertices, positions, diameters, colors,
                  camera_type='orthographic', point_lights=[],
                  area_light=[(2., 3., 40.), 'White', .7, .7, 3, 3],
                  background='White', textures=None, transmittances=None,
-                 depth_cueing=False, cue_density=5e-3,
+                 depth_cueing=False, cue_density=5e-3, constant_fog_height=0.0,
                  celllinewidth=0.05, bondlinewidth=0.10, bondatoms=[],
                  exportconstraints=False,
                  arrows=None):
@@ -115,6 +115,7 @@ def POVRAYInit(self, cell, cell_vertices, positions, diameters, colors,
     self.camera_type = camera_type
     self.celllinewidth = celllinewidth
     self.cue_density = cue_density
+    self.constant_fog_height = constant_fog_height
     self.depth_cueing = depth_cueing
     self.display = display
     self.exportconstraints = exportconstraints
@@ -416,8 +417,9 @@ adaptive 1 jitter}}"""
             # larger does not make any sense
             dist = 1e-4
         else:
-            dist = 1. / self.cue_density
-        fog += f'fog {{fog_type 2 distance {dist:.4f} up <0,0,1> fog_offset -3 fog_alt 1 '\
+            dist = 2. / self.cue_density
+        constant_fog_height = self.constant_fog_height if self.constant_fog_height is not None else 0.0
+        fog += f'fog {{fog_type 2 distance {dist:.4f} up <0,0,1> fog_offset {constant_fog_height} fog_alt 0.1 '\
                 f'color {pc(self.background)}}}'
 
     mat_style_keys = (f'#declare {k} = {v}'
@@ -654,5 +656,6 @@ else:
     ase.io.pov.POVRAY.write_ini = write_ini
 
 ase.io.pov.POVRAY.__init__ = POVRAYInit
+ase.io.pov.POVRAY.write_pov = write_pov
 ase.io.pov.POVRAY.from_PlottingVariables = from_PlottingVariables
 ase.io.utils.PlottingVariables.__init__ = PlottingVariablesInit
