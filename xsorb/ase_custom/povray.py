@@ -654,6 +654,7 @@ if 'POVRAY_OLD_STYLE' in os.environ:
 
 else:
     ase.io.pov.POVRAY.write_ini = write_ini
+    ase.io.pov.POVRAY.material_styles_dict['pale']=('finish {ambient 0.9 diffuse 0.30 roughness 0.001}')
 
 ase.io.pov.POVRAY.__init__ = POVRAYInit
 ase.io.pov.POVRAY.write_pov = write_pov

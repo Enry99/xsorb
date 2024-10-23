@@ -122,7 +122,8 @@ def render_image(*,
     - nobonds: if True, do not draw bonds.
     - mol_indices: list with the indices of the atoms to consider as the molecule
     - custom_settings: dictionary with custom settings, containing:
-        'atomic_colors', 'atomic_radius', 'bond_radius', 'bond_line_width' and 'cell_line_width'.
+        'atomic_colors', 'atomic_radius', 'bond_radius', 'bond_line_width' and 'cell_line_width',
+        and 'nontransparent_atoms'
     """
 
     atoms = atoms.copy() #do not modify the original object
@@ -226,19 +227,55 @@ def render_image(*,
         else:
             textures = None
 
+        if custom_settings and custom_settings.get('nontransparent_atoms') is not None:
+            transmittances = []
+            textures = []
+            trans_map = {True: 0.0, False: 0.8}
+            texture_map = {True: 'ase3', False: 'pale'}
+            for i in range(len(atoms)):
+                nontrasp = i in custom_settings.get('nontransparent_atoms')
+                transmittances.append(trans_map[nontrasp])
+                textures.append(texture_map[nontrasp])
+        else:
+            transmittances = None
+
         povray_settings=dict(canvas_width=width_res,
                                 celllinewidth=CELLLINEWIDTH,
                                 transparent=False,
                                 camera_type='orthographic',
                                 camera_dist=2,
                                 textures=textures,
+                                transmittances=transmittances,
                                 bondlinewidth=BOND_LINE_WIDTH,
                             )
         if not nobonds:
             povray_settings['bondatoms'] = get_bondpairs(config_copy, radius=BOND_RADIUS)
         if depth_cueing is not None:
+
+            # Calculate height of ground fog by finding where the slab begins,
+            # if we have a slab-molecule system
+
+            if mol_indices is not None:
+                mol_zs = atoms.positions[mol_indices][:,2]
+                constant_fog_height = - (mol_zs.max() - mol_zs.min())
+            else:
+                # Try to guess by creating a histogram of z values, and considering that
+                # the slab begins where the histogram is > 70% of the maximum density
+                nbins = 5*int(atoms.positions[:,2].max() - atoms.positions[:,2].min()) +1 #5bin/Angstrom
+                hist, bin_edges = np.histogram(atoms.positions[:,2], bins=nbins)
+                threshold = 0.4 * hist.max()
+                zmax_mol = atoms.positions[:,2].max()
+                #Get highest bin where the histogram is above the threshold
+                for i in range(len(hist)-1,-1,-1):
+                    if hist[i] > threshold:
+                        zmax_slab = bin_edges[i] + 1
+                        break
+                zmax_slab = min(zmax_mol, zmax_slab)
+                constant_fog_height = - (zmax_mol - zmax_slab)
+
             povray_settings['depth_cueing'] = True
             povray_settings['cue_density'] = depth_cueing
+            povray_settings['constant_fog_height'] = constant_fog_height
 
 
         #Do the actual rendering
