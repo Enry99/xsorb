@@ -369,11 +369,12 @@ class AdsorptionStructuresGenerator:
 
         #Exclude configs outside cell if requested
         if self.settings.structure.misc.inside_only:
-            adsorption_structures = [ads for ads in adsorption_structures if \
-                np.all(0-TOL < \
-                       ads.atoms[ads.mol_indices].get_scaled_positions(wrap=False).flatten() \
-                        < 1+TOL)]
-
+            filtered_adsorption_structures = []
+            for ads in adsorption_structures:
+                flatposlist = ads.atoms[ads.mol_indices].get_scaled_positions(wrap=False).flatten()
+                if np.all(0-TOL < flatposlist) and np.all(flatposlist < 1+TOL):
+                    filtered_adsorption_structures.append(ads)
+            adsorption_structures = filtered_adsorption_structures
 
         if verbose:
             print('Adsorption structures generated.')
