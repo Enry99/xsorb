@@ -319,16 +319,17 @@ class Slab:
         return adsites, adsite_labels, connected_adsites
 
 
-    def check_atoms_outside_cell(self, atoms, tol=1e-3):
+    def check_atoms_outside_cell(self, atoms, mol_indices, tol=0.01):
         '''
-        Check if any atom of the Atoms object is outside the cell
+        Check if any atom of the molecule is outside the cell
         Args:
         - atoms: Atoms object to check
         '''
-        for atom in atoms:
-            if any(atom.position < 0 - tol) or any(atom.position > atoms.cell.diagonal() + tol):
-                return True
-        return False
+        flatposlist = atoms[mol_indices].get_scaled_positions(wrap=False).flatten()
+        allinside = np.all(0-tol < flatposlist) and np.all(flatposlist< 1+tol)
+        if not allinside:
+            print('Some atoms are outside the cell. This configuration will be skipped.')
+        return not allinside
 
     def generate_adsorption_structures(self, molecule : Atoms,
                                        adsites : list,
@@ -373,8 +374,9 @@ class Slab:
                     final_deltaz += dz
 
                 struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
+                mol_indices = list(range(len(mol)) if mol_before_slab else range(len(self.slab_ase), len(self.slab_ase)+len(mol)))
                 struct.cell = self.slab_ase.cell
-                if self.check_atoms_outside_cell(struct):
+                if self.check_atoms_outside_cell(struct, mol_indices):
                     continue
                 adsorption_structures.append(struct)
                 full_labels.append(rotation_label+site_label+'{:.3f}'.format(final_deltaz))
@@ -412,8 +414,9 @@ class Slab:
                             final_deltaz += dz
 
                         struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
+                        mol_indices = list(range(len(mol)) if mol_before_slab else range(len(self.slab_ase), len(self.slab_ase)+len(mol)))
                         struct.cell = self.slab_ase.cell
-                        if self.check_atoms_outside_cell(struct):
+                        if self.check_atoms_outside_cell(struct, mol_indices):
                             continue
                         adsorption_structures.append(struct)
                         rotation_label = rotation_label.split(',')
@@ -443,8 +446,9 @@ class Slab:
                             final_deltaz += dz
 
                         struct = mol + self.slab_ase if mol_before_slab else self.slab_ase + mol
+                        mol_indices = list(range(len(mol)) if mol_before_slab else range(len(self.slab_ase), len(self.slab_ase)+len(mol)))
                         struct.cell = self.slab_ase.cell
-                        if self.check_atoms_outside_cell(struct):
+                        if self.check_atoms_outside_cell(struct, mol_indices):
                             continue
                         adsorption_structures.append(struct)
                         full_labels.append(rotation_label+site_label+'{:.3f}'.format(final_deltaz))
