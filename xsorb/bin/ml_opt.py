@@ -59,7 +59,7 @@ def main():
         opt = BFGS(atoms, trajectory=out_file, logfile=log_file, append_trajectory=True)
         converged = opt.run(fmax=0.01, steps=500)
 
-    with open(log_file, "a") as f:
+    with open(log_file, "a", encoding=sys.getfilesystemencoding()) as f:
         f.write(f"\nOptimization {'converged' if converged else 'NOT converged'}.\n")
 
 

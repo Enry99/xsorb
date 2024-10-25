@@ -15,6 +15,7 @@ from typing import Optional
 from pathlib import Path
 import tomllib
 import json
+import sys
 
 from dacite import from_dict, Config
 
@@ -176,7 +177,7 @@ class ConstraintsParams:
     layers_height: float = 0.5
     fix_slab_xyz: list[bool] = field(default_factory=lambda: [True,True,True])
     fix_mol_xyz: list[bool] = field(default_factory=lambda: [True,True,False])
-    fix_slab_preopt: bool = False
+    fix_slab_ml_opt: bool = False
 
     def __post_init__(self):
         if self.fixed_layers_slab is not None and self.fixed_indices_slab is not None:
@@ -227,10 +228,10 @@ class Settings:
 
         #Read the settings file
         if Path('settings.toml').is_file():
-            with open("settings.toml", "rb") as f:
+            with open("settings.toml", "rb",encoding=sys.getfilesystemencoding()) as f:
                 self.settings_dict = tomllib.load(f)
         elif Path('settings.json').is_file():
-            with open("settings.json", "rb") as f:
+            with open("settings.json", "rb",encoding=sys.getfilesystemencoding()) as f:
                 self.settings_dict = json.load(f)
         else:
             raise FileNotFoundError("Settings file (settings.toml or settings.json)"\

@@ -10,6 +10,7 @@
 from __future__ import annotations
 from pathlib import Path
 import json
+import sys
 
 import numpy as np
 from ase import Atoms
@@ -21,9 +22,9 @@ def read_custom_colors():
     '''
 
     if Path("custom_colors.json").exists():
-        with open("custom_colors.json", "r") as f:
+        with open("custom_colors.json", "r", encoding=sys.getfilesystemencoding()) as f:
             custom_colors = json.load(f)
-            print(f"Custom colors read from file.")
+            print("Custom colors read from file.")
         return custom_colors
 
     return None

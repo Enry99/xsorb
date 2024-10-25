@@ -50,7 +50,7 @@
         #fixed_indices_mol              = [3]                   # fix chosen atoms of the molecule for relaxation. Indices are to be taken as in slab file, possibly more than one site. -1 = fix all
         #fix_slab_xyz                   = [True,True,True]      # coordinates (x,y,z) to fix for the selected atoms in slab: True=fix, False=relax
         #fix_mol_xyz                    = [True,True,False]     # coordinates (x,y,z) to fix for the selected atoms in molecule: True=fix, False=relax
-        #fix_slab_preopt                = false                 # fix all slab atoms in the preoptimization
+        #fix_slab_ml_opt                = false                 # fix all slab atoms in the optimization with the machine learning potential
 
     #[Structure.misc]
         #inside_only                    = false                 # only include adsorption configurations with coordinates inside the cell (neglecting pbcs), with a tolerance of 1% in fractional coordinates

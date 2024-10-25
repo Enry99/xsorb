@@ -14,6 +14,7 @@ from typing import Callable
 import shutil
 import glob
 import os
+import sys
 import warnings
 from pathlib import Path
 
@@ -129,13 +130,13 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
 
     #write user-defined settings to string, to be parsed by ASE, overriding the preset flags
     if "incar_string" in dftsettings:
-        with open('_temp_incar_', 'w') as f:
+        with open('_temp_incar_', 'w',encoding=sys.getfilesystemencoding()) as f:
             f.write(dftsettings["incar_string"])
         calc.read_incar('_temp_incar_')
         os.remove('_temp_incar_')
 
     if "kpoints_string" in dftsettings:
-        with open('_temp_kpts_', 'w') as f:
+        with open('_temp_kpts_', 'w',encoding=sys.getfilesystemencoding()) as f:
             f.write(dftsettings["kpoints_string"])
 
     if "kpoints_string" in dftsettings or "pymatgen_set" in dftsettings:
@@ -192,13 +193,13 @@ def edit_files_for_restart(program : str, paths : list[str]):
 
     for path in paths:
         if program == 'espresso':
-            with open(path, 'r') as f:
+            with open(path, 'r',encoding=sys.getfilesystemencoding()) as f:
                 lines = f.readlines()
                 for i, line in enumerate(lines):
                     if 'from_scratch' in line:
                         lines[i] = lines[i].replace('from_scratch','restart')
                         break
-            with open(path, 'w') as f:
+            with open(path, 'w',encoding=sys.getfilesystemencoding()) as f:
                 f.writelines(lines)
 
         elif program == 'vasp':
@@ -209,7 +210,7 @@ def edit_files_for_restart(program : str, paths : list[str]):
             vasprun = poscar.replace('POSCAR', 'vasprun.xml')
             oszicar = poscar.replace('POSCAR', 'OSZICAR')
 
-            with open(incar, 'r') as f:
+            with open(incar, 'r',encoding=sys.getfilesystemencoding()) as f:
                 lines = f.readlines()
                 istart_found = False
                 for i, line in enumerate(lines):
@@ -219,7 +220,7 @@ def edit_files_for_restart(program : str, paths : list[str]):
                         break
                 if not istart_found: lines.append('ISTART = 1\n')
 
-            with open(incar, 'w') as f:
+            with open(incar, 'w',encoding=sys.getfilesystemencoding()) as f:
                 f.writelines(lines)
 
             #copy files for the first part of the relaxation, to avoid overwriting

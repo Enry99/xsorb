@@ -9,6 +9,7 @@ Custom module to handle arrows in ase.io.pov, and to change fog and color styles
 '''
 
 import os
+import sys
 
 import numpy as np
 import ase.io.utils
@@ -363,7 +364,7 @@ Pause_When_Done={self.pause}
 Verbose=False
 Max_Image_Buffer_Memory=1024
 """
-    with open(path, 'w') as fd:
+    with open(path, 'w', encoding=sys.getfilesystemencoding()) as fd:
         fd.write(ini_str)
     return path
 
@@ -387,7 +388,7 @@ Pause_When_Done={self.pause}
 Verbose=False
 Max_Image_Buffer_Memory=1024
 """
-    with open(path, 'w') as fd:
+    with open(path, 'w', encoding=sys.getfilesystemencoding()) as fd:
         fd.write(ini_str)
     return path
 
@@ -642,7 +643,7 @@ union{{torus{{R, Rcell rotate 45*z texture{{pigment{{color COL transmit TRANS}} 
 {arrows if arrows != '' else '// no arrows'}
 """  # noqa: E501
 
-    with open(path, 'w') as fd:
+    with open(path, 'w', encoding=sys.getfilesystemencoding()) as fd:
         fd.write(pov)
 
     return path

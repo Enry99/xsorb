@@ -12,19 +12,13 @@ def build_xsorb_parser():
         description='Select one of the commands below. The program will read further input informations from the file "settings.in"'
         )
 
-    parser.add_argument('--v', '--version', action='version', version='%(prog)s '+__version__)
+
 
 
     calc_group = parser.add_argument_group(title='Calculation options')
     #main flags
     main_calc = calc_group.add_mutually_exclusive_group()
-    main_calc.add_argument('-g', action='store_true', help='generate all pwi(s) and a csv file with config labels, without submitting the jobs')
-    main_calc.add_argument('-s', action='store_true', help='launch screening.')
-    main_calc.add_argument('-r', action='store_true', help='launch final relaxations')
-    main_calc.add_argument('-preopt', action='store_true', help='Pre-optimize the structures before the screening using a machine learning force field.')
-    main_calc.add_argument('-restart', choices=['s', 'r'], help='restart all (unfinished) screening or relax calculations')
-    main_calc.add_argument('-scancel', action='store_true', help='Cancel all running jobs for this xsorb run (works only for Slurm scheduler).')
-    main_calc.add_argument('-regenerate_labels', action='store_true', help='Regenerate site_labels.csv if accidentally deleted.')
+
     #optional flags
     relax_options = calc_group.add_mutually_exclusive_group()
     relax_options.add_argument('--n', type=int, help='number of configurations (starting from the screening energy minimum) for the final relaxation. Default 5 (or 1 with --by-site)')

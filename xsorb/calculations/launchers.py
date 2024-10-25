@@ -55,7 +55,7 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     and launches calculations for the preliminary screening.
 
     Args:
-    - from_preopt: use the final configuration from machine learning pre-optimization
+    - from_ml_opt: use the final configuration from machine learning pre-optimization
         as starting point instead of generating them from scratch
     - save_image: save an image of the adsorption sites
     and of the molecular rotations when generating the configurations

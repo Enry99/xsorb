@@ -215,7 +215,7 @@ def plot_energy_evolution(calc_type : str):
     Plot the energy evolution during optimization for all the configurations
 
     Args:
-    - calc_type: 'screening','preopt','relax','ml_opt'
+    - calc_type: 'screening','relax','ml_opt'
     '''
 
     from matplotlib import pyplot as plt
@@ -245,7 +245,7 @@ def plot_energy_evolution(calc_type : str):
     plt.grid(linestyle='dotted')
     plt.legend(title="Config, energy",
                ncols=np.ceil(len(rows)/10),
-               prop={'size': 6  if calc_type in ('screening', 'preopt') else 8})
+               prop={'size': 6  if calc_type in ('screening', 'ml_opt') else 8})
     energy_plot_filename = f'{calc_type}_energies.png'
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
     print(f'Plot saved in {energy_plot_filename}')

@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 
 from ase import Atoms
 
@@ -78,7 +79,7 @@ def is_optimization_completed(filename : str, program : str):
 
     searchfor = OPTIMIZATION_COMPLETED_STRINGS[program]
 
-    with open(filename, 'r') as f:
+    with open(filename, 'r',encoding=sys.getfilesystemencoding()) as f:
         file_content = f.readlines()
 
     completed = False
@@ -107,7 +108,7 @@ def is_scf_not_converged(filename : str, program : str):
     searchfor = SCF_NONCONVERGED_STRINGS[program]
     convergence_string = SCF_CONVERGED_STRINGS[program]
 
-    with open(filename, 'r') as f:
+    with open(filename, 'r',encoding=sys.getfilesystemencoding()) as f:
         file_content = f.readlines()
 
     # we might encounter the situation where a first loop is not converged,

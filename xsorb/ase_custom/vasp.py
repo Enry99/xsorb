@@ -11,6 +11,7 @@ Mod to ase.io.vasp.read_vasp to add resorting for poscar if ase-sort.dat is pres
 
 from pathlib import Path
 import re
+import sys
 
 import numpy as np
 import ase.io.vasp
@@ -151,7 +152,7 @@ def read_vasp(filename='CONTCAR'):
     sortfile = f'{Path(filename).parent}/ase-sort.dat'
     if Path(sortfile).exists():
         resort_list = []
-        with open(sortfile, 'r') as fd:
+        with open(sortfile, 'r', encoding=sys.getfilesystemencoding()) as fd:
             for line in fd:
                 sort, resort = line.split()
                 resort_list.append(int(resort))

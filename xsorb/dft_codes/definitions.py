@@ -35,8 +35,8 @@ IN_FILE_PATHS = {
         'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwi',
     },
 
-    'preopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/preopt_{0}.pwi'
+    'ml_opt': {
+        'ml': ML_OPT_OUTDIR+'/{0}/ml_opt_{0}.pwi'
     },
 
     'slab': {
@@ -64,8 +64,8 @@ OUT_FILE_PATHS = {
         'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwo',
     },
 
-    'preopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/preopt_{0}.traj'
+    'ml_opt': {
+        'ml': ML_OPT_OUTDIR+'/{0}/ml_opt_{0}.traj'
     },
 
     'slab': {
@@ -92,8 +92,8 @@ LOG_FILE_PATHS = {
         'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwo',
     },
 
-    'preopt': {
-        'ml' : ML_OPT_OUTDIR+'/{0}/preopt_{0}.log'
+    'ml_opt': {
+        'ml' : ML_OPT_OUTDIR+'/{0}/ml_opt_{0}.log'
     },
 
     'slab': {

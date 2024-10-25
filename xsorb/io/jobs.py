@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 from xsorb.io.settings import Settings
 from xsorb.io.database import Database
@@ -37,7 +38,7 @@ def launch_jobs(*,program : str,
 
     Args:
     - program: 'espresso', 'vasp' or 'ml'
-    - calc_type: 'screening'/'relax'/'preopt' or 'isolated'
+    - calc_type: 'screening'/'relax'/'ml_opt' or 'isolated'
     - jobscript: path of the jobscript file
     - sbatch_command: command to submit the jobscript (in Slurm it is sbatch)
     - systems: list of WrittenSystem objects containing calc_id and paths
@@ -55,7 +56,7 @@ def launch_jobs(*,program : str,
         os.chdir(j_dir)   ####################
 
         #change job title (only for slumr jobscripts)
-        with open('jobscript.sh', 'r') as f:
+        with open('jobscript.sh', 'r',encoding=sys.getfilesystemencoding()) as f:
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if "job-name" in line:
@@ -67,7 +68,7 @@ def launch_jobs(*,program : str,
                         suffix = system.calc_id
                     lines[i] = f"{line.split('=')[0]}={prefix}{suffix}\n"
                     break
-        with open('jobscript.sh', 'w') as f:
+        with open('jobscript.sh', 'w',encoding=sys.getfilesystemencoding()) as f:
             f.writelines(lines)
 
         postfix = SBATCH_POSTFIX[program].format(
@@ -86,7 +87,7 @@ def launch_jobs(*,program : str,
     if calc_type not in ('isolated'): #no database for slab/molecule
         Database.add_job_ids(calc_type, [system.calc_id for system in systems], submitted_jobs)
     else:
-        with open(".submitted_jobs.txt", "a") as f:
+        with open(".submitted_jobs.txt", "a",encoding=sys.getfilesystemencoding()) as f:
             f.writelines([job+'\n' for job in submitted_jobs])
 
 
@@ -166,7 +167,7 @@ def scancel():
 
     #also add jobs from .submitted_jobs.txt
     if Path(".submitted_jobs.txt").exists():
-        with open(".submitted_jobs.txt", "r") as f:
+        with open(".submitted_jobs.txt", "r",encoding=sys.getfilesystemencoding()) as f:
             submitted_jobs = f.readlines()
             submitted_job_ids.extend([job.strip() for job in submitted_jobs])
 

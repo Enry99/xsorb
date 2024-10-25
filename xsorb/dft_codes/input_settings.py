@@ -10,6 +10,7 @@ Module to read input settings for different DFT programs and store them in a dic
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
+import sys
 
 from dacite import from_dict, Config
 from ase.io.espresso import read_fortran_namelist
@@ -161,11 +162,11 @@ def read_vasp_settings(input_settings_dict : dict):
     dftprogram_settings_dict = vars(vasp_settings_class)
 
     if vasp_settings_class.incar_path:
-        with open(vasp_settings_class.incar_path, 'r') as f:
+        with open(vasp_settings_class.incar_path, 'r',encoding=sys.getfilesystemencoding()) as f:
             dftprogram_settings_dict["incar_string"] = f.read()
 
     if vasp_settings_class.kpoints_path:
-        with open(vasp_settings_class.kpoints_path, 'r') as f:
+        with open(vasp_settings_class.kpoints_path, 'r',encoding=sys.getfilesystemencoding()) as f:
             dftprogram_settings_dict["kpoints_string"] = f.read()
 
     return dftprogram_settings_dict
