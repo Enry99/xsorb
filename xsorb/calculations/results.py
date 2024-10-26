@@ -14,9 +14,9 @@ import sys
 
 from ase import Atoms
 
+import xsorb.io.jobs
 from xsorb.structures.utils import slab_mol_bonds
-from xsorb.io.utils import ase_custom_read as read
-from xsorb.io.jobs import get_running_jobs
+from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.dft_codes.definitions import (OUT_FILE_PATHS,
     SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, OPTIMIZATION_COMPLETED_STRINGS)
 if TYPE_CHECKING:
@@ -200,7 +200,7 @@ def get_calculations_results(*,systems: list[WrittenSystem],
     if total_e_slab_mol is None:
         total_e_slab_mol = read_total_e_slab_mol_from_default_folders(program)
 
-    running_jobs = get_running_jobs()
+    running_jobs = xsorb.io.jobs.get_running_jobs()
 
     results_list : list[CalculationResults | None ] = []
 

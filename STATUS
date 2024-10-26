@@ -2,9 +2,9 @@ settings.toml:                  OK
 
 xsorb/calculations/*:           OK
 
-xsorb/cli:                      aggiungi main executable xsorb (e in futuro xfrag)
+xsorb/cli:                      aggiungere xfrag
 
-xsorb/dft_codes:                sistemare tutto
+xsorb/dft_codes:                manca la parte di xfrag
 
 xsorb/io/*:                     OK
 
@@ -13,10 +13,12 @@ xsorb/structures/*:             OK
 xsorb/visualize/*:              OK
 
 
-THEN: dftcodes, parser(subparser).
+FIX high symmetry sites duplicates
+
 FINALLY: xfrag.
 
-
+TODO: in the whole code, replace strings \ with multiline strings (docstrings)
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
 TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
-TODO: in xfrag, mettere plot istogrammi con tutte le combinazioni e colore dei bonds.
+TODO: mettere plot istogrammi, sia per xsorb, con le varie eads, sia in xfrag, con tutte le combinazioni.
+NOTE: dire che xsorb supporta ibrav

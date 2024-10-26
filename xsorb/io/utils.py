@@ -4,27 +4,12 @@
 # Author: Enrico Pedretti
 
 '''
-General utility functions for the I/O module
+Small utility functions for the io module
 '''
 
 from __future__ import annotations
 import time
 import math
-
-from ase.io import read, write
-
-from xsorb.ase_custom import AtomsCustom
-
-
-def ase_custom_read(filename, **kwargs):
-    """
-    Modified version of ase.io.read that returns an ase_custom.AtomsCustom object
-    """
-    atoms_or_atoms_list = read(filename=filename, **kwargs)
-    if isinstance(atoms_or_atoms_list, list):
-        return [AtomsCustom(at) for at in atoms_or_atoms_list]
-    else:
-        return AtomsCustom(atoms_or_atoms_list)
 
 
 def overwrite_question(file_path : str) -> str:
@@ -64,7 +49,6 @@ def continue_even_if_not_all_completed_question() -> bool:
             return answer.lower() == 'y'
         else:
             print('Value not recognized. Try again.')
-
 
 
 def progressbar(it, prefix="", size=50):

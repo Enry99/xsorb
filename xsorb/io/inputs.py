@@ -8,20 +8,24 @@ Module for writing input files for the calculations
 '''
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
 import shutil
 from pathlib import Path
 from dataclasses import dataclass
 
 from ase import Atoms
 
-from xsorb.structures.generation import AdsorptionStructure
 from xsorb.structures.utils import set_fixed_slab_constraints
 from xsorb.io.settings import Settings
 from xsorb.io.database import Database
-from xsorb.io.utils import overwrite_question, write, write_xyz_custom
+from xsorb.io.utils import overwrite_question
+from xsorb.ase_custom.io import write
+from xsorb.ase_custom import write_xyz_custom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import write_file_with_calculator
 from xsorb.dft_codes.override import override_dft_settings
+if TYPE_CHECKING:
+    from xsorb.io.inputs import AdsorptionStructure
 
 
 @dataclass

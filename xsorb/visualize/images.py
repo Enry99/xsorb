@@ -16,8 +16,9 @@ from dataclasses import asdict
 
 from ase.visualize import view
 
-from xsorb.io import Settings, Database
-from xsorb.structures import Slab
+import xsorb.structures.slab
+from xsorb.io.settings import Settings
+from xsorb.io.database import Database
 from xsorb.visualize.render import render_image
 from xsorb.visualize.plot import plot_overview_grid
 from xsorb.visualize.utils import get_centered_mol_and_slab, read_custom_colors
@@ -34,7 +35,7 @@ def plot_adsorption_sites(all_sites : bool = False):
 
     settings = Settings()
 
-    slab = Slab(slab_filename=settings.input.slab_filename,
+    slab = xsorb.structures.slab.Slab(slab_filename=settings.input.slab_filename,
             surface_thickness=settings.structure.adsorption_sites.surface_thickness,
             layers_threshold=settings.structure.constraints.layers_height,
             sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,
@@ -112,7 +113,7 @@ def plot_images(calc_type : str,
         atoms = row.to_atoms()
         mol_indices = row.data.get('mol_indices')
 
-        if kwargs.get('center_molecule'):
+        if kwargs.get('center_mol'):
             #use the same translation for all frames in the trajectory, to avoid jumps
             _, _, transl_vector = get_centered_mol_and_slab(atoms, mol_indices)
         else:

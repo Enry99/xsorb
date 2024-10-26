@@ -106,6 +106,8 @@ class AdsorptionSiteCrystal(AdsorptionSite):
     Can be compared with the equality operator, that compares the unique_id.
     '''
 
+    type: str #type of the site, e.g. ontop, bridge, hollow, etc.
+
     #for now leave it empty, we might need to add more attributes in the future
 
 

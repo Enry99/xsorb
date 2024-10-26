@@ -28,7 +28,7 @@ from ase.data.colors import jmol_colors as ATOM_COLORS
 from ase import Atoms
 
 from xsorb.ase_custom import AtomsCustom
-from xsorb.io import write
+from xsorb.ase_custom.io import write
 
 #scaling factors for drawing atoms and bonds
 ATOMIC_RADIUS_DEFAULT = 0.6

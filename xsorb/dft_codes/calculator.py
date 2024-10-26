@@ -26,7 +26,7 @@ from ase.constraints import FixScaled
 from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
 
-from xsorb.io.utils import write
+from xsorb.ase_custom.io import write
 
 
 class MLFakeCalculator():

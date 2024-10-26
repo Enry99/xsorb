@@ -189,7 +189,7 @@ def get_dftprogram_settings(program : str, input_settings_dict : dict):
 
     if program == 'espresso':
         return read_espresso_settings(input_settings_dict)
-    elif program == 'VASP':
+    elif program == 'vasp':
         return read_vasp_settings(input_settings_dict)
     else:
         raise ValueError(f'Program {program} not recognized.')

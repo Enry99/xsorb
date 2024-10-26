@@ -25,7 +25,7 @@ from ase.constraints import FixCartesian
 from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
-from xsorb.io.utils import ase_custom_read as read
+from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.visualize.plot import plot_adsites_image
 from xsorb.structures.properties import (AdsorptionSite, AdsorptionSiteCrystal,
     AdsorptionSiteAmorphous, SurroundingSite)
@@ -221,7 +221,8 @@ class Slab:
         """
 
         #create structure containing only surface atoms
-        surf = self.asf.slab.copy().remove_sites(self.asf.slab.subsurface_sites())
+        surf = self.asf.slab.copy()
+        surf.remove_sites(self.asf.subsurface_sites())
         #flatten the surface (z=0 for all)
         for i in range(len(surf)): surf[i].z = 0 # pylint: disable=consider-using-enumerate,multiple-statements
 
@@ -261,7 +262,7 @@ class Slab:
 
                 # add further information to the site types
                 if site_type == 'ontop':
-                    first_nn_species = nn_list[0].site.species_string
+                    first_nn_species = nn_list[0].species_string
                     info = f"{site_type} {first_nn_species}"
                 elif site_type == 'hollow':
                     info = f"{site_type} {coord_n}-fold"
@@ -279,7 +280,8 @@ class Slab:
 
                 all_adsites.append(AdsorptionSiteCrystal(label=str(i_site),
                                                          coords=site_coords,
-                                                         info=info))
+                                                         info=info,
+                                                         type=site_type))
                 i_site += 1
 
         return all_adsites
@@ -315,8 +317,8 @@ class Slab:
         #adsites is a dict which contains the ontop, hollow and bridge sites
         adsites_coords = self.asf.find_adsorption_sites(distance=0,
                                                  symm_reduce=0,
-                                                 no_obtuse_hollow=no_obtuse_hollow).pop('all')
-
+                                                 no_obtuse_hollow=no_obtuse_hollow)
+        adsites_coords.pop('all') #remove the 'all' key
 
         #find the equivalent sets of sites according to symm_reduce.
         #in each set, selec the site closest to te cell center as the representative site
@@ -466,7 +468,7 @@ class Slab:
 
             adsite.surrounding_sites = []
 
-            nnsites = nn.get_nn_info(self.asf.slab, adsite.unique_id)
+            nnsites = nn.get_nn_info(self.asf.slab, adsite.atom_index)
 
             nn_counter_for_this_site = 0
             for nnsite in nnsites:
@@ -482,7 +484,7 @@ class Slab:
                     vector = nnsite['site'].coords - adsite.coords
 
                     surrounding_site = SurroundingSite(
-                        label = f'{adsite.unique_id}.{nn_counter_for_this_site}',
+                        label = f'{adsite.label}.{nn_counter_for_this_site}',
                         coords = nnsite['site'].coords,
                         info = atom_species,
                         atom_index = nnindex,
@@ -501,7 +503,7 @@ class Slab:
                                           surf_sites_indices : list,
                                           max_cn : float,
                                           selected_sites : list | None = None,
-                                          selected_atomic_species : list | None = None,
+                                          atomic_species : list | None = None,
                                           include_surrounding_sites : bool = False,
                                           surrounding_sites_deltaz: float | None = 1.5):
         """
@@ -525,7 +527,7 @@ class Slab:
 
             if selected_sites and i_site not in selected_sites:
                 continue
-            if selected_atomic_species and atom_species not in selected_atomic_species:
+            if atomic_species and atom_species not in atomic_species:
                 continue
             if any(unique_id == x.unique_id for x in existing_sites):
                 continue
@@ -554,7 +556,7 @@ class Slab:
                                         max_cn_offset : float | None = 2,
                                         max_cn: float | None = None,
                                         selected_sites: list | None = None,
-                                        selected_atomic_species: list | None = None,
+                                        atomic_species: list | None = None,
                                         include_surrounding_sites : bool = False,
                                         surrounding_sites_deltaz: float | None = 1.5,
                                         save_image: bool = False,
@@ -572,7 +574,7 @@ class Slab:
         - max_cn: maximum coordination number allowed. Priority over max_cn_offset.
         - selected_sites: indices of the sites to be returned by this function,
             selected between those found by AdsorbateSiteFinder.
-        - selected_atomic_species: list of atomic species to be considered as adsorption sites.
+        - atomic_species: list of atomic species to be considered as adsorption sites.
         - include_surrounding_sites: decide wether to include the surrounding sites in the output.
         - surrounding_sites_deltaz: deltaz from the main site to consider a site as surrounding.
         - save_image: decide wether to save a png image of the sites.
@@ -598,7 +600,7 @@ class Slab:
             surf_sites_indices=surf_sites_indices,
             max_cn=max_cn,
             selected_sites=selected_sites,
-            selected_atomic_species=selected_atomic_species,
+            atomic_species=atomic_species,
             include_surrounding_sites=include_surrounding_sites,
             surrounding_sites_deltaz=surrounding_sites_deltaz)
 

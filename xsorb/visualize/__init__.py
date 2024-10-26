@@ -6,4 +6,4 @@ User-exposed classes and functions:
 
 """
 
-from xsorb.visualize.images import plot_images, plot_energy_evolution, plot_adsorption_sites
+# from xsorb.visualize.images import plot_images, plot_energy_evolution, plot_adsorption_sites, view_config

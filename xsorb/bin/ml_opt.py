@@ -15,7 +15,7 @@ import os
 
 from ase.optimize import BFGS, BFGSLineSearch
 
-from xsorb.io.utils import ase_custom_read as read
+from xsorb.ase_custom.io import ase_custom_read as read
 
 def main():
     '''

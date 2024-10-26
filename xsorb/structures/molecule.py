@@ -17,7 +17,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.core.bonds import CovalentBond
 from ase.constraints import FixCartesian
 
-from xsorb.io.utils import ase_custom_read as read
+from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.visualize.plot import plot_rotations_images
 from xsorb.structures.properties import MoleculeRotation, SurroundingSite
 

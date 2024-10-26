@@ -15,8 +15,8 @@ import shutil
 import subprocess
 import sys
 
+import xsorb.io.database
 from xsorb.io.settings import Settings
-from xsorb.io.database import Database
 from xsorb.dft_codes.definitions import SBATCH_POSTFIX
 from xsorb.dft_codes.calculator import edit_files_for_restart
 if TYPE_CHECKING:
@@ -85,7 +85,7 @@ def launch_jobs(*,program : str,
         os.chdir(main_dir) ####################
 
     if calc_type not in ('isolated'): #no database for slab/molecule
-        Database.add_job_ids(calc_type, [system.calc_id for system in systems], submitted_jobs)
+        xsorb.io.database.Database.add_job_ids(calc_type, [system.calc_id for system in systems], submitted_jobs)
     else:
         with open(".submitted_jobs.txt", "a",encoding=sys.getfilesystemencoding()) as f:
             f.writelines([job+'\n' for job in submitted_jobs])
@@ -103,7 +103,7 @@ def restart_jobs(calc_type : str):
 
     settings = Settings()
 
-    rows = Database.get_calculations(calc_type,
+    rows = xsorb.io.database.Database.get_calculations(calc_type,
                                      selection='status="incomplete",job_status="terminated"')
     indices_to_restart = [row.calc_id for row in rows]
     in_files = [row.in_file for row in rows]
@@ -134,7 +134,7 @@ def restart_jobs(calc_type : str):
             submitted_jobs.append(outstring.split()[-1])
         os.chdir(main_dir) ####################
 
-    Database.add_job_ids(calc_type, indices_to_restart, submitted_jobs)
+    xsorb.io.database.Database.add_job_ids(calc_type, indices_to_restart, submitted_jobs)
 
 
 #TODO: generalize to other schedulers, replace with regex
@@ -163,7 +163,7 @@ def scancel():
     '''
 
     #add jobs from the database(s)
-    submitted_job_ids = Database.get_all_job_ids()
+    submitted_job_ids = xsorb.io.database.Database.get_all_job_ids()
 
     #also add jobs from .submitted_jobs.txt
     if Path(".submitted_jobs.txt").exists():
@@ -173,6 +173,10 @@ def scancel():
 
     running_jobs = get_running_jobs()
     running_job_ids = [job.split()[0] for job in running_jobs]
+
+    if len(running_job_ids) == 0:
+        print("No jobs to cancel.")
+        return
 
     print(f"Cancelling jobs {running_job_ids}.")
     _cancel_jobs(running_job_ids)

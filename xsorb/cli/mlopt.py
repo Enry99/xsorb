@@ -1,5 +1,5 @@
 '''
-CLI parser for command: gen
+CLI parser for command: mlopt
 '''
 
 import argparse
@@ -8,10 +8,11 @@ from xsorb.cli.command import CLICommandBase
 
 
 class CLICommand(CLICommandBase):
-    """Generate the initial structures, without launching any calculation.
+    """generate the initial structures and launch the optimizations with a machine learning force field
 
-The initial structures are generated based on the settings in the configuration file.
-The structures are added to the structures.db database.
+    This can be used by itself, or as a pre-optimization step before the screening
+    to have a better starting point for the DFT calculations, or even
+    to substitute the screening step.
 
     """
 
@@ -22,10 +23,11 @@ The structures are added to the structures.db database.
                         help='''save an image with the adsorption sites,
                             and an image with the rotations of the molecule''')
 
+
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.calculations.launchers import generate
-        generate(save_image=args.save_images)
+        from xsorb.calculations.launchers import launch_ml_opt
+        launch_ml_opt(save_images=args.save_images)
 
 
     @staticmethod

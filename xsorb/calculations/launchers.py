@@ -16,9 +16,9 @@ import sys
 
 import numpy as np
 
-from xsorb.structures import AdsorptionStructuresGenerator
+from xsorb.structures.generation import AdsorptionStructuresGenerator
 from xsorb.io.settings import Settings
-from xsorb.io.utils import ase_custom_read as read
+from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.io.inputs import write_inputs, write_slab_mol_inputs
 from xsorb.io.jobs import launch_jobs
 from xsorb.io.database import Database
@@ -134,7 +134,7 @@ def launch_final_relax(*,
     - n_configs: nubmer of configurations to be relaxed, starting from the one with lowest energy
     - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration.
         The configuration with E - Emin < threshold will be selected
-    - required_calc_ids: user-specified indices, instead of identifying them according to energy
+    - calc_ids: user-specified indices, instead of identifying them according to energy
     - excluded_calc_ids: indices of the configurations to be excluded
     - take_from: type of calculation for the selection. Can be 'screening', 'ml_opt'
     - relax_from_initial: use the initial configuration as starting point for the relaxation
@@ -156,6 +156,8 @@ def launch_final_relax(*,
                            'required_calc_ids can be specified.')
     if n_configs is None and threshold is None and calc_ids is None:
         #none specified, use n_configs method, with default values
+        #this should never be the case, as the user should specify at least one
+        #in the current implementation of the arg parser
         if by_site:
             n_configs = 1
         else:

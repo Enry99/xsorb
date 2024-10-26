@@ -56,10 +56,12 @@ import pandas as pd
 import ase.db
 import ase.db.core
 
-from xsorb.structures.generation import AdsorptionStructure
-from xsorb.calculations.results import get_calculations_results
+import xsorb.calculations.results
 if TYPE_CHECKING:
     from xsorb.io.inputs import WrittenSystem
+    from xsorb.structures.generation import AdsorptionStructure
+
+DATAFRAME_COLUMNS_NAMES = ("site", "site_info", "mol_atom", "initial_dz", "xrot", "yrot", "zrot")
 
 
 #TODO: check that the atoms object stored in the database also contains custom_labels. Otherwise,
@@ -169,7 +171,8 @@ class Database:
     def update_calculations(calc_type : str,
                             refresh : bool = False,
                             mult : float | None = None,
-                            write_csv : bool = True) -> None:
+                            write_csv : bool = True,
+                            txt : bool = False) -> None:
         '''
         Update the database with the new results.
         Also update the job status
@@ -180,6 +183,8 @@ class Database:
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding. Needs to be passed when refreshing the database
             if the value was changed from the settings
+        - write_csv: bool to write the results to a csv file
+        - txt: bool to write a txt file instead of a csv file
         '''
 
         if calc_type == 'all':
@@ -188,7 +193,7 @@ class Database:
                     Database.update_calculations(ctype, refresh, mult, write_csv=False)
 
             if write_csv: #only write the csv file once
-                Database.write_csvfile()
+                Database.write_csvfile(txt=txt)
             return
 
         with ase.db.connect(Database.calc_types[calc_type]) as db:
@@ -215,11 +220,12 @@ class Database:
                                         for row in rows]
 
             #Get the results of the calculations
-            results = get_calculations_results(systems=systems,
-                                               program=program,
-                                               mol_indices=rows[0].data.mol_indices,
-                                               mult=mult,
-                                               total_e_slab_mol=total_e_slab_mol)
+            results = xsorb.calculations.results.get_calculations_results(
+                    systems=systems,
+                    program=program,
+                    mol_indices=rows[0].data.mol_indices,
+                    mult=mult,
+                    total_e_slab_mol=total_e_slab_mol)
 
             for row_id, result in zip(row_ids, results):
                 if results is not None:
@@ -239,7 +245,7 @@ class Database:
                     #print(f'Warning: Calculation {row.calc_id} cannot be updated.')
 
         if write_csv:
-            Database.write_csvfile()
+            Database.write_csvfile(txt=txt)
 
     @staticmethod
     def get_structures(calc_ids : list[int] | int | None = None) -> list:
@@ -291,6 +297,10 @@ class Database:
         '''
         if selection is not None and calc_ids is not None:
             raise ValueError('Cannot use both selection and calc_ids')
+
+        if not Path(Database.calc_types[calc_type]).exists():
+            print(f'Warning: No {calc_type} calculations present in the database.')
+            return []
 
         #Make sure that the database is up to date
         Database.update_calculations(calc_type)
@@ -355,12 +365,13 @@ class Database:
         '''
         job_ids = []
         calc_types = Database.calc_types.copy()
-        calc_types.pop('structures')
+
         for calc_type in calc_types.values():
-            with ase.db.connect(calc_type) as db:
-                for row in db.select(include_data=False):
-                    if row.status=='incomplete' and row.get('job_id') is not None:
-                        job_ids.append(row.job_id)
+            if Path(calc_type).exists():
+                with ase.db.connect(calc_type) as db:
+                    for row in db.select(include_data=False):
+                        if row.status=='incomplete' and row.get('job_id') is not None:
+                            job_ids.append(row.job_id)
 
         return job_ids
 
@@ -392,6 +403,9 @@ class Database:
         - bool: True if all the calculations are completed, False otherwise
         '''
 
+        if not Path(Database.calc_types[calc_type]).exists():
+            return False
+
         #Make sure that the database is up to date
         Database.update_calculations(calc_type)
 
@@ -413,16 +427,20 @@ class Database:
 
         Args:
         - include_results: bool to include the results of the calculations
+        - txt: bool to write a txt file instead of a csv file
         '''
 
         print('Writing results file...')
+
+        if not Path('structures.db').exists():
+            raise RuntimeError('Missing structures.db database. Cannot write csv file.')
 
         # Get the data from the database
         info_dicts : list[dict] = []
         with ase.db.connect('structures.db') as db:
             for i, row in db.select(include_data=False):
                 info_dict = {'calc_id': row.id}
-                for key in AdsorptionStructure.dataframe_column_names():
+                for key in DATAFRAME_COLUMNS_NAMES:
                     info_dict.update({key: row.get(key)})
                 info_dicts.append(info_dict)
 
@@ -458,7 +476,7 @@ class Database:
                     last_calc_e_column_name = f'Eads_{calc_type[:3]}(eV)'
 
         # Write csv file
-        df = pd.DataFrame(columns=['calc_id'] + AdsorptionStructure.dataframe_column_names())
+        df = pd.DataFrame(columns=['calc_id'] + DATAFRAME_COLUMNS_NAMES)
         for info_dict in info_dicts:
             df_line = pd.Series(info_dict)
             df.loc[i] = df_line

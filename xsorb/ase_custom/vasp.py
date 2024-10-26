@@ -149,7 +149,7 @@ def read_vasp(filename='CONTCAR'):
         set_constraints(atoms, selective_flags)
 
     # Resort if ase-sort.dat is present
-    sortfile = f'{Path(filename).parent}/ase-sort.dat'
+    sortfile = f'{Path(fd.name).parent}/ase-sort.dat'
     if Path(sortfile).exists():
         resort_list = []
         with open(sortfile, 'r', encoding=sys.getfilesystemencoding()) as fd:

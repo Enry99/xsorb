@@ -13,13 +13,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 from pathlib import Path
-import tomllib
 import json
 import sys
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import pip._vendor.tomli as tomllib
+
 from dacite import from_dict, Config
 
-from xsorb.io.utils import ase_custom_read as read
+from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.dft_codes.definitions import SUPPORTED_PROGRAMS
 from xsorb.dft_codes.input_settings import get_dftprogram_settings
 
@@ -66,23 +70,21 @@ class CoordNumberParams:
     coord_number_params card of the settings file.
     '''
     cn_method: str
-    range_selection: dict
 
     atomic_species: Optional[list[str]]
     max_cn: Optional[float]
-    max_cn_offset: float = 2
+    max_cn_offset: Optional[float]
     include_surrounding_sites: bool = False
     surrounding_sites_deltaz: float = 1.5
-    surrounding_exclude_main: bool = True
     cn_plain_fixed_radius: float = 1.5
 
     def __post_init__(self):
         if self.cn_method not in ['plain', 'minimumdistancenn', 'crystalnn']:
             raise ValueError('cn_method must be either plain, MinimumDistanceNN or CystalNN.')
-        if 'mode' not in self.range_selection or 'value' not in self.range_selection:
-            raise ValueError('range_selection must be in the format {mode = "max", value = 4}.')
-        if self.range_selection['mode'] not in ['max', 'offset']:
-            raise ValueError('range_selection mode must be either max or offset.')
+        if self.max_cn is not None and self.max_cn_offset is not None:
+            raise ValueError('You can use either max_cn or max_cn_offset, not both at the same time.')
+        if self.max_cn is None and self.max_cn_offset is None:
+            self.max_cn_offset = 2
 
 @dataclass
 class AdsorptionSitesParams:
@@ -205,7 +207,7 @@ class StructureParams:
     molecule: MoleculeParams
     constraints: ConstraintsParams = field(
         default_factory=lambda: ConstraintsParams(None, None, None))
-    misc: MiscParams = MiscParams()
+    misc: MiscParams = field(default_factory=lambda: MiscParams(False,False,True,True))
 
 
 
@@ -228,10 +230,10 @@ class Settings:
 
         #Read the settings file
         if Path('settings.toml').is_file():
-            with open("settings.toml", "rb",encoding=sys.getfilesystemencoding()) as f:
+            with open("settings.toml", "rb") as f:
                 self.settings_dict = tomllib.load(f)
         elif Path('settings.json').is_file():
-            with open("settings.json", "rb",encoding=sys.getfilesystemencoding()) as f:
+            with open("settings.json", "r", encoding=sys.getfilesystemencoding()) as f:
                 self.settings_dict = json.load(f)
         else:
             raise FileNotFoundError("Settings file (settings.toml or settings.json)"\
