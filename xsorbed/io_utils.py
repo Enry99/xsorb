@@ -9,6 +9,7 @@ Function definitions to read from pwo and launch scripts
 
 """
 
+from __future__ import annotations
 import os, shutil, subprocess
 import numpy as np
 import pandas as pd
