@@ -171,6 +171,7 @@ class AdsorptionStructuresGenerator:
         dz_tot = 0
         molcopy = mol.copy()
 
+        niter = 0
         while True:
 
             # First, find the closest slab-molecule pair, not in absolute sense but
@@ -184,7 +185,8 @@ class AdsorptionStructuresGenerator:
 
             i_slab, j_mol, *_ = np.unravel_index(np.argmin(diff_matrix), diff_matrix.shape)
 
-            if diff_matrix[i_slab,j_mol] >= 0:
+            print(diff_matrix[i_slab,j_mol])
+            if diff_matrix[i_slab,j_mol] > -1e-6: #avoid infinite loop due to numerical errors
                 break #already above target distance
 
             #Then, translate the mol upwards so that the z coordinate of the mol atom
@@ -206,6 +208,11 @@ class AdsorptionStructuresGenerator:
 
             molcopy.translate([0,0,dz])
             dz_tot += dz
+
+            niter += 1
+
+            if niter > 100:
+                raise RuntimeError("Too many iterations in _mindistance_deltaz")
 
         return dz_tot
 
@@ -351,12 +358,14 @@ class AdsorptionStructuresGenerator:
         adsorption_structures : list[AdsorptionStructure] = []
         for mol_ref_index in self.mol.reference_atom_indices:
             for adsite in adsites:
+                print(adsite)
                 molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
                                                                     which_index=mol_ref_index,
                                                                     adsite=adsite,
                                                                     save_image=save_image,
                                                                     verbose=verbose)
                 for mol_rot in molecule_rotations:
+                    print(mol_rot)
                     structure = self._put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
                     adsorption_structures.append(structure)
 

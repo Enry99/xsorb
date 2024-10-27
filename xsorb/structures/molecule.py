@@ -117,7 +117,7 @@ class Molecule:
         self.reference_atom_indices = atom_indexes
 
         #Translate reference atom to origin
-        self.translated_mols = []
+        self.translated_mols = {}
         for atom_index in self.reference_atom_indices:
             mol = self.mol_ase.copy()
             if atom_index != -1:
@@ -125,7 +125,7 @@ class Molecule:
             else:
                 #center of positions (not of mass)
                 mol.translate(-self.mol_ase.positions.mean(axis=0))
-            self.translated_mols.append(mol)
+            self.translated_mols.update({atom_index : mol})
 
         #set other useful attributes
         self.constrained_indices = [constr.a for constr in self.mol_ase.constraints]
