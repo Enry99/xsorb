@@ -69,7 +69,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
         the AdsorptionStructure object, the path to the input, output and log files.
     '''
 
-    program = settings.program if calc_type is not 'ml_opt' else 'ml'
+    program = settings.program if calc_type != 'ml_opt' else 'ml'
 
     if verbose: print('Writing input files...') #pylint: disable=multiple-statements
 
@@ -92,7 +92,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     for i, ads_structure in zip(calc_ids, adsorption_structures):
 
         #possibly apply constraints to slab in case of ml_opt
-        if calc_type is 'ml_opt' and settings.structure.constraints.fix_slab_ml_opt:
+        if calc_type == 'ml_opt' and settings.structure.constraints.fix_slab_ml_opt:
             set_fixed_slab_constraints(ads_structure.atoms, ads_structure.slab_indices)
 
         file_label = f'{calc_type_for_writing.lower()}_{i}'  #e.g. screening_i or relax_i
@@ -188,7 +188,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
     for atoms, system in zip(structures, written_systems):
 
         #possibly apply constraints to slab in case of ml_opt
-        if ml and system.calc_id is 'slab' and settings.structure.constraints.fix_slab_ml_opt:
+        if ml and system.calc_id == 'slab' and settings.structure.constraints.fix_slab_ml_opt:
             set_fixed_slab_constraints(atoms)
 
         file_label : str = system.calc_id

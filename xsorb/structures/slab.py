@@ -188,10 +188,8 @@ class Slab:
             in_coord = False
             for op in symm_ops:
                 idxs = find_in_coord_list_pbc(unique_coords, op.operate(coords), atol=threshold)
-                if idxs:
-                    if len(idxs) > 1:
-                        raise RuntimeError('ERROR: a new site is symmetrically equivalent' \
-                              ' to two INEQUIVALENT sites.')
+                if len(idxs) > 0: #note: this is crucial, and mimicks pymatgen's original in_coord_list_pbc,
+                    #which just does len(find_in_coord_list_pbc) > 0
                     in_coord = True
                     equivalent_sets[idxs[0]] += [self.asf.slab.lattice.get_cartesian_coords(coords)]
                     break
@@ -326,7 +324,7 @@ class Slab:
             #sort the sites by distance from the center of the cell
             sorted_sites = sorted(adsites_coords[site_type],
                 key=lambda x: np.linalg.norm(
-                    x - self.asf.slab.lattice.get_cartesian_coords([0.5, 0.5, 0]))
+                    np.array([x[0],x[1],0]) - self.asf.slab.lattice.get_cartesian_coords([0.5, 0.5, 0]))
                     )
 
             #find the equivalent sets of sites
