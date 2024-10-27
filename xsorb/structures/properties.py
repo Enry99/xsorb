@@ -200,13 +200,22 @@ class AdsorptionStructure:
         """
         Returns a dictionary with the information of the AdsorptionStructure object
         """
-        infodict = {"site": self.adsite.label,
+
+        try: #to make the ase db check happy
+            site = int(self.adsite.label)
+        except ValueError:
+            site = self.adsite.label
+        try: #to make the ase db check happy
+            zrot = float(self.mol_rot.zrot)
+        except ValueError:
+            zrot = self.mol_rot.zrot
+        infodict = {"site": site,
                     "site_info": self.adsite.info,
                     "mol_atom": self.mol_rot.mol_atom,
                     "initial_dz": self.distance,
-                    "xrot": self.mol_rot.xrot,
-                    "yrot": self.mol_rot.yrot,
-                    "zrot": self.mol_rot.zrot}
+                    "xrot": float(self.mol_rot.xrot),
+                    "yrot": float(self.mol_rot.yrot),
+                    "zrot": zrot}
 
         #check that the keys are the same as the column names.
         #(to avoid introducing bugs when adding new columns in the code)

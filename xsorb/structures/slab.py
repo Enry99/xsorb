@@ -270,7 +270,7 @@ class Slab:
                     else:
                         if len(nn_list) >=2:
                             distance = np.linalg.norm(nn_list[0].coords[:2] - nn_list[1].coords[:2])
-                            info = f"{site_type} {distance}"
+                            info = f"{site_type} {distance:.2f}"
                         else:
                             info = f"{site_type}"
                 else:

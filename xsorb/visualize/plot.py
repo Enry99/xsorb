@@ -125,7 +125,7 @@ def plot_adsites_image(mode : str,
         if mode == "coord_number_surrounding":
             for surrounding_site in main_site.surrounding_sites:
                 site_xy = sop.operate(surrounding_site.coords)[:2]
-                label = surrounding_site.label
+                label = str(surrounding_site.label)
                 if surrounding_site.duplicate_main:
                     label += '^'
                 if surrounding_site.duplicate_surrounding:

@@ -108,8 +108,8 @@ class Database:
                         break
                 if not already_present:
                     calc_id = db.write(ads_struct.atoms,
-                                       kwargs=ads_struct.to_info_dict(),
-                                       data=ads_struct.additional_data_arrays())
+                                       data=ads_struct.additional_data_arrays(),
+                                       **ads_struct.to_info_dict())
                     calc_ids.append(calc_id)
 
         if write_csv:
@@ -159,12 +159,12 @@ class Database:
                 data.update({'adsorption_structure': ads_struct})
                 db.write(ads_struct.atoms,
                         calc_id=system.calc_id,
-                        kwargs=ads_struct.to_info_dict(),
                         status='incomplete',
                         in_file_path=system.in_file_path,
                         out_file_path=system.out_file_path,
                         log_file_path=system.log_file_path,
-                        data=data)
+                        data=data,
+                        **ads_struct.to_info_dict())
 
 
     @staticmethod
@@ -438,7 +438,7 @@ class Database:
         # Get the data from the database
         info_dicts : list[dict] = []
         with ase.db.connect('structures.db') as db:
-            for i, row in db.select(include_data=False):
+            for row in db.select(include_data=False):
                 info_dict = {'calc_id': row.id}
                 for key in DATAFRAME_COLUMNS_NAMES:
                     info_dict.update({key: row.get(key)})
@@ -476,8 +476,8 @@ class Database:
                     last_calc_e_column_name = f'Eads_{calc_type[:3]}(eV)'
 
         # Write csv file
-        df = pd.DataFrame(columns=['calc_id'] + DATAFRAME_COLUMNS_NAMES)
-        for info_dict in info_dicts:
+        df = pd.DataFrame(columns=['calc_id'] + list(DATAFRAME_COLUMNS_NAMES))
+        for i, info_dict in enumerate(info_dicts):
             df_line = pd.Series(info_dict)
             df.loc[i] = df_line
 

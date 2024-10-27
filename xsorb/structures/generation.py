@@ -185,7 +185,6 @@ class AdsorptionStructuresGenerator:
 
             i_slab, j_mol, *_ = np.unravel_index(np.argmin(diff_matrix), diff_matrix.shape)
 
-            print(diff_matrix[i_slab,j_mol])
             if diff_matrix[i_slab,j_mol] > -1e-6: #avoid infinite loop due to numerical errors
                 break #already above target distance
 
@@ -358,14 +357,12 @@ class AdsorptionStructuresGenerator:
         adsorption_structures : list[AdsorptionStructure] = []
         for mol_ref_index in self.mol.reference_atom_indices:
             for adsite in adsites:
-                print(adsite)
                 molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
                                                                     which_index=mol_ref_index,
                                                                     adsite=adsite,
                                                                     save_image=save_image,
                                                                     verbose=verbose)
                 for mol_rot in molecule_rotations:
-                    print(mol_rot)
                     structure = self._put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
                     adsorption_structures.append(structure)
 
