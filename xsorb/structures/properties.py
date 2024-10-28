@@ -229,4 +229,4 @@ class AdsorptionStructure:
         '''
         return {"slab_indices": self.slab_indices,
                 "mol_indices": self.mol_indices,
-                "custom_labels": self.atoms.get_array("custom_labels")}
+                "custom_labels": self.atoms.get_array("custom_labels").tolist()}

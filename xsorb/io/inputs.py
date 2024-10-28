@@ -244,8 +244,8 @@ def saveas(calc_type : str, saveas_format : str):
 
     for row in rows:
         if saveas_format == 'xyz':
-            write_xyz_custom(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.atoms)
+            write_xyz_custom(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.toatoms())
         else:
-            write(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.atoms)
+            write(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.toatoms())
 
     print("All files saved.")

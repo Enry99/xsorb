@@ -228,7 +228,7 @@ class Database:
                     total_e_slab_mol=total_e_slab_mol)
 
             for row_id, result in zip(row_ids, results):
-                if results is not None:
+                if result is not None:
                     db.update(id=row_id,
                               atoms=result.atoms,
                               status=result.status,

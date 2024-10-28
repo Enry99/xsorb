@@ -11,7 +11,7 @@ used to read the settings file and store the parameters.
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 from pathlib import Path
 import json
 import sys
@@ -122,7 +122,7 @@ class MoleculeParams:
 
     individual_rotations: Optional[list[list[float]]]
 
-    vertical_angles: str | list[float] = 'x'
+    vertical_angles: Union[str,list[float]] = 'x'
     adsorption_distance_mode: str = 'value'
     target_distance: float = 2.0
     min_distance: float = 1.5
