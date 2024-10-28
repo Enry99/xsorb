@@ -99,7 +99,7 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
 
     preset_incar_settings = {}
 
-    if "pymatgen_set" in dftsettings:
+    if dftsettings.get("pymatgen_set"):
         sets_map = {'mprelaxset': MPRelaxSet,
                     'mpmetalrelaxset': MPMetalRelaxSet,
                     'mpscanrelaxset': MPScanRelaxSet,
@@ -114,7 +114,7 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
         preset_incar_settings.pop('@module')
         preset_incar_settings.pop('@class')
 
-        if "kpoints_string" not in dftsettings:
+        if not dftsettings.get("kpoints_string"):
             relax.kpoints.write_file('_temp_kpts_')
 
     preset_incar_settings["xc"] = dftsettings["vasp_xc_functional"]
@@ -129,17 +129,17 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
 
 
     #write user-defined settings to string, to be parsed by ASE, overriding the preset flags
-    if "incar_string" in dftsettings:
+    if dftsettings.get("incar_string"):
         with open('_temp_incar_', 'w',encoding=sys.getfilesystemencoding()) as f:
             f.write(dftsettings["incar_string"])
         calc.read_incar('_temp_incar_')
         os.remove('_temp_incar_')
 
-    if "kpoints_string" in dftsettings:
+    if dftsettings.get("kpoints_string"):
         with open('_temp_kpts_', 'w',encoding=sys.getfilesystemencoding()) as f:
             f.write(dftsettings["kpoints_string"])
 
-    if "kpoints_string" in dftsettings or "pymatgen_set" in dftsettings:
+    if dftsettings.get("kpoints_string") or dftsettings.get("pymatgen_set"):
         calc.read_kpoints('_temp_kpts_')
         os.remove('_temp_kpts_')
 
@@ -165,7 +165,10 @@ def write_file_with_calculator(atoms : Atoms,
         raise ValueError(f'Program {program} not supported')
 
 
-    calc = setup_functions[program](atoms, dftsettings, label, directory)
+    calc = setup_functions[program](atoms=atoms,
+                                    dftsettings=dftsettings,
+                                    label=label,
+                                    directory=directory)
     calc.write_input(atoms)
 
 

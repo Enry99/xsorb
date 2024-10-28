@@ -160,7 +160,7 @@ class AdsorptionStructuresGenerator:
         mult = self.settings.structure.molecule.radius_scale_factor
 
         if mode == 'value':
-            radii = np.array([min_distance]*len(covalent_radii))
+            radii = np.array([min_distance]*len(covalent_radii))/2 #dist. is diameter
         elif mode == 'covalent_radius':
             radii = covalent_radii*mult
         elif mode == 'vdw_radius':
