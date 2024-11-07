@@ -6,11 +6,9 @@
 
 '''
 Redefinition of the ase.Atoms class to:
-- include custom labels for the atoms, obtainable with get_custom_labels()
+- include custom_labels property to atoms, handled by the tags property.
 - add constraints when summing two Atoms objects.
 '''
-
-import re
 
 from ase import Atoms, Atom
 from ase.constraints import FixAtoms, FixCartesian, FixScaled
@@ -19,60 +17,37 @@ from ase.constraints import FixAtoms, FixCartesian, FixScaled
 class AtomsCustom(Atoms):
     """
     Custom class inheriting from ASE Atoms class,
-    with the addition of custom_labels array,
-    and the corresponding get_custom_labels() and set_custom_labels() methods.
+    with custom labels included as tags.
+    DO NOT USE TAGS SINCE THEY SHOULD BE RESERVED FOR CUSTOM LABELS.
 
     It also has the added functionality
     to include both constraints when summing two Atoms objects.
     """
 
-    def __init__(self, symbols=None,
-                 positions=None, numbers=None,
-                 tags=None, momenta=None, masses=None,
-                 magmoms=None, charges=None,
-                 scaled_positions=None,
-                 cell=None, pbc=None, celldisp=None,
-                 constraint=None,
-                 calculator=None,
-                 info=None,
-                 custom_labels=None):
+    @property
+    def custom_labels(self):
+        """Get custom_labels."""
 
-        if hasattr(symbols, 'get_custom_labels'):
-            #here symbols is a AtomsCustom:
-            # copy constructor
-            custom_labels = symbols.get_custom_labels()
-        elif symbols is not None:
-            #strip possible custom labels:
-            for i, symbol in enumerate(symbols):
-                if isinstance(symbol, str):
-                    symbols[i] = re.sub(r'\d+', '', symbol) #remove numbers
+        symbols = self.get_chemical_symbols()
+        tags = self.get_tags()
 
-        super().__init__(symbols=symbols,positions=positions,numbers=numbers,tags=tags,
-                         momenta=momenta,masses=masses,magmoms=magmoms,charges=charges,
-                         scaled_positions=scaled_positions,cell=cell, pbc=pbc, celldisp=celldisp,
-                         constraint=constraint,calculator=calculator,info=info)
-
-        if custom_labels is None:
-            custom_labels = self.get_chemical_symbols()
-
-        self.set_custom_labels(custom_labels)
-
-
-    def set_custom_labels(self, custom_labels=None):
-        """Set custom_labels."""
-
-        if custom_labels is not None:
-            labels = [f'{label:3}' for label in custom_labels]
-        else: labels=None
-        self.set_array('custom_labels', labels, str, ())
-
-
-    def get_custom_labels(self):
-        """Get array of custom_labels."""
-        if 'custom_labels' in self.arrays:
-            return [label.strip() for label in self.arrays['custom_labels']]
+        if tags.any(): # if not all zero (default)
+            custom_labels = []
+            for symbol, tag in zip(self.get_chemical_symbols(), self.get_tags()):
+                if tag != -1:
+                    custom_labels.append(f"{symbol}{tag}")
+                else:
+                    custom_labels.append(symbol)
         else:
-            return None
+            custom_labels = symbols
+
+        return custom_labels
+
+
+    @custom_labels.setter
+    def custom_labels(self, ids=None):
+        """Set custom_labels."""
+        self.set_tags(ids)
 
 
     def extend(self, other):
@@ -92,3 +67,30 @@ class AtomsCustom(Atoms):
             if isinstance(constr, (FixCartesian,FixScaled,FixAtoms)):
                 constr.a += n1
                 self.constraints += [constr]
+
+
+def extract_number_from_string(string, symbol):
+    """
+    Extract the number from a string, given the symbol.
+    The number is the last part of the string, after the symbol.
+
+    Parameters
+    ----------
+    string : str
+        The string to extract the number from.
+    symbol : str
+        The symbol of the element.
+
+    Returns
+    -------
+    number : int
+        The number extracted from the string, or -1 if no number is found.
+    """
+    # extract the number from the end of the string
+    number = string.split(symbol)[-1]
+    if number:
+        number = int(number)
+    else:
+        number = -1
+
+    return number

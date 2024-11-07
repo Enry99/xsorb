@@ -181,7 +181,7 @@ def render_image(*,
 
         #then, substitute user-defined colors
         try:
-            species = atoms.get_custom_labels()
+            species = atoms.custom_labels
         except AttributeError:
             species = atoms.get_chemical_symbols()
 

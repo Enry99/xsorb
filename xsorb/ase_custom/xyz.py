@@ -14,8 +14,9 @@ from ase.constraints import FixAtoms, FixCartesian
 from ase.io.extxyz import (XYZError, set_calc_and_arrays, key_val_str_to_dict, parse_properties,
     output_column_format, save_calc_results, voigt_6_to_full_3x3_stress)
 from ase.utils import writer
+from ase.io.espresso import label_to_symbol
 
-from xsorb.ase_custom.atoms import AtomsCustom
+from xsorb.ase_custom.atoms import AtomsCustom, extract_number_from_string
 
 
 def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
@@ -112,7 +113,17 @@ def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
     symbols = arrays.pop('symbols', None)
 
     if symbols is not None:
-        symbols = [s.capitalize() for s in symbols]
+        symbols_plus_numbers = symbols.copy()
+        symbols, tags = [], []
+        for symbol_plus_number in symbols_plus_numbers:
+            symbol = label_to_symbol(symbol_plus_number)
+            number = extract_number_from_string(symbol_plus_number, symbol)
+            symbols.append(symbol)
+            tags.append(number)
+        if not tags:
+            tags = None
+    else:
+        tags=None
 
     atoms = AtomsCustom(numbers if numbers is not None else symbols,
                   positions=arrays.pop('positions', None),
@@ -120,7 +131,7 @@ def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
                   cell=cell,
                   pbc=pbc,
                   info=info,
-                  custom_labels=symbols)
+                  tags=tags)
 
     # Read and set constraints
     if 'move_mask' in arrays:
@@ -147,7 +158,6 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
     """
     Custom version of ase.io.extxyz.write_xyz to handle custom_labels
     if custom_labels_as_symbols is True, custom_labels will be written as symbols
-    otherwise will just be included as an additional column
 
 
 
@@ -267,11 +277,8 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
             else:
                 raise ValueError(f'Missing array "{column}"')
 
-        #NOTE: replace symbols with custom_labels
-        if 'custom_labels' in arrays and custom_labels_as_symbols:
-            arrays['symbols'] = arrays['custom_labels']
-            del arrays['custom_labels']
-            fr_cols.remove('custom_labels')
+        if custom_labels_as_symbols:
+            arrays['symbols'] = atoms.custom_labels
 
         comm, ncols, dtype, fmt = output_column_format(atoms,
                                                        fr_cols,

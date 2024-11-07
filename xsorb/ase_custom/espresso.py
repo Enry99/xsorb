@@ -25,7 +25,7 @@ from ase.utils import reader
 from ase import Atom
 from ase.constraints import FixAtoms, FixCartesian
 
-from xsorb.ase_custom.atoms import AtomsCustom
+from xsorb.ase_custom.atoms import AtomsCustom, extract_number_from_string
 
 
 @reader
@@ -71,8 +71,15 @@ def read_espresso_in_custom(fileobj):
     positions_card = get_atomic_positions(
         card_lines, n_atoms=data['system']['nat'], cell=cell, alat=alat)
 
-    symbols = [label_to_symbol(position[0]) for position in positions_card]
-    custom_labels = [position[0] for position in positions_card]
+    symbols, tags = [], []
+    for position in positions_card:
+        sybmol_plus_number = position[0]
+        symbol = label_to_symbol(sybmol_plus_number)
+        number = extract_number_from_string(sybmol_plus_number, symbol)
+        symbols.append(symbol)
+        tags.append(number)
+    if not tags:
+        tags = None
     positions = [position[1] for position in positions_card]
     constraint_flags = [position[2] for position in positions_card]
     magmoms = [species_info[symbol]["magmom"] for symbol in symbols]
@@ -81,7 +88,7 @@ def read_espresso_in_custom(fileobj):
     # TODO: put more info into the atoms object
     # e.g magmom, forces.
     atoms = AtomsCustom(symbols=symbols, positions=positions, cell=cell, pbc=True,
-                  magmoms=magmoms, custom_labels=custom_labels)
+                  magmoms=magmoms, tags=tags)
     atoms.set_constraint(convert_constraint_flags(constraint_flags))
 
     return atoms
@@ -238,7 +245,7 @@ def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
                     mass=Atom(label_to_symbol(label)).mass,
                     pseudo=pseudo))
 
-    for atom, mask, custom_label in zip(atoms, masks, atoms.get_custom_labels()):
+    for atom, mask, custom_label in zip(atoms, masks, atoms.custom_labels):
         # construct line for atomic positions
         atomic_positions_str.append(
             format_atom_position(atom, crystal_coordinates, custom_label, mask=mask)
@@ -371,8 +378,6 @@ def parse_pwo_start_custom(lines, index=0):
 
     info = {}
 
-    custom_labels = []
-
     for idx, line in enumerate(lines[index:], start=index):
         if 'celldm(1)' in line:
             # celldm(1) has more digits than alat!!
@@ -388,12 +393,15 @@ def parse_pwo_start_custom(lines, index=0):
                 [float(x) for x in lines[idx + 2].split()[3:6]],
                 [float(x) for x in lines[idx + 3].split()[3:6]]])
         elif 'positions (alat units)' in line:
-            info['symbols'], info['positions'] = [], []
+            info['symbols'], info['positions'], info['tags'] = [], [], []
 
             for at_line in lines[idx + 1:idx + 1 + info['nat']]:
                 sym, x, y, z = parse_position_line(at_line)
-                info['symbols'].append(label_to_symbol(sym))
-                custom_labels.append(sym)
+                sybmol_plus_number = sym
+                symbol = label_to_symbol(sybmol_plus_number)
+                number = extract_number_from_string(sybmol_plus_number, symbol)
+                info['symbols'].append(symbol)
+                info['tags'].append(number)
                 info['positions'].append([x * info['celldm(1)'],
                                           y * info['celldm(1)'],
                                           z * info['celldm(1)']])
@@ -402,10 +410,13 @@ def parse_pwo_start_custom(lines, index=0):
             # Will need to be extended for DFTCalculator info.
             break
 
+    if not tags:
+        tags = None
+
     # Make atoms for convenience
     info['atoms'] = AtomsCustom(symbols=info['symbols'],
                           positions=info['positions'],
-                          cell=info['cell'], pbc=True, custom_labels=custom_labels)
+                          cell=info['cell'], pbc=True, tags=tags)
 
     return info
 
@@ -561,13 +572,19 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
                 n_atoms=n_atoms, cell=cell, alat=cell_alat)
 
             # convert to Atoms object
-            symbols = [label_to_symbol(position[0]) for position in
-                       positions_card]
-            custom_labels = [position[0] for position in positions_card]
+            symbols, tags = [], []
+            for position in positions_card:
+                sybmol_plus_number = position[0]
+                symbol = label_to_symbol(sybmol_plus_number)
+                number = extract_number_from_string(sybmol_plus_number, symbol)
+                symbols.append(symbol)
+                tags.append(number)
+            if not tags:
+                tags = None
             positions = [position[1] for position in positions_card]
             constraint_flags = [position[2] for position in positions_card]
             structure = AtomsCustom(symbols=symbols, positions=positions, cell=cell,
-                              pbc=True, custom_labels=custom_labels)
+                              pbc=True, tags=tags)
             structure.set_constraint(convert_constraint_flags(constraint_flags))
 
         # Extract calculation results

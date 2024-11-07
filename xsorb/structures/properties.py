@@ -179,7 +179,7 @@ class AdsorptionStructure:
 
     Methods:
     - to_info_dict: returns a dictionary with the information of the AdsorptionStructure object
-    - additional_data_arrays: returns a dictionary with slab_indices, mol_indices and custom_labels
+    - additional_data_arrays: returns a dictionary with slab_indices, mol_indices
     '''
     atoms: Atoms
     adsite: AdsorptionSite
@@ -228,5 +228,4 @@ class AdsorptionStructure:
         Returns a dictionary with the additional data arrays of the AdsorptionStructure object
         '''
         return {"slab_indices": self.slab_indices,
-                "mol_indices": self.mol_indices,
-                "custom_labels": self.atoms.get_array("custom_labels").tolist()}
+                "mol_indices": self.mol_indices}

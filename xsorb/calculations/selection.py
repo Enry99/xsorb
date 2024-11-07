@@ -35,11 +35,11 @@ def select_calculations(rows : list,
     '''
 
     if threshold is not None:
-        emin = rows[0].energy
+        emin = [row.energy for row in rows][0]
         calc_indices = [row.calc_id for row in rows if row.energy - emin < threshold]
 
     elif n_configs is not None:
-        calc_indices = [row.calc_id for row in rows[:n_configs]]
+        calc_indices = [row.calc_id for i, row in enumerate(rows) if i < n_configs]
 
     else:
         raise ValueError('Either n_configs or threshold must be specified.')

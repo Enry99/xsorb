@@ -39,7 +39,6 @@ The calculation databases have the following columns:
     and the AdsorptionStructure.additional_data_arrays():
     - slab_indices
     - mol_indices
-    - custom_labels
 
 Each database also has the following metadata:
 - program (str): name of the program used for the calculations
@@ -64,9 +63,6 @@ if TYPE_CHECKING:
 
 DATAFRAME_COLUMNS_NAMES = ("site", "site_info", "mol_atom", "initial_dz", "xrot", "yrot", "zrot")
 
-
-#TODO: check that the atoms object stored in the database also contains custom_labels. Otherwise,
-# make sure they are returned when necessary from the data key
 
 class Database:
     '''
@@ -167,7 +163,6 @@ class Database:
                         data=data,
                         **ads_struct.to_info_dict())
 
-
     @staticmethod
     def update_calculations(calc_type : str,
                             refresh : bool = False,
@@ -224,7 +219,7 @@ class Database:
             results = xsorb.calculations.results.get_calculations_results(
                     systems=systems,
                     program=program,
-                    mol_indices=rows[0].data.mol_indices,
+                    mol_indices=[row.data.mol_indices for row in rows][0],
                     mult=mult,
                     total_e_slab_mol=total_e_slab_mol)
 
