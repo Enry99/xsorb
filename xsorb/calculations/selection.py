@@ -151,15 +151,14 @@ def get_adsorption_structures(get_structures_from : str,
 
     if get_structures_from == 'ml_opt':
         rows_original, _ = Database.get_calculations(calc_type='structures',
-                                                  calc_ids=calc_ids,
-                                                  include_data=False)
+                                                  calc_ids=calc_ids)
         constraints = [row.constraints for row in rows_original]
 
     # prepare the structures by substituting the atoms with the one from the
     # previous calculation
     adsorption_structures : list [AdsorptionStructure] = []
     for row in rows:
-        ads_struct : AdsorptionStructure = row.data.adsorption_structure
+        ads_struct = AdsorptionStructure(**row.data.adsorption_structure)
         atoms : Atoms = row.toatoms()
 
         if get_structures_from == 'ml_opt':

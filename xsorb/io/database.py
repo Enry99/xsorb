@@ -51,6 +51,7 @@ Each database also has the following metadata:
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from pathlib import Path
+from dataclasses import asdict
 
 import pandas as pd
 import ase.db
@@ -156,7 +157,7 @@ class Database:
                 #write the new calculation in any case
                 ads_struct : AdsorptionStructure = system.adsorption_structure
                 data=ads_struct.additional_data_arrays()
-                data.update({'adsorption_structure': ads_struct})
+                data.update({'adsorption_structure': asdict(ads_struct)})
                 db.write(ads_struct.atoms,
                         calc_id=system.calc_id,
                         status='incomplete',

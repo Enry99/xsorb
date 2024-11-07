@@ -200,7 +200,7 @@ class Slab:
         return equivalent_sets
 
 
-    def _get_classified_high_symmetry_sites(self, site_types : tuple[str, str, str],
+    def _get_classified_high_symmetry_sites(self,
                                            adsites_coords : dict,
                                            selected_sites : list | None = None):
         """
@@ -208,7 +208,6 @@ class Slab:
         classified according to the site type, and include the info.
 
         Args:
-        - site_types: tuple containing the types of adsorption sites to be classified
         - adsites_coords: dictionary containing the coordinates of the ontop,
             hollow and bridge sites
         - selected_sites (optional): indices of the sites for manual selection
@@ -236,10 +235,13 @@ class Slab:
         all_adsites.extend(existing_sites)
 
         i_site = len(all_adsites)
-        for site_type, sites_coords_list in zip(site_types,
-            [adsites_coords['ontop'], adsites_coords['hollow'], adsites_coords['bridge']]):
+        for site_type, sites_coords_list in adsites_coords.items():
 
             for site_coords in sites_coords_list:
+
+                # skip the site if it is already in the list of existing sites
+                if np.any([np.allclose(site_coords, ex_site.coords) for ex_site in existing_sites]):
+                    continue
 
                 unique_id = "{0:.2f},{1:.2f}".format(*site_coords[:2]) #pylint: disable=consider-using-f-string
 
@@ -334,9 +336,7 @@ class Slab:
             adsites_coords[site_type]=[equivalent_set[0] for equivalent_set in equivalent_sets_list]
 
         #classify the adsorption sites, building the list of AdsorptionSiteCrystal objects
-        all_adsites = self._get_classified_high_symmetry_sites(site_types,
-                                                               adsites_coords,
-                                                               selected_sites)
+        all_adsites = self._get_classified_high_symmetry_sites(adsites_coords, selected_sites)
 
 
         if verbose:
