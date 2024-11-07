@@ -17,6 +17,7 @@ from ase.geometry import get_distances
 from ase.data import covalent_radii
 from ase.data.vdw_alvarez import vdw_radii
 
+from xsorb.ase_custom import AtomsCustom
 from xsorb.io.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
@@ -251,12 +252,10 @@ class AdsorptionStructuresGenerator:
 
 
         if self.settings.structure.misc.mol_before_slab:
-            atoms : Atoms = mol + self.slab.slab_ase
-            slab_indices = list(range(len(mol), len(mol)+len(self.slab.slab_ase)))
+            atoms : AtomsCustom = mol + self.slab.slab_ase
             mol_indices = list(range(len(mol)))
         else:
             atoms = self.slab.slab_ase + mol
-            slab_indices = list(range(len(self.slab.slab_ase)))
             mol_indices = list(range(len(self.slab.slab_ase), len(self.slab.slab_ase)+len(mol)))
         atoms.cell = self.slab.slab_ase.cell
         atoms.pbc = self.slab.slab_ase.pbc
@@ -265,7 +264,6 @@ class AdsorptionStructuresGenerator:
                                    adsite=adsite,
                                    mol_rot=mol_rot,
                                    distance=distance,
-                                   slab_indices=slab_indices,
                                    mol_indices=mol_indices)
 
 

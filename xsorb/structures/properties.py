@@ -10,8 +10,10 @@ Module to store all the dataclasses that describe adsorption structures, sites a
 
 from __future__ import annotations
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from ase import Atoms
+if TYPE_CHECKING:
+    from xsorb.ase_custom.atoms import AtomsCustom
 
 
 @dataclass
@@ -36,7 +38,7 @@ class MoleculeRotation:
 
     Can be compared with the equality operator, that compares the unique_id.
     '''
-    atoms: Atoms
+    atoms: AtomsCustom
     xrot: str
     yrot: str
     zrot: str
@@ -173,19 +175,16 @@ class AdsorptionStructure:
     - adsite: AdsorptionSite object of the adsorption site
     - mol_rot: MoleculeRotation object of the rotated molecule
     - distance: float, distance between the reference atom of the molecule
-    - slab_indices: list[int], indices of the atoms of the slab
     - mol_indices: list[int], indices of the atoms of the molecule
     and the adsorption site
 
     Methods:
     - to_info_dict: returns a dictionary with the information of the AdsorptionStructure object
-    - additional_data_arrays: returns a dictionary with slab_indices, mol_indices
     '''
-    atoms: Atoms
+    atoms: AtomsCustom
     adsite: AdsorptionSite
     mol_rot: MoleculeRotation
     distance : float
-    slab_indices: list[int]
     mol_indices: list[int]
 
 
@@ -222,10 +221,3 @@ class AdsorptionStructure:
         assert self.dataframe_column_names() == tuple(infodict.keys())
 
         return infodict
-
-    def additional_data_arrays(self):
-        '''
-        Returns a dictionary with the additional data arrays of the AdsorptionStructure object
-        '''
-        return {"slab_indices": self.slab_indices,
-                "mol_indices": self.mol_indices}

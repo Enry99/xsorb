@@ -75,7 +75,7 @@ Example:
         parser.add_argument('-nobd','--nobonds',
                         action='store_true',
                         default=False, help='Do not show bonds' )
-        parser.add_argument('-w', '--width-resolution',
+        parser.add_argument('-w', '--width-res',
                         type=nonnegative_int,
                         default=700,
                         help='Horizontal resolution in pixels.')

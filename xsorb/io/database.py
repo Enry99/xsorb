@@ -36,9 +36,6 @@ The calculation databases have the following columns:
     -the AdsorptionStructure object,
     -the 'trajectory'
     -the 'adsorption_energy_evolution'
-    and the AdsorptionStructure.additional_data_arrays():
-    - slab_indices
-    - mol_indices
 
 Each database also has the following metadata:
 - program (str): name of the program used for the calculations
@@ -57,8 +54,8 @@ import ase.db
 import ase.db.core
 
 import xsorb.calculations.results
+import xsorb.io
 if TYPE_CHECKING:
-    from xsorb.io.inputs import WrittenSystem
     from xsorb.structures.generation import AdsorptionStructure
 
 DATAFRAME_COLUMNS_NAMES = ("site", "site_info", "mol_atom", "initial_dz", "xrot", "yrot", "zrot")
@@ -105,7 +102,7 @@ class Database:
                         break
                 if not already_present:
                     calc_id = db.write(ads_struct.atoms,
-                                       data=ads_struct.additional_data_arrays(),
+                                       data={'adsorption_structure': asdict(ads_struct)},
                                        **ads_struct.to_info_dict())
                     calc_ids.append(calc_id)
 
@@ -116,7 +113,7 @@ class Database:
 
 
     @staticmethod
-    def add_calculations(systems : list [WrittenSystem],
+    def add_calculations(systems : list [xsorb.io.inputs.WrittenSystem],
                          program : str,
                          mult : float,
                          total_e_slab_mol : float | None,
@@ -152,15 +149,13 @@ class Database:
 
                 #write the new calculation in any case
                 ads_struct : AdsorptionStructure = system.adsorption_structure
-                data=ads_struct.additional_data_arrays()
-                data.update({'adsorption_structure': asdict(ads_struct)})
                 db.write(ads_struct.atoms,
                         calc_id=system.calc_id,
                         status='incomplete',
                         in_file_path=system.in_file_path,
                         out_file_path=system.out_file_path,
                         log_file_path=system.log_file_path,
-                        data=data,
+                        data={'adsorption_structure': asdict(ads_struct)},
                         **ads_struct.to_info_dict())
 
     @staticmethod
@@ -195,7 +190,7 @@ class Database:
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             #Get the ids and calc_ids of the (incomplete) calculations to be updated
             selection = 'status=incomplete' if not refresh else None
-            rows = db.select(selection, include_data=True)
+            rows = list(db.select(selection, include_data=True))
 
             row_ids = [row.id for row in rows]
 
@@ -205,21 +200,18 @@ class Database:
             else:
                 mult = db.metadata.get('mult')
             total_e_slab_mol = db.metadata.get('total_e_slab_mol')
-            systems = [WrittenSystem(calc_id='',
-                                     adsorption_structure=None,
+            systems = [xsorb.io.inputs.WrittenSystem(calc_id='',
+                                     adsorption_structure=row.data.adsorption_structure,
                                      in_file_path=row.get('in_file_path'),
                                      out_file_path=row.get('out_file_path'),
                                      log_file_path=row.get('log_file_path'),
-                                     job_id=row.get('job_id'),
-                                     adsite_z=row.data.adsorption_structure.adsite.coords[2],
-                                     mol_ref_idx=row.data.adsorption_structure.mol_rot.mol_atom)
-                                        for row in rows]
+                                     job_id=row.get('job_id')
+                                     ) for row in rows]
 
             #Get the results of the calculations
             results = xsorb.calculations.results.get_calculations_results(
                     systems=systems,
                     program=program,
-                    mol_indices=[row.data.mol_indices for row in rows][0],
                     mult=mult,
                     total_e_slab_mol=total_e_slab_mol)
 
@@ -257,7 +249,9 @@ class Database:
         - list of rows
         '''
         with ase.db.connect('structures.db') as db:
-            rows = db.select(include_data=False)
+            rows = list(db.select())
+            for row in rows:
+                row.__dict__.update({'calc_id': row.id})
         if calc_ids:
             if isinstance(calc_ids, int):
                 calc_ids = [calc_ids]
@@ -302,10 +296,10 @@ class Database:
         Database.update_calculations(calc_type)
 
         with ase.db.connect(Database.calc_types[calc_type]) as db:
-            rows = db.select(selection=selection,
+            rows = list(db.select(selection=selection,
                              columns=columns,
                              sort=sort_key,
-                             include_data=include_data)
+                             include_data=include_data))
         if calc_ids:
             if isinstance(calc_ids, int):
                 calc_ids = [calc_ids]
@@ -406,7 +400,7 @@ class Database:
         Database.update_calculations(calc_type)
 
         with ase.db.connect(Database.calc_types[calc_type]) as db:
-            return len(db.select('status=incomplete', include_data=False)) == 0
+            return len(list(db.select('status=incomplete', include_data=False))) == 0
 
 
     @staticmethod

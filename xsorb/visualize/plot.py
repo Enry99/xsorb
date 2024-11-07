@@ -184,6 +184,7 @@ def plot_adsites_image(mode : str,
 
 def plot_overview_grid(calc_type : str,
                        outfiles : list[str],
+                       rot_label: str,
                        calc_indices : list[int],
                        energies : list[float],
                        stars : list[str]):
@@ -214,14 +215,21 @@ def plot_overview_grid(calc_type : str,
     axes = [fig.add_subplot(n_rows_fig,n_cols_fig,i) for i in range(1,len(calc_indices) + 1)]
 
     # find the index of the minimum energy
-    imin = np.argmin(energies)
+    for i, energy in enumerate(energies):
+        if energy is None:
+            energies[i] = np.nan
+    if not all(np.isnan(energies)):
+        imin = np.nanargmin(energies)
+    else:
+        imin = None
     # read the images from files, and plot them into the grid
     for i, calc_index in enumerate(calc_indices):
 
         img = mpimg.imread(outfiles[i])
         axes[i].imshow(img)
         axes[i].axis('equal') #ensures all images are in identical rectangular boxes
-        axes[i].set_title(f'{energies[i]:.2f}{stars[i]} eV', fontsize = 5, pad=1,
+        if not np.isnan(energies[i]):
+            axes[i].set_title(f'{calc_index}: {energies[i]:.2f}{stars[i]} eV', fontsize = 5, pad=1,
                           color='red' if i == imin else 'black')
 
         #rect = plt.patches.Rectangle((0.0, 0.93), 0.08, 0.07, transform=axes[i].transAxes,
@@ -234,4 +242,4 @@ def plot_overview_grid(calc_type : str,
         axes[i].set_xticks([])
         axes[i].set_yticks([])
 
-    fig.savefig(f"{calc_type}_overview.png", dpi=700, bbox_inches='tight')
+    fig.savefig(f"{calc_type}_overview_{rot_label}.png", dpi=700, bbox_inches='tight')

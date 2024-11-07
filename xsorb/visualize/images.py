@@ -79,6 +79,13 @@ def plot_images(calc_type : str,
     kwargs are those for xsorb.visualize.render_image
     '''
 
+    kwargs.pop('traceback', None)
+    kwargs.pop('command', None)
+    kwargs.pop('func', None)
+    kwargs.pop('arrows_type', None)
+    framerate = kwargs.pop('framerate', None)
+    rotations = kwargs.pop('rotation', None)
+
     if calc_type not in ('initial','screening', 'relax', 'ml_opt'):
         raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'ml_opt'")
 
@@ -92,12 +99,12 @@ def plot_images(calc_type : str,
         return
 
     custom_colors = read_custom_colors()
-    if custom_colors.get('povray_old_style'):
+    if custom_colors and custom_colors.get('povray_old_style'):
         os.environ['POVRAY_OLD_STYLE'] = '1'
 
     #get it here, so that we can decide to apply it or not
     #depending on the rotation.
-    depth_cueing = kwargs.pop('depth_cueing')
+    depth_cueing = kwargs.pop('depth_cueing', None)
 
 
     main_dir = os.getcwd()
@@ -110,22 +117,27 @@ def plot_images(calc_type : str,
     stars = [] #for marking non-converged calculations
     for row in progressbar(rows, 'Rendering:'):
 
-        atoms = row.to_atoms()
-        mol_indices = row.data.get('mol_indices')
+        atoms = row.toatoms()
+        mol_indices = row.data.adsorption_structure.mol_indices
 
-        if kwargs.get('center_mol'):
+        if kwargs.pop('center_mol', None):
             #use the same translation for all frames in the trajectory, to avoid jumps
             _, _, transl_vector = get_centered_mol_and_slab(atoms, mol_indices)
         else:
             transl_vector = None
 
-        if not kwargs.get('rotations'): #lateral, top,
-            rot_list = ['-5z,-85x', '']
-            rotations_labels = ['lateral', 'top', ]
-            depth_cueings = [None, depth_cueing]
+        if not rotations: #lateral, top,
+            rot_list = ['', '-5z,-85x']
+            rotations_labels = ['top', 'lateral']
+            depth_cueings = [depth_cueing, None]
         else: #use specified rotation
-            rot_list = [kwargs.get('rotations')]
-            rotations_labels = [kwargs.get('rotations').replace(',','_')]
+            if 'front' in rotations:
+                rotations = '-90x'
+                rotation_label = 'front'
+            else:
+                rotation_label = rotations.replace(',','_')
+            rot_list = [rotations]
+            rotations_labels = [rotation_label]
             depth_cueings = [depth_cueing]
 
         for rot, rot_label, dc in zip(rot_list, rotations_labels, depth_cueings):
@@ -133,7 +145,7 @@ def plot_images(calc_type : str,
             file_label = f'{calc_type}_{row.calc_id}_{rot_label}'
 
             #render trajectory for each config
-            if movie and rot_label == rotations_labels[0]:
+            if movie and (rot_label == rotations_labels[1] if not rotations else True):
 
                 print('Generating frames for traj...')
 
@@ -152,7 +164,7 @@ def plot_images(calc_type : str,
 
                 print('Frames generated. Generating movie...')
 
-                success = os.system(f'ffmpeg -framerate {kwargs.get("framerate")} '\
+                success = os.system(f'ffmpeg -framerate {framerate} '\
                             f'-i rendered_frames/{file_label}_%05d.png  '\
                             '-vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" '\
                             f'-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '\
@@ -172,14 +184,16 @@ def plot_images(calc_type : str,
                          custom_settings=custom_colors,
                          depth_cueing=dc,
                          **kwargs)
-                outfiles.append(f'{file_label}.png')
-                energies.append(row.get('adsorption_energy'))
-                stars.append('**' if row.get('scf_nonconverged') else \
+                if rot_label == rotations_labels[0]:
+                    outfiles.append(f'{file_label}.png')
+                    energies.append(row.get('adsorption_energy'))
+                    stars.append('**' if row.get('scf_nonconverged') else \
                              '*' if row.get('status') != 'completed' else '')
 
     if calc_id is None and not movie:   #plot grid
         plot_overview_grid(calc_type=calc_type,
                            outfiles=outfiles,
+                           rot_label=rotations_labels[0],
                            calc_indices=[row.calc_id for row in rows],
                            energies=energies,
                            stars=stars)

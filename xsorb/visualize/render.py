@@ -29,6 +29,7 @@ from ase import Atoms
 
 from xsorb.ase_custom import AtomsCustom
 from xsorb.ase_custom.io import write
+import xsorb.ase_custom.povray  #monkey patching
 
 #scaling factors for drawing atoms and bonds
 ATOMIC_RADIUS_DEFAULT = 0.6

@@ -17,7 +17,7 @@ from ase import Atoms
 
 from xsorb.structures.utils import set_fixed_slab_constraints
 from xsorb.io.settings import Settings
-from xsorb.io.database import Database
+import xsorb.io.database
 from xsorb.io.utils import overwrite_question
 from xsorb.ase_custom.io import write
 from xsorb.ase_custom import write_xyz_custom
@@ -25,7 +25,7 @@ from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_
 from xsorb.dft_codes.calculator import write_file_with_calculator
 from xsorb.dft_codes.override import override_dft_settings
 if TYPE_CHECKING:
-    from xsorb.io.inputs import AdsorptionStructure
+    from xsorb.structures.properties import AdsorptionStructure
 
 
 @dataclass
@@ -34,13 +34,11 @@ class WrittenSystem:
     Small dataclass to store info about the written systems
     '''
     calc_id: int | str #index or 'slab'/'mol'
-    adsorption_structure: AdsorptionStructure | None
+    adsorption_structure: AdsorptionStructure
     in_file_path: str
     out_file_path: str
     log_file_path: str
     job_id: int | None = None
-    adsite_z: float | None = None
-    mol_ref_idx: int | None = None
 
 
 def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
@@ -75,7 +73,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
     #Add structures to database, and obtain the calc_ids
     if calc_ids is None:
-        calc_ids = Database.add_structures(adsorption_structures)
+        calc_ids = xsorb.io.database.Database.add_structures(adsorption_structures)
 
 
     #Write the input files
@@ -127,7 +125,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     #if we are not in generation mode, update the databases.
     if calc_type is not None:
         total_e_slab_mol=settings.input.total_e_slab_mol if program != 'ml' else None
-        Database.add_calculations(systems=written_systems,
+        xsorb.io.database.Database.add_calculations(systems=written_systems,
                                   program=program,
                                   mult=settings.structure.molecule.radius_scale_factor,
                                   total_e_slab_mol=total_e_slab_mol,
@@ -238,9 +236,9 @@ def saveas(calc_type : str, saveas_format : str):
     folder.mkdir(exist_ok=True, parents=True)
 
     if calc_type == 'initial':
-        rows = Database.get_structures()
+        rows = xsorb.io.database.Database.get_structures()
     else:
-        rows = Database.get_calculations(calc_type)
+        rows = xsorb.io.database.Database.get_calculations(calc_type)
 
     for row in rows:
         if saveas_format == 'xyz':

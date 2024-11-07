@@ -3,3 +3,4 @@ pymatgen==2023.3.23
 matplotlib>=3.9.0
 numpy>=1.24.2
 pandas>=2.0.0
+dacite>=1.8.1

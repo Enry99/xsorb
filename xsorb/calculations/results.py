@@ -179,7 +179,6 @@ def bond_status(atoms, mol_indices : list, mult : float):
 
 def get_calculations_results(*,systems: list[WrittenSystem],
                              program : str,
-                             mol_indices : list[int],
                              total_e_slab_mol : float | None,
                              mult : float,
                              verbose : bool =True):
@@ -190,9 +189,6 @@ def get_calculations_results(*,systems: list[WrittenSystem],
     Args:
     - systems: list of WrittenSystem objects
     - program: DFT program. Possible values: 'espresso','vasp','ml'
-    - mol_indices: indices of the molecule atoms in the Atoms object
-    - mol_reference_atom: index of the reference atom of the molecule
-    - adsite_z: z coordinate of the adsorption site
     - total_e_slab_mol: total energy of the slab and molecule, if available
     - mult: multiplicative factor for the covalent radii to determine bonding.
     '''
@@ -229,15 +225,18 @@ def get_calculations_results(*,systems: list[WrittenSystem],
 
             scf_nonconverged = is_scf_not_converged(system.log_file_path, program)
 
+            mol_indices = system.adsorption_structure.mol_indices
             bonds = bond_status(atoms, mol_indices, mult)
 
-            if system.mol_ref_idx == -1:
+            mol_ref_idx = system.adsorption_structure.mol_rot.mol_atom
+            adsize_z = system.adsorption_structure.adsite.coords[2]
+            if mol_ref_idx == -1:
                 #geometric center of the molecule
-                final_dz = atoms.positions[mol_indices].mean(axis=0) - system.adsite_z
+                final_dz = atoms.positions[mol_indices].mean(axis=0) - adsize_z
             else:
                 #reference atom of the molecule
-                mol_ref_index =  + mol_indices[0]
-                final_dz = atoms[mol_ref_index].position[2] - system.adsite_z
+                mol_ref_index = mol_ref_idx + mol_indices[0]
+                final_dz = atoms[mol_ref_index].position[2] - adsize_z
 
             job_status = 'running' if system.job_id in running_jobs else 'terminated'
 
