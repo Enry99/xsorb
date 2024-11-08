@@ -80,7 +80,7 @@ Examples:
     @staticmethod
     def run(args : argparse.Namespace):
         #validate args:
-        if args.by_site or args.by_mol_idx or args.chem_phys and args.i:
+        if (args.by_site or args.by_mol_idx or args.chem_phys) and args.i:
             print('Error: cannot use --by-site, --by-mol-idx or --chem-phys with --i')
             import sys
             sys.exit(1)

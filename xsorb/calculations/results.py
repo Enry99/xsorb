@@ -216,6 +216,7 @@ def get_calculations_results(*,systems: list[WrittenSystem],
 
         try:
             atoms = traj[-1]
+            adsorption_energy = atoms.get_potential_energy() - total_e_slab_mol
 
             adsorption_energy_evol = \
                     [at.get_potential_energy() - total_e_slab_mol for at in traj]
@@ -241,7 +242,7 @@ def get_calculations_results(*,systems: list[WrittenSystem],
             job_status = 'running' if system.job_id in running_jobs else 'terminated'
 
             calc_results = CalculationResults(atoms=atoms,
-                                            adsorption_energy=adsorption_energy_evol[0],
+                                            adsorption_energy=adsorption_energy,
                                             status=status,
                                             scf_nonconverged=scf_nonconverged,
                                             bonds=bonds,

@@ -40,11 +40,18 @@ class CLICommand(CLICommandBase):
 
         if args.refresh:
             from xsorb.io.settings import Settings
-            settings = Settings()
+            settings = Settings(read_energies=True)
+            total_e_slab_mol = sum(settings.input.E_slab_mol)
             mult=settings.structure.molecule.radius_scale_factor
         else:
             mult = None
-        Database.update_calculations(args.calc_type, args.refresh, mult=mult, txt=args.txt)
+            total_e_slab_mol = None
+        Database.update_calculations(args.calc_type,
+                                     args.refresh,
+                                     total_e_slab_mol=total_e_slab_mol,
+                                     mult=mult,
+                                     txt=args.txt,
+                                     verbose=True)
 
 
     @staticmethod

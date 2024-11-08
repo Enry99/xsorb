@@ -36,10 +36,10 @@ def select_calculations(rows : list,
 
     if threshold is not None:
         emin = [row.energy for row in rows][0]
-        calc_indices = [row.calc_id for row in rows if row.energy - emin < threshold]
+        calc_indices = [row.get('calc_id') for row in rows if row.energy - emin < threshold]
 
     elif n_configs is not None:
-        calc_indices = [row.calc_id for i, row in enumerate(rows) if i < n_configs]
+        calc_indices = [row.get('calc_id') for i, row in enumerate(rows) if i < n_configs]
 
     else:
         raise ValueError('Either n_configs or threshold must be specified.')
@@ -80,11 +80,11 @@ def obtain_calc_indices(*,
 
     if n_configs is None and threshold is None:
         #just return the indices of all the configurations
-        rows, _ = Database.get_calculations(calc_type=calc_type,
+        rows = Database.get_calculations(calc_type=calc_type,
                                         exclude_ids=excluded_calc_ids,
                                         columns=['calc_id'],
                                         include_data=False)
-        return [row.calc_id for row in rows]
+        return [row.get('calc_id') for row in rows]
 
     if n_configs is not None and threshold is not None:
         raise ValueError('Only one between n_configs and threshold can be specified.')
@@ -99,7 +99,7 @@ def obtain_calc_indices(*,
     #select only rows that have energy
     selections = ['energy,bonds!=None', 'energy,bonds=None'] if separate_chem_phys else ['energy']
     for selection in selections:
-        rows, _ = Database.get_calculations(calc_type=calc_type,
+        rows = Database.get_calculations(calc_type=calc_type,
                                         selection=selection,
                                         exclude_ids=excluded_calc_ids,
                                         columns=['energy', 'calc_id', 'site'],
@@ -107,19 +107,19 @@ def obtain_calc_indices(*,
                                         include_data=False)
 
         if by_mol_atom:
-            for mol_atom in set(row.mol_atom for row in rows):
-                rows_mol_atom = [row for row in rows if row.mol_atom  == mol_atom]
+            for mol_atom in set(row.get('mol_atom') for row in rows):
+                rows_mol_atom = [row for row in rows if row.get('mol_atom')  == mol_atom]
 
                 if by_site:
-                    for site in set(row.site for row in rows_mol_atom):
-                        rows_site = [row for row in rows_mol_atom if row.site == site]
+                    for site in set(row.get('site') for row in rows_mol_atom):
+                        rows_site = [row for row in rows_mol_atom if row.get('site') == site]
                         selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
                 else:
                     selected_calc_ids += select_calculations(rows_mol_atom, n_configs, threshold)
         else:
             if by_site:
-                for site in set(row.site for row in rows):
-                    rows_site = [row for row in rows if row.site == site]
+                for site in set(row.get('site') for row in rows):
+                    rows_site = [row for row in rows if row.get('site') == site]
                     selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
             else:
                 selected_calc_ids += select_calculations(rows, n_configs, threshold)
@@ -147,12 +147,12 @@ def get_adsorption_structures(get_structures_from : str,
     '''
 
     #get structures from database
-    rows, _ = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
+    rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
 
     if get_structures_from == 'ml_opt':
-        rows_original, _ = Database.get_calculations(calc_type='structures',
+        rows_original = Database.get_calculations(calc_type='structures',
                                                   calc_ids=calc_ids)
-        constraints = [row.constraints for row in rows_original]
+        constraints = [row.get('constraints') for row in rows_original]
 
     # prepare the structures by substituting the atoms with the one from the
     # previous calculation

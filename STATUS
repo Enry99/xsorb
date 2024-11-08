@@ -16,6 +16,7 @@ xsorb/visualize/*:              OK
 PROBLEMI:
 -Eslabmol non viene letta correttamente quando faccio l'update dei database.
 -lunghezza sbagliata dei siti bridge
+-l'immagine dei siti è clippata per cella non rettangolare
 
 
 

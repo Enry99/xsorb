@@ -169,9 +169,11 @@ class Database:
     @staticmethod
     def update_calculations(calc_type : str,
                             refresh : bool = False,
+                            total_e_slab_mol : float | None = None,
                             mult : float | None = None,
                             write_csv : bool = True,
-                            txt : bool = False) -> None:
+                            txt : bool = False,
+                            verbose: bool=False) -> None:
         '''
         Update the database with the new results.
         Also update the job status
@@ -184,15 +186,24 @@ class Database:
             if the value was changed from the settings
         - write_csv: bool to write the results to a csv file
         - txt: bool to write a txt file instead of a csv file
+        - verbose: bool to print messages
         '''
+
+        if verbose and refresh:
+            print('Re-reading the output files, updating e_slab_mol, '\
+                   'the radii mult factor, and recalculating the bonding status...')
 
         if calc_type == 'all':
             for ctype, db_name in Database.calc_types.items():
                 if Path(db_name).exists():
-                    Database.update_calculations(ctype, refresh, mult, write_csv=False)
+                    Database.update_calculations(calc_type=ctype,
+                                                 refresh=refresh,
+                                                 mult=mult,
+                                                 write_csv=False,
+                                                 verbose=verbose)
 
             if write_csv: #only write the csv file once
-                Database.write_csvfile(txt=txt)
+                Database.write_csvfile(txt=txt, verbose=verbose)
             return
 
         with ase.db.connect(Database.calc_types[calc_type]) as db:
@@ -207,7 +218,10 @@ class Database:
                 db.metadata['mult'] = mult
             else:
                 mult = db.metadata.get('mult')
-            total_e_slab_mol = db.metadata.get('total_e_slab_mol')
+            if total_e_slab_mol is not None:
+                db.metadata['total_e_slab_mol'] = total_e_slab_mol
+            else:
+                total_e_slab_mol = db.metadata.get('total_e_slab_mol')
             systems = [xsorb.io.inputs.WrittenSystem(calc_id='',
                                      adsorption_structure=row.data.adsorption_structure,
                                      in_file_path=row.get('in_file_path'),
@@ -221,10 +235,12 @@ class Database:
                     systems=systems,
                     program=program,
                     mult=mult,
-                    total_e_slab_mol=total_e_slab_mol)
+                    total_e_slab_mol=total_e_slab_mol,
+                    verbose=verbose)
 
             for row_id, result in zip(row_ids, results):
                 if result is not None:
+                    #print(result.adsorption_energy)
                     db.update(id=row_id,
                               atoms=result.atoms,
                               status=result.status,
@@ -240,8 +256,11 @@ class Database:
                     #this is probably already printed somewhere else. Check
                     #print(f'Warning: Calculation {row.calc_id} cannot be updated.')
 
+        if verbose:
+            print(f'{calc_type} database updated.')
+
         if write_csv:
-            Database.write_csvfile(txt=txt)
+            Database.write_csvfile(txt=txt, verbose=verbose)
 
     @staticmethod
     def get_structures(calc_ids : list[int] | int | None = None) -> list:
@@ -301,7 +320,7 @@ class Database:
             return []
 
         #Make sure that the database is up to date
-        Database.update_calculations(calc_type)
+        Database.update_calculations(calc_type, verbose=False)
 
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             rows = list(db.select(selection=selection,
@@ -338,7 +357,7 @@ class Database:
 
 
     @staticmethod
-    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[str]) -> None:
+    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[int]) -> None:
         '''
         Add the job ids to the corresponding database
 
@@ -350,7 +369,7 @@ class Database:
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             for calc_id, job_id in zip(calc_ids, job_ids):
                 row_id = db.get(f'calc_id={calc_id}', include_data=False).id
-                db.update(id=row_id, job_id=int(job_id), job_status='submitted')
+                db.update(id=row_id, job_id=job_id, job_status='submitted')
 
 
     @staticmethod
@@ -405,14 +424,16 @@ class Database:
             return False
 
         #Make sure that the database is up to date
-        Database.update_calculations(calc_type)
+        Database.update_calculations(calc_type, verbose=False)
 
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             return len(list(db.select('status=incomplete', include_data=False))) == 0
 
 
     @staticmethod
-    def write_csvfile(include_results : bool = True, txt : bool = False) -> None:
+    def write_csvfile(include_results : bool = True,
+                      txt : bool = False,
+                      verbose: bool = False) -> None:
         '''
         Reads the structures.db database and writes the info to a csv file.
         Is not meant to be called from the CLI, since it is executed
@@ -426,9 +447,10 @@ class Database:
         Args:
         - include_results: bool to include the results of the calculations
         - txt: bool to write a txt file instead of a csv file
+        - verbose: bool to print messages
         '''
 
-        print('Writing results file...')
+        if verbose: print('Writing results file...')
 
         if not Path('structures.db').exists():
             raise RuntimeError('Missing structures.db database. Cannot write csv file.')
@@ -447,6 +469,7 @@ class Database:
             energies_column_names = []
             for calc_type, db_name in Database.calc_types.items():
                 #order is ml_opt, screening, relax
+                atleast_one_calc = False
                 if Path(db_name).exists():
                     with ase.db.connect(db_name) as db:
                         for i, info_dict in enumerate(info_dicts):
@@ -460,20 +483,22 @@ class Database:
                                 eads = f'{eads:.3f}'
                                 if row.get('scf_nonconverged'):
                                     eads += '**'
-                                    print(f'Warning! {calc_type} {info_dict["calc_id"]} '\
+                                    if verbose: print(f'Warning! {calc_type} {info_dict["calc_id"]} '\
                                           'failed to reach SCF convergence in the last step. '\
                                             'The energy will be marked with **')
                                 elif row.get('status') != 'completed':
                                     eads += '*'
-                                    print(f'Warning! {calc_type} {info_dict["calc_id"]} '\
+                                    if verbose: print(f'Warning! {calc_type} {info_dict["calc_id"]} '\
                                           'has not reached final configuration. '\
                                             'The energy will be marked with a *')
                             info_dicts[i].update({f'Eads_{calc_type[:3]}(eV)': eads})
                             info_dicts[i].update({'bonds': row.get('bonds')})
                             info_dicts[i].update({'final_dz': row.get('final_dz')})
+                            atleast_one_calc = True
 
-                    last_calc_e_column_name = f'Eads_{calc_type[:3]}(eV)'
-                    energies_column_names.append(last_calc_e_column_name)
+                    if atleast_one_calc:
+                        last_calc_e_column_name = f'Eads_{calc_type[:3]}(eV)'
+                        energies_column_names.append(last_calc_e_column_name)
 
         # Write csv file
         df_column_names = ['calc_id'] + list(DATAFRAME_COLUMNS_NAMES)
@@ -494,4 +519,4 @@ class Database:
         else:
             df.to_csv('results.csv', index=False)
 
-        print('Results file written.')
+        if verbose: print('Results file written.')

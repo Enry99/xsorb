@@ -61,7 +61,7 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     and of the molecular rotations when generating the configurations
     '''
 
-    settings=Settings()
+    settings=Settings(read_energies=True) #need the energies to store them into the db metadata
 
     if from_ml_opt:
         calc_ids = obtain_calc_indices(calc_type='ml_opt')
@@ -165,7 +165,7 @@ def launch_final_relax(*,
 
 
     #Retrieve the structures
-    settings=Settings()
+    settings=Settings(read_energies=True) #need the energies to store them into the db metadata
 
     #this check also updates the db
     if not Database.all_completed(calc_type=take_from) and \

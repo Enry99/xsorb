@@ -81,14 +81,14 @@ def launch_jobs(*,program : str,
         else:
             outstring = subprocess.getoutput(launch_string) #launches the jobscript from j_dir
             print(outstring)
-            submitted_jobs.append(outstring.split()[-1])
+            submitted_jobs.append(int(outstring.split()[-1]))
         os.chdir(main_dir) ####################
 
     if calc_type not in ('isolated'): #no database for slab/molecule
         xsorb.io.database.Database.add_job_ids(calc_type, [system.calc_id for system in systems], submitted_jobs)
     else:
         with open(".submitted_jobs.txt", "a",encoding=sys.getfilesystemencoding()) as f:
-            f.writelines([job+'\n' for job in submitted_jobs])
+            f.writelines([f'{job}\n' for job in submitted_jobs])
 
 
 def restart_jobs(calc_type : str):
@@ -131,7 +131,7 @@ def restart_jobs(calc_type : str):
         else:
             outstring = subprocess.getoutput(launch_string) #launches the jobscript from j_dir
             print(outstring)
-            submitted_jobs.append(outstring.split()[-1])
+            submitted_jobs.append(int(outstring.split()[-1]))
         os.chdir(main_dir) ####################
 
     xsorb.io.database.Database.add_job_ids(calc_type, indices_to_restart, submitted_jobs)
