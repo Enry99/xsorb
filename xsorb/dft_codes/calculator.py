@@ -23,10 +23,10 @@ from pymatgen.io.vasp.sets import (MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet,
 from pymatgen.io.ase import AseAtomsAdaptor
 from ase import Atoms
 from ase.constraints import FixScaled
-from ase.calculators.espresso import Espresso
 from ase.calculators.vasp import Vasp
 
 from xsorb.ase_custom.io import write
+from xsorb.ase_custom.espresso import write_espresso_in_custom
 
 
 class MLFakeCalculator():
@@ -66,20 +66,56 @@ def setup_ML_calculator(**kwargs) -> MLFakeCalculator:
     return MLFakeCalculator(label, directory)
 
 
-def setup_Espresso_calculator(**kwargs) -> Espresso:
+class EspressoFakeCalculator():
+    '''
+    Fake calculator for Espresso,
+    which just writes the input files and does not perform any calculation.
+    Its structure is made to be compatible with the other calculators,
+    so that the write_input function can be called in the same way,
+    and has the same initialization parameters.
+    '''
+
+    def __init__(self,label,directory,pseudopotentials,kpts,koffset,input_data,additional_cards):
+        self.label = label
+        self.directory = Path(directory)
+        self.pseudopotentials = pseudopotentials
+        self.kpts = kpts
+        self.koffset = koffset
+        self.input_data = input_data
+        self.additional_cards = additional_cards
+
+
+    def write_input(self, atoms : Atoms):
+        '''
+        Function that writes the input file for the ML optimization
+        Works in the same way as the write_input function of the other calculators,
+        creating the directory if it does not exist
+        '''
+        self.directory.mkdir(exist_ok=True, parents=True)
+        write_espresso_in_custom(self.directory / f'{self.label}.pwi',
+                                  atoms=atoms,
+                                  pseudopotentials=self.pseudopotentials,
+                                  kpts=self.kpts,
+                                  koffset=self.koffset,
+                                  input_data=self.input_data,
+                                  additional_cards=self.additional_cards)
+
+
+def setup_Espresso_calculator(**kwargs) -> EspressoFakeCalculator:
     '''
     Setup the Espresso calculator for the DFT calculation
     and returns the calculator, to be used in a code-agnostic way in
     the write_file_with_calculator function.
     '''
 
-    dftsettings : dict = kwargs.get("dftsettings")
+    dftsettings : dict = kwargs.get("dftsettings").copy()
+    pseudopotentials = dftsettings.pop('pseudopotentials')
     label : str = kwargs.get("label")
     directory : str = kwargs.get("directory")
 
-    return Espresso(label = label,
+    return EspressoFakeCalculator(label = label,
                     directory=directory,
-                    pseudopotentials=dftsettings['pseudopotentials'],
+                    pseudopotentials=pseudopotentials,
                     kpts=dftsettings["kpts"],
                     koffset=dftsettings["koffset"],
                     input_data=dftsettings,

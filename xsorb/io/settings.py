@@ -248,8 +248,7 @@ class Settings:
 
         #intialize the dataclasses
         self.input = from_dict(data_class=InputParams,
-                               data=self.settings_dict["Input"],
-                               config=Config(type_hooks={str: str.lower}, strict=True))
+                               data=self.settings_dict["Input"])
 
 
         self.structure = from_dict(data_class=StructureParams,

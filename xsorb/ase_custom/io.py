@@ -4,6 +4,9 @@ Custom I/O functions for ASE Atoms objects
 
 from ase.io import read, write
 
+import xsorb.ase_custom.espresso
+import xsorb.ase_custom.xyz
+import xsorb.ase_custom.vasp
 from xsorb.ase_custom import AtomsCustom
 
 

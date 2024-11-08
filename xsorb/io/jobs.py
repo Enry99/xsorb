@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from xsorb.io.inputs import WrittenSystem
 
 
-TEST = True
+TEST = False
 
 
 def launch_jobs(*,program : str,
@@ -72,9 +72,9 @@ def launch_jobs(*,program : str,
             f.writelines(lines)
 
         postfix = SBATCH_POSTFIX[program].format(
-            in_file=system.in_file_path,
-            out_file=system.out_file_path,
-            log_file=system.log_file_path,
+            in_file=Path(system.in_file_path).name,
+            out_file=Path(system.out_file_path).name,
+            log_file=Path(system.log_file_path).name,
             main_dir=main_dir)
         launch_string = f"{sbatch_command} jobscript.sh {postfix}"
         if TEST: print(launch_string) #pylint: disable=multiple-statements
@@ -143,7 +143,7 @@ def get_running_jobs():
     Get the running jobs by interrogating the scheduler
     '''
     running_jobs = subprocess.getoutput("squeue --me").split("\n")[1:]
-    running_job_ids = [job.split()[0] for job in running_jobs]
+    running_job_ids = [int(job.split()[0]) for job in running_jobs]
 
     return running_job_ids
 
@@ -172,12 +172,12 @@ def scancel():
             submitted_job_ids.extend([job.strip() for job in submitted_jobs])
 
     running_jobs = get_running_jobs()
-    running_job_ids = [job.split()[0] for job in running_jobs]
+    job_ids_to_cancel = [job for job in running_jobs if job in submitted_job_ids]
 
-    if len(running_job_ids) == 0:
+    if len(job_ids_to_cancel) == 0:
         print("No jobs to cancel.")
         return
 
-    print(f"Cancelling jobs {running_job_ids}.")
-    _cancel_jobs(running_job_ids)
+    print(f"Cancelling jobs {job_ids_to_cancel}.")
+    _cancel_jobs(job_ids_to_cancel)
     print("All jobs cancelled.")

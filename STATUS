@@ -13,7 +13,12 @@ xsorb/structures/*:             OK
 xsorb/visualize/*:              OK
 
 
-FIX high symmetry sites duplicates
+PROBLEMI:
+-Eslabmol non viene letta correttamente quando faccio l'update dei database.
+-lunghezza sbagliata dei siti bridge
+
+
+
 
 FINALLY: xfrag.
 

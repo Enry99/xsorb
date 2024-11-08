@@ -21,7 +21,7 @@ from ase.io.espresso import (read_fortran_namelist, get_cell_parameters, ibrav_e
     _PW_HIGHEST_OCCUPIED,_PW_HIGHEST_OCCUPIED_LOWEST_FREE,_PW_KPTS,_PW_BANDS,_PW_BANDSTRUCTURE,
     _PW_DIPOLE, _PW_DIPOLE_DIRECTION, kpoint_convert)
 from ase.calculators.singlepoint import SinglePointDFTCalculator,SinglePointKPoint
-from ase.utils import reader
+from ase.utils import reader, writer
 from ase import Atom
 from ase.constraints import FixAtoms, FixCartesian
 
@@ -138,7 +138,7 @@ def format_atom_position(atom, crystal_coordinates, custom_label, mask='', tidx=
     astr = line_fmt.format(**inps)
     return astr
 
-
+@writer
 def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
                       kspacing=None, kpts=None, koffset=(0, 0, 0),
                       crystal_coordinates=False, additional_cards=None,
@@ -410,13 +410,13 @@ def parse_pwo_start_custom(lines, index=0):
             # Will need to be extended for DFTCalculator info.
             break
 
-    if not tags:
-        tags = None
+    if not info['tags']:
+        info['tags'] = None
 
     # Make atoms for convenience
     info['atoms'] = AtomsCustom(symbols=info['symbols'],
                           positions=info['positions'],
-                          cell=info['cell'], pbc=True, tags=tags)
+                          cell=info['cell'], pbc=True, tags=info['tags'])
 
     return info
 
@@ -478,6 +478,8 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
         _PW_KPTS: [],
         _PW_BANDS: [],
         _PW_BANDSTRUCTURE: [],
+        _PW_DIPOLE: [],
+        _PW_DIPOLE_DIRECTION: [],
     }
 
     for idx, line in enumerate(pwo_lines):
@@ -781,6 +783,6 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
 
 
 # Runtime patching
-ase.io.espresso.write_espresso_in = write_espresso_in_custom
+#ase.io.espresso.write_espresso_in = write_espresso_in_custom
 ase.io.espresso.read_espresso_in = read_espresso_in_custom
 ase.io.espresso.read_espresso_out = read_espresso_out_custom

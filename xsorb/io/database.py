@@ -101,7 +101,11 @@ class Database:
                         calc_ids.append(row.id)
                         break
                 if not already_present:
-                    calc_id = db.write(ads_struct.atoms,
+                    atoms = ads_struct.atoms.copy()
+                    #remove constraints in the ads_struct atoms object
+                    ads_struct.atoms.set_constraint()
+                    ads_struct.mol_rot.atoms.set_constraint()
+                    calc_id = db.write(atoms,
                                        data={'adsorption_structure': asdict(ads_struct)},
                                        **ads_struct.to_info_dict())
                     calc_ids.append(calc_id)
@@ -149,7 +153,11 @@ class Database:
 
                 #write the new calculation in any case
                 ads_struct : AdsorptionStructure = system.adsorption_structure
-                db.write(ads_struct.atoms,
+                atoms = ads_struct.atoms.copy()
+                #remove constraints in the ads_struct atoms object
+                ads_struct.atoms.set_constraint()
+                ads_struct.mol_rot.atoms.set_constraint()
+                db.write(atoms,
                         calc_id=system.calc_id,
                         status='incomplete',
                         in_file_path=system.in_file_path,
@@ -342,7 +350,7 @@ class Database:
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             for calc_id, job_id in zip(calc_ids, job_ids):
                 row_id = db.get(f'calc_id={calc_id}', include_data=False).id
-                db.update(id=row_id, job_id=job_id, job_status='submitted')
+                db.update(id=row_id, job_id=int(job_id), job_status='submitted')
 
 
     @staticmethod
@@ -436,6 +444,7 @@ class Database:
 
         last_calc_e_column_name = None
         if include_results:
+            energies_column_names = []
             for calc_type, db_name in Database.calc_types.items():
                 #order is ml_opt, screening, relax
                 if Path(db_name).exists():
@@ -464,9 +473,15 @@ class Database:
                             info_dicts[i].update({'final_dz': row.get('final_dz')})
 
                     last_calc_e_column_name = f'Eads_{calc_type[:3]}(eV)'
+                    energies_column_names.append(last_calc_e_column_name)
 
         # Write csv file
-        df = pd.DataFrame(columns=['calc_id'] + list(DATAFRAME_COLUMNS_NAMES))
+        df_column_names = ['calc_id'] + list(DATAFRAME_COLUMNS_NAMES)
+        if include_results:
+            df_column_names += energies_column_names
+            df_column_names.append('bonds')
+            df_column_names.append('final_dz')
+        df = pd.DataFrame(columns=df_column_names)
         for i, info_dict in enumerate(info_dicts):
             df_line = pd.Series(info_dict)
             df.loc[i] = df_line

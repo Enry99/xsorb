@@ -65,7 +65,7 @@ class AtomsCustom(Atoms):
         #add constraints from the second
         for constr in othercp.constraints:
             if isinstance(constr, (FixCartesian,FixScaled,FixAtoms)):
-                constr.a += n1
+                constr.index[0] += n1
                 self.constraints += [constr]
 
 

@@ -128,7 +128,7 @@ class Molecule:
             self.translated_mols.update({atom_index : mol})
 
         #set other useful attributes
-        self.constrained_indices = [constr.a for constr in self.mol_ase.constraints]
+        self.constrained_indices = [constr.index[0] for constr in self.mol_ase.constraints]
         self.natoms = len(self.mol_ase)
 
 

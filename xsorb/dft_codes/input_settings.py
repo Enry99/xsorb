@@ -54,6 +54,7 @@ def read_espresso_settings(input_settings_dict : dict):
     # parse namelist section and extract remaining lines
     with open(espresso_settings_class.pwi_path, 'r') as file:
         dftprogram_settings_dict, card_lines = read_fortran_namelist(file)
+        dftprogram_settings_dict = dict(dftprogram_settings_dict)
 
     dftprogram_settings_dict.update(vars(espresso_settings_class))
 
