@@ -93,7 +93,12 @@ def plot_adsites_image(mode : str,
     #ax.yaxis.set_tick_params(labelsize=5)
 
     #plot slab without the sites, using Pymatgen's function
-    plot_slab(slab_pymat, ax, adsorption_sites=False, repeat=3, window=0.7, decay=0.25)
+    if np.any(slab_pymat.lattice.matrix[:2, :2] < 0):
+        #(a1)_x < (a1+a2)_x => non orthorombic and tilted
+        window = 1.1
+    else:
+        window = 0.7
+    plot_slab(slab_pymat, ax, adsorption_sites=False, repeat=3, window=window, decay=0.25)
 
 
     #calculate useful paraeters to plot the sites
