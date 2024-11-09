@@ -219,7 +219,8 @@ class Slab:
 
         #create structure containing only surface atoms
         surf = self.asf.slab.copy()
-        surf.remove_sites(self.asf.subsurface_sites())
+        surf.remove_sites([idx for idx, site in enumerate(surf.sites) \
+                           if site in self.asf.subsurface_sites()])
         #flatten the surface (z=0 for all)
         for i in range(len(surf)): surf[i].z = 0 # pylint: disable=consider-using-enumerate,multiple-statements
 
