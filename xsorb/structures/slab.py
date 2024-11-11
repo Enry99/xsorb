@@ -25,7 +25,7 @@ from ase.constraints import FixCartesian
 from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
-from xsorb.ase_custom.io import ase_custom_read as read
+from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.visualize.plot import plot_adsites_image
 from xsorb.structures.properties import (AdsorptionSite, AdsorptionSiteCrystal,
     AdsorptionSiteAmorphous, SurroundingSite)
@@ -38,7 +38,7 @@ class Slab:
         by placing the molecule on all the different sites
 
         Initialization parameters:
-        - slab_filename: file containing the structure of the slab
+        - slab: Atoms object of the slab
         - layers_threshold: deltaz for the atoms to be considered as part of the same layer.
             Used to identify layers when fixing atoms by layer.
         - surface_thickness: thickness (delta_z) of the surface layer (in A)
@@ -55,7 +55,7 @@ class Slab:
             at least 1 Angstrom from the bottom of the cell
     '''
 
-    def __init__(self, slab_filename : str,
+    def __init__(self, slab: AtomsCustom,
                  surface_thickness : float = 0.9,
                  layers_threshold : float = 0.5,
                  fixed_layers_slab : list | None = None,
@@ -64,7 +64,7 @@ class Slab:
                  sort_atoms_by_z : bool = False,
                  translate_slab_from_below_cell_bottom : bool = True):
 
-        self.slab_ase = read(filename=slab_filename)
+        self.slab_ase = slab.copy()
         self.natoms   = len(self.slab_ase)
         self.surface_thickness = surface_thickness
 

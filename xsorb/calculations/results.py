@@ -38,33 +38,6 @@ class CalculationResults:
     final_dz: float
 
 
-def read_total_e_slab_mol_from_default_folders(program: str, verbose : bool = True):
-    '''
-    Attempt to read the energies of the slab and molecule from the
-    output files of the slab/molecule calculations launched by xsorb
-    (not provided by the user in the settings file).
-    Returns 0 if the energies are not found.
-
-    Args:
-    - program: 'espresso', 'vasp' or 'ml'
-    - verbose: print messages
-
-    '''
-    try:
-        slab_en = read(OUT_FILE_PATHS['slab'][program]).get_potential_energy()
-        mol_en = read(OUT_FILE_PATHS['mol'][program]).get_potential_energy()
-        return slab_en + mol_en
-
-    except Exception as e: # pylint: disable=broad-except
-        #this is a general exception to catch any error that might occur.
-        #It can be file not found, or energy not present in the file, etc.
-        if verbose:
-            print('It was not possible to obtain slab and molecule energy in any way.',
-                    f'Error message from ase: {e}.',
-                    'Total energies will be shown instead of adsorption energies.')
-        return 0
-
-
 def is_optimization_completed(filename : str, program : str):
     '''
     Check if the given calculation is completed, reading the output file
@@ -192,9 +165,6 @@ def get_calculations_results(*,systems: list[WrittenSystem],
     - total_e_slab_mol: total energy of the slab and molecule, if available
     - mult: multiplicative factor for the covalent radii to determine bonding.
     '''
-
-    if total_e_slab_mol is None:
-        total_e_slab_mol = read_total_e_slab_mol_from_default_folders(program)
 
     running_jobs = xsorb.io.jobs.get_running_jobs()
 

@@ -41,7 +41,10 @@ def generate(save_image : bool = False):
 
     settings=Settings()
 
-    gen = AdsorptionStructuresGenerator(settings, verbose=True)
+    slab = read(settings.input.slab_filename)
+    mol = read(settings.input.molecule_filename)
+
+    gen = AdsorptionStructuresGenerator(slab, mol, settings, verbose=True)
     adsorption_structures = gen.generate_adsorption_structures(write_sites=False,
                                                                save_image=save_image)
 
@@ -68,7 +71,9 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
         adsorption_structures = get_adsorption_structures(calc_ids=calc_ids,
                                                           get_structures_from='ml_opt')
     else:
-        gen = AdsorptionStructuresGenerator(settings, verbose=True)
+        slab = read(settings.input.slab_filename)
+        mol = read(settings.input.molecule_filename)
+        gen = AdsorptionStructuresGenerator(slab, mol, settings, verbose=True)
         adsorption_structures = gen.generate_adsorption_structures(write_sites=True,
                                                                     save_image=save_image)
         calc_ids = None
@@ -98,7 +103,10 @@ def launch_ml_opt(save_image : bool = False,):
 
     settings=Settings()
 
-    gen = AdsorptionStructuresGenerator(settings, verbose=True)
+    slab = read(settings.input.slab_filename)
+    mol = read(settings.input.molecule_filename)
+
+    gen = AdsorptionStructuresGenerator(slab, mol, settings, verbose=True)
     adsorption_structures = gen.generate_adsorption_structures(write_sites=True,
                                                                 save_image=save_image)
 

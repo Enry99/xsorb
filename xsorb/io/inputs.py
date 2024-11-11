@@ -124,7 +124,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
     #if we are not in generation mode, update the databases.
     if calc_type is not None:
-        total_e_slab_mol=settings.input.total_e_slab_mol if program != 'ml' else None
+        total_e_slab_mol=settings.total_e_slab_mol if program != 'ml' else None
         xsorb.io.database.Database.add_calculations(systems=written_systems,
                                   program=program,
                                   mult=settings.structure.molecule.radius_scale_factor,

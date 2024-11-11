@@ -41,7 +41,7 @@ class CLICommand(CLICommandBase):
         if args.refresh:
             from xsorb.io.settings import Settings
             settings = Settings(read_energies=True)
-            total_e_slab_mol = sum(settings.input.E_slab_mol)
+            total_e_slab_mol = settings.total_e_slab_mol
             mult=settings.structure.molecule.radius_scale_factor
         else:
             mult = None

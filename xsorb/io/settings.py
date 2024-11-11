@@ -24,7 +24,7 @@ except ModuleNotFoundError:
 from dacite import from_dict, Config
 
 from xsorb.ase_custom.io import ase_custom_read as read
-from xsorb.dft_codes.definitions import SUPPORTED_PROGRAMS
+from xsorb.dft_codes.definitions import SUPPORTED_PROGRAMS, OUT_FILE_PATHS
 from xsorb.dft_codes.input_settings import get_dftprogram_settings
 
 
@@ -43,14 +43,11 @@ class InputParams:
     jobscript_ml_path: Optional[str]
     submit_command_ml: Optional[str]
     jobname_prefix: str = ''
-    total_e_slab_mol = None
 
     def __post_init__(self):
         if self.E_slab_mol is not None:
             if len(self.E_slab_mol) != 2:
                 raise ValueError("E_slab_mol must be a list of two floats.")
-            self.total_e_slab_mol = self.E_slab_mol[0] + self.E_slab_mol[1]
-
 
         if self.jobscript_ml_path is not None and self.submit_command_ml is None:
             raise ValueError("jobscript_ml_path is provided but submit_command_ml is not.")
@@ -269,26 +266,45 @@ class Settings:
             self.settings_dict["Calculation_parameters"][self.program]
             )
 
-        #read energies of slab and mol if requested
-        if read_energies and self.input.E_slab_mol is None:
-            self.read_E_slab_mol(verbose)
+        #at this point, self.input.E_slab_mol can be None, if not specified in the settings file,
+        #or a list of two floats, if specified. One can be 0, e.g. [13.6, 0.0] if only the
+        #slab energy or molecule energy is known. We need to fill in the missing energies if
+        #available if read_energies is True.
+        if read_energies:
+            self.total_e_slab_mol = self.read_E_slab_mol(verbose)
+        else:
+            self.total_e_slab_mol = None
 
 
     def read_E_slab_mol(self, verbose : bool = True): # pylint: disable=invalid-name
         '''
         Attempt to read the energies of the slab and molecule from the slab and molecule files,
         and store them in E_slab_mol of the input dataclass.
-        If the energies cannot be read, E_slab_mol is set to [0.0, 0.0].
+        If either file is not found, the corresponding energy will be set to 0.0.
         '''
-        try:
-            slab_en = read(self.input.slab_filename).get_potential_energy()
-            mol_en = read(self.input.molecule_filename).get_potential_energy()
-            self.input.E_slab_mol = [slab_en, mol_en]
-        except Exception as e: # pylint: disable=broad-except
-            #this is a general exception to catch any error that might occur.
-            #It can be file not found, or energy not present in the file, etc.
-            self.input.E_slab_mol = [0.0, 0.0]
-            if verbose:
-                print('It was not possible to obtain slab and molecule energy in any way.',
-                       f'Error message from ase: {e}.',
-                        'Total energies will be shown instead of adsorption energies.')
+
+        if self.input.E_slab_mol is None:
+            self.input.E_slab_mol = [0,0]
+
+        if int(self.input.E_slab_mol[0]) == 0:
+            try:
+                self.input.E_slab_mol[0] = read(self.input.slab_filename).get_potential_energy()
+            except Exception as e: # pylint: disable=broad-except
+                try:
+                    self.input.E_slab_mol[0] = \
+                        read(OUT_FILE_PATHS['slab'][self.program]).get_potential_energy()
+                except Exception as e: # pylint: disable=broad-except
+                    if verbose:
+                        print(f"Error reading slab energy: {e}. Setting to 0")
+        if int(self.input.E_slab_mol[1]) == 0:
+            try:
+                self.input.E_slab_mol[1] = read(self.input.molecule_filename).get_potential_energy()
+            except Exception as e: # pylint: disable=broad-except
+                try:
+                    self.input.E_slab_mol[1] = \
+                        read(OUT_FILE_PATHS['mol'][self.program]).get_potential_energy()
+                except Exception as e: # pylint: disable=broad-except
+                    if verbose:
+                        print(f"Error reading molecule energy: {e}. Setting to 0")
+
+        return sum(self.input.E_slab_mol)

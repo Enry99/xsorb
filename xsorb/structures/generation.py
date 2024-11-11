@@ -53,7 +53,8 @@ class AdsorptionStructuresGenerator:
         the combinations of molecular rotations and adsorption sites
     '''
 
-    def __init__(self, settings: Settings, verbose : bool = False) -> None:
+    def __init__(self, slab: AtomsCustom, mol: AtomsCustom,
+                 settings: Settings, verbose : bool = False) -> None:
 
 
         self.settings = settings
@@ -62,7 +63,7 @@ class AdsorptionStructuresGenerator:
         #Slab import from file
         if verbose:
             print('Loading slab...')
-        self.slab = Slab(slab_filename=settings.input.slab_filename,
+        self.slab = Slab(slab=slab,
                     surface_thickness=settings.structure.adsorption_sites.surface_thickness,
                     layers_threshold=settings.structure.constraints.layers_height,
                     fixed_layers_slab=settings.structure.constraints.fixed_layers_slab,
@@ -77,7 +78,7 @@ class AdsorptionStructuresGenerator:
         #Molecule import from file
         if verbose:
             print('Loading molecule...')
-        self.mol = Molecule(molecule_filename=settings.input.molecule_filename,
+        self.mol = Molecule(mol=mol,
                     atom_indexes=settings.structure.molecule.selected_atom_indexes,
                     molecule_axis_atoms=settings.structure.molecule.molecule_axis["values"] \
                         if settings.structure.molecule.molecule_axis["mode"] == "atom_indices" \

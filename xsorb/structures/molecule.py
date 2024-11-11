@@ -17,7 +17,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.core.bonds import CovalentBond
 from ase.constraints import FixCartesian
 
-from xsorb.ase_custom.io import ase_custom_read as read
+from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.visualize.plot import plot_rotations_images
 from xsorb.structures.properties import MoleculeRotation, SurroundingSite
 
@@ -29,7 +29,7 @@ class Molecule:
         by placing the molecule on all the different sites
 
         Initialization parameters:
-        - molecule_filename: file containing the structure of the molecule
+        - mol: Atoms object of the molecule
         - atom_indexes: list of indices of the reference atom (indexing starting from 0,
             in the order of the input file)
         - molecule_axis_atoms: indices of the two atoms defining the x-axis
@@ -46,7 +46,7 @@ class Molecule:
     '''
 
 
-    def __init__(self, molecule_filename : str,
+    def __init__(self, mol: AtomsCustom,
                  atom_indexes: list[int],
                  molecule_axis_atoms : list[int] | None = None,
                  axis_vector: list[float] | None = None,
@@ -56,7 +56,7 @@ class Molecule:
                  fix_mol_xyz : list[bool] | None = None):
 
 
-        self.mol_ase = read(molecule_filename)
+        self.mol_ase = mol.copy()
 
         #align axis to x axis
         if molecule_axis_atoms and axis_vector:
