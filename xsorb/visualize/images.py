@@ -17,6 +17,7 @@ from dataclasses import asdict
 from ase.visualize import view
 
 import xsorb.structures.slab
+from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.io.settings import Settings
 from xsorb.io.database import Database
 from xsorb.visualize.render import render_image
@@ -117,7 +118,7 @@ def plot_images(calc_type : str,
     stars = [] #for marking non-converged calculations
     for row in progressbar(rows, 'Rendering:'):
 
-        atoms = row.toatoms()
+        atoms = AtomsCustom(row.toatoms())
         mol_indices = row.data.adsorption_structure.mol_indices
 
         if kwargs.pop('center_mol', None):

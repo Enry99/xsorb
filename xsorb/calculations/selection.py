@@ -9,13 +9,10 @@ Module with the functions to select the configurations for subsequent calculatio
 '''
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
-from ase import Atoms
-
+from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.io.database import Database
-if TYPE_CHECKING:
-    from xsorb.structures.properties import AdsorptionStructure
+from xsorb.structures.properties import AdsorptionStructure
 
 
 def select_calculations(rows : list,
@@ -97,18 +94,22 @@ def obtain_calc_indices(*,
 
     selected_calc_ids = []
     #select only rows that have energy
-    selections = ['energy,bonds!=None', 'energy,bonds=None'] if separate_chem_phys else ['energy']
-    for selection in selections:
-        rows = Database.get_calculations(calc_type=calc_type,
-                                        selection=selection,
-                                        exclude_ids=excluded_calc_ids,
-                                        columns=['energy', 'calc_id', 'site'],
-                                        sort_key='energy',
-                                        include_data=False)
+    rows = Database.get_calculations(calc_type=calc_type,
+                                    selection='energy',
+                                    exclude_ids=excluded_calc_ids,
+                                    #columns=['energy', 'calc_id', 'site', 'bonds'],
+                                    sort_key='energy',
+                                    include_data=False)
+    if separate_chem_phys:
+        selections = [[row for row in rows if row.bonds != 'none'],
+                     [row for row in rows if row.bonds == 'none']]
+    else:
+        selections = [rows]
 
+    for selection in selections:
         if by_mol_atom:
-            for mol_atom in set(row.get('mol_atom') for row in rows):
-                rows_mol_atom = [row for row in rows if row.get('mol_atom')  == mol_atom]
+            for mol_atom in set(row.get('mol_atom') for row in selection):
+                rows_mol_atom = [row for row in selection if row.get('mol_atom')  == mol_atom]
 
                 if by_site:
                     for site in set(row.get('site') for row in rows_mol_atom):
@@ -118,11 +119,11 @@ def obtain_calc_indices(*,
                     selected_calc_ids += select_calculations(rows_mol_atom, n_configs, threshold)
         else:
             if by_site:
-                for site in set(row.get('site') for row in rows):
-                    rows_site = [row for row in rows if row.get('site') == site]
+                for site in set(row.get('site') for row in selection):
+                    rows_site = [row for row in selection if row.get('site') == site]
                     selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
             else:
-                selected_calc_ids += select_calculations(rows, n_configs, threshold)
+                selected_calc_ids += select_calculations(selection, n_configs, threshold)
 
     print(f'{calc_type} results collected.')
 
@@ -149,17 +150,16 @@ def get_adsorption_structures(get_structures_from : str,
     #get structures from database
     rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
 
-    if get_structures_from == 'ml_opt':
-        rows_original = Database.get_calculations(calc_type='structures',
-                                                  calc_ids=calc_ids)
+    if get_structures_from == 'structures':
+        rows_original = Database.get_structures(calc_ids=calc_ids)
         constraints = [row.get('constraints') for row in rows_original]
 
     # prepare the structures by substituting the atoms with the one from the
     # previous calculation
     adsorption_structures : list [AdsorptionStructure] = []
     for row in rows:
-        ads_struct = AdsorptionStructure(**row.data.adsorption_structure)
-        atoms : Atoms = row.toatoms()
+        ads_struct = AdsorptionStructure.from_dict(row.data.adsorption_structure)
+        atoms = AtomsCustom(row.toatoms())
 
         if get_structures_from == 'ml_opt':
             atoms.set_constraint(constraints.pop(0))

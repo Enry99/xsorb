@@ -10,10 +10,8 @@ Module to store all the dataclasses that describe adsorption structures, sites a
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from xsorb.ase_custom.atoms import AtomsCustom
+from xsorb.ase_custom.atoms import AtomsCustom
 
 
 @dataclass
@@ -43,6 +41,17 @@ class MoleculeRotation:
     yrot: str
     zrot: str
     mol_atom: int
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        '''
+        Creates a MoleculeRotation object from a dictionary
+        '''
+        return cls(AtomsCustom(data['atoms']),
+                   data['xrot'],
+                   data['yrot'],
+                   data['zrot'],
+                   data['mol_atom'])
 
     @property
     def unique_id(self):
@@ -77,6 +86,13 @@ class AdsorptionSite:
     label: str
     coords: list[float]
     info: str
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        '''
+        Creates an AdsorptionSite object from a dictionary
+        '''
+        return cls(data['label'], list(data['coords']), data['info'])
 
     @property
     def unique_id(self):
@@ -186,6 +202,18 @@ class AdsorptionStructure:
     mol_rot: MoleculeRotation
     distance : float
     mol_indices: list[int]
+
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        '''
+        Creates an AdsorptionStructure object from a dictionary
+        '''
+        return cls(AtomsCustom(data['atoms']),
+                   AdsorptionSite.from_dict(data['adsite']),
+                   MoleculeRotation.from_dict(data['mol_rot']),
+                   data['distance'],
+                   data['mol_indices'])
 
 
     @staticmethod

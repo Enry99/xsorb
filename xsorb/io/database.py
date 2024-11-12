@@ -54,7 +54,8 @@ import ase.db
 import ase.db.core
 
 import xsorb.calculations.results
-import xsorb.io
+import xsorb.io.inputs
+from xsorb.ase_custom.atoms import AtomsCustom
 if TYPE_CHECKING:
     from xsorb.structures.generation import AdsorptionStructure
 
@@ -96,7 +97,7 @@ class Database:
             for ads_struct in adsorption_structures:
                 already_present = False
                 for row in db.select(include_data=False):
-                    if ads_struct.atoms == row.toatoms():
+                    if ads_struct.atoms == AtomsCustom(row.toatoms()):
                         already_present = True
                         calc_ids.append(row.id)
                         break
@@ -492,8 +493,10 @@ class Database:
                                           'has not reached final configuration. '\
                                             'The energy will be marked with a *')
                             info_dicts[i].update({f'Eads_{calc_type[:3]}(eV)': eads})
-                            info_dicts[i].update({'bonds': row.get('bonds')})
-                            info_dicts[i].update({'final_dz': row.get('final_dz')})
+                            if row.get('bonds'):
+                                info_dicts[i].update({'bonds': row.get('bonds')})
+                            if row.get('final_dz'):
+                                info_dicts[i].update({'final_dz': row.get('final_dz')})
                             atleast_one_calc = True
 
                     if atleast_one_calc:

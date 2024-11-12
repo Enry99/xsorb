@@ -13,7 +13,6 @@ import shutil
 from pathlib import Path
 from dataclasses import dataclass
 
-from ase import Atoms
 
 from xsorb.structures.utils import set_fixed_slab_constraints
 from xsorb.io.settings import Settings
@@ -21,6 +20,7 @@ import xsorb.io.database
 from xsorb.io.utils import overwrite_question
 from xsorb.ase_custom.io import write
 from xsorb.ase_custom import write_xyz_custom
+from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import write_file_with_calculator
 from xsorb.dft_codes.override import override_dft_settings
@@ -242,8 +242,8 @@ def saveas(calc_type : str, saveas_format : str):
 
     for row in rows:
         if saveas_format == 'xyz':
-            write_xyz_custom(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.toatoms())
+            write_xyz_custom(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', AtomsCustom(row.toatoms()))
         else:
-            write(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', row.toatoms())
+            write(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', AtomsCustom(row.toatoms()))
 
     print("All files saved.")

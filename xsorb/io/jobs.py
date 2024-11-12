@@ -104,11 +104,11 @@ def restart_jobs(calc_type : str):
     settings = Settings()
 
     rows = xsorb.io.database.Database.get_calculations(calc_type,
-                                     selection='status="incomplete",job_status="terminated"')
+                                     selection='status=incomplete,job_status=terminated')
     indices_to_restart = [row.calc_id for row in rows]
-    in_files = [row.in_file for row in rows]
-    out_files = [row.out_file for row in rows]
-    log_files = [row.log_file for row in rows]
+    in_files = [row.in_file_path for row in rows]
+    out_files = [row.out_file_path for row in rows]
+    log_files = [row.log_file_path for row in rows]
 
     #edit input files
     edit_files_for_restart(settings.program, in_files)
