@@ -272,8 +272,10 @@ class Settings:
         #available if read_energies is True.
         if read_energies:
             self.total_e_slab_mol = self.read_E_slab_mol(verbose)
+            self.total_e_slab_mol_ml = self.read_E_slab_mol_ml(verbose)
         else:
             self.total_e_slab_mol = None
+            self.total_e_slab_mol_ml = None
 
 
     def read_E_slab_mol(self, verbose : bool = True): # pylint: disable=invalid-name
@@ -308,3 +310,28 @@ class Settings:
                         print(f"Error reading molecule energy: {e}. Setting to 0")
 
         return sum(self.input.E_slab_mol)
+
+
+    def read_E_slab_mol_ml(self, verbose : bool = True): # pylint: disable=invalid-name
+        '''
+        Attempt to read the energies of the slab and molecule from the slab and molecule files,
+        and store them in E_slab_mol of the input dataclass.
+        If either file is not found, the corresponding energy will be set to 0.0.
+        '''
+
+        try:
+            eslab_ml = \
+                read(OUT_FILE_PATHS['slab']['ml']).get_potential_energy()
+        except Exception as e: # pylint: disable=broad-except
+            eslab_ml = 0.0
+            if verbose:
+                print(f"Error reading ML slab energy: {e}. Setting to 0")
+        try:
+            emol_ml = \
+                read(OUT_FILE_PATHS['mol']['ml']).get_potential_energy()
+        except Exception as e: # pylint: disable=broad-except
+            emol_ml = 0.0
+            if verbose:
+                print(f"Error reading molecule energy: {e}. Setting to 0")
+
+        return eslab_ml + emol_ml

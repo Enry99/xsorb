@@ -114,7 +114,7 @@ def launch_ml_opt(save_image : bool = False,):
                                    settings=settings,
                                    calc_type='ml_opt')
 
-    launch_jobs(program=settings.program,
+    launch_jobs(program='ml',
                 calc_type='ml_opt',
                 jobscript=settings.input.jobscript_ml_path,
                 sbatch_command=settings.input.submit_command_ml,
@@ -211,13 +211,18 @@ def launch_final_relax(*,
                 jobname_prefix=settings.input.jobname_prefix)
 
 
-def launch_isolated_slab_and_molecule(ml : bool, mol_only : bool = False, samecell : bool = False):
+
+def launch_isolated_slab_and_molecule(ml : bool,
+                                      launch_slab : bool = True,
+                                      launch_mol: bool = True,
+                                      samecell : bool = False):
     '''
     Launch the calculations for the isolated slab and molecule.
 
     Args:
     - ml: for machine learning calculations
-    - mol_only: only the molecule is launched
+    - launch_slab: launch the calculations for the slab
+    - launch_mol: launch the calculations for the molecule
     - samecell: use the same slab cell also for the molecule (to remove coverage effects)
     '''
 
@@ -244,12 +249,12 @@ def launch_isolated_slab_and_molecule(ml : bool, mol_only : bool = False, samece
     mol.pbc = True
 
 
-    written_systems = write_slab_mol_inputs(slab=slab if not mol_only else None,
-                                            molecule=mol,
+    written_systems = write_slab_mol_inputs(slab=slab if launch_slab else None,
+                                            molecule=mol if launch_mol else None,
                                             settings=settings,
                                             ml=ml)
 
-    launch_jobs(program=settings.program,
+    launch_jobs(program='ml' if ml else settings.program,
                 calc_type='isolated',
                 jobscript=settings.input.jobscript_path if not ml \
                     else settings.input.jobscript_ml_path,

@@ -14,7 +14,7 @@ xsorb/visualize/*:              OK
 
 
 PROBLEMI:
--lunghezza sbagliata dei siti bridge
+-controllare che quando non sovrascrivo gli input i conti non vengano lanciati
 
 
 

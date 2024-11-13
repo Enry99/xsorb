@@ -171,6 +171,7 @@ class Database:
     def update_calculations(calc_type : str,
                             refresh : bool = False,
                             total_e_slab_mol : float | None = None,
+                            total_e_slab_mol_ml : float | None = None,
                             mult : float | None = None,
                             write_csv : bool = True,
                             txt : bool = False,
@@ -182,6 +183,8 @@ class Database:
         Args:
         - calc_type: string with the type of calculation: 'screening'/'relax'/'ml_opt', or 'all'
         - refresh: bool to force the update of the database
+        - total_e_slab_mol: float with the total energy of the isolated molecule and slab.
+        - total_e_slab_mol_ml: float with the total energy of the isolated molecule and slab (for ML)
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding. Needs to be passed when refreshing the database
             if the value was changed from the settings
@@ -199,6 +202,8 @@ class Database:
                 if Path(db_name).exists():
                     Database.update_calculations(calc_type=ctype,
                                                  refresh=refresh,
+                                                 total_e_slab_mol=total_e_slab_mol,
+                                                 total_e_slab_mol_ml=total_e_slab_mol_ml,
                                                  mult=mult,
                                                  write_csv=False,
                                                  verbose=verbose)
@@ -219,6 +224,8 @@ class Database:
                 db.metadata['mult'] = mult
             else:
                 mult = db.metadata.get('mult')
+            total_e_slab_mol = total_e_slab_mol \
+                    if calc_type != 'ml_opt' else total_e_slab_mol_ml
             if total_e_slab_mol is not None:
                 db.metadata['total_e_slab_mol'] = total_e_slab_mol
             else:
@@ -241,7 +248,9 @@ class Database:
 
             for row_id, result in zip(row_ids, results):
                 if result is not None:
-                    #print(result.adsorption_energy)
+                    #remove constraints to be able to write into the database
+                    for i, _ in enumerate(result.trajectory):
+                        result.trajectory[i].set_constraint()
                     db.update(id=row_id,
                               atoms=result.atoms,
                               status=result.status,

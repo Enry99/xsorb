@@ -114,7 +114,7 @@ OPTIMIZATION_COMPLETED_STRINGS = {
     #'vasp' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
     'vasp' : 'finalpos', #in vasprun.xml
     'espresso': 'Begin final coordinates',
-    'ml': 'Optimization completed.'
+    'ml': 'Optimization converged.'
 }
 
 SCF_NONCONVERGED_STRINGS = {

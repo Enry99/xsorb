@@ -216,6 +216,14 @@ class AdsorptionStructure:
                    data['mol_indices'])
 
 
+    @property
+    def slab_indices(self):
+        '''
+        Returns the indices of the atoms of the slab
+        '''
+        return [i for i in range(len(self.atoms)) if i not in self.mol_indices]
+
+
     @staticmethod
     def dataframe_column_names():
         '''

@@ -121,9 +121,9 @@ def restart_jobs(calc_type : str):
         j_dir = Path(in_file).parent
         os.chdir(j_dir)
 
-        postfix = SBATCH_POSTFIX[settings.program].format(in_file=in_file,
-                                                 out_file=out_file,
-                                                 log_file=log_file,
+        postfix = SBATCH_POSTFIX[settings.program].format(in_file=Path(in_file).name,
+                                                 out_file=Path(out_file).name,
+                                                 log_file=Path(log_file).name,
                                                  main_dir=main_dir)
         launch_string = f"{settings.input.submit_command} jobscript.sh {postfix}"
 

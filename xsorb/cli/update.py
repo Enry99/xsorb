@@ -42,13 +42,16 @@ class CLICommand(CLICommandBase):
             from xsorb.io.settings import Settings
             settings = Settings(read_energies=True)
             total_e_slab_mol = settings.total_e_slab_mol
+            total_e_slab_mol_ml = settings.total_e_slab_mol_ml
             mult=settings.structure.molecule.radius_scale_factor
         else:
             mult = None
             total_e_slab_mol = None
+            total_e_slab_mol_ml = None
         Database.update_calculations(args.calc_type,
                                      args.refresh,
                                      total_e_slab_mol=total_e_slab_mol,
+                                     total_e_slab_mol_ml=total_e_slab_mol_ml,
                                      mult=mult,
                                      txt=args.txt,
                                      verbose=True)

@@ -27,7 +27,7 @@ class CLICommand(CLICommandBase):
     @staticmethod
     def run(args : argparse.Namespace):
         from xsorb.calculations.launchers import launch_ml_opt
-        launch_ml_opt(save_images=args.save_images)
+        launch_ml_opt(save_image=args.save_images)
 
 
     @staticmethod

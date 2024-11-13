@@ -181,7 +181,6 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
     if verbose: print('Writing input files...') #pylint: disable=multiple-statements
 
     #Write the input files
-    written_systems = []
     answer_all = False #pylint: disable=invalid-name
     for atoms, system in zip(structures, written_systems):
 

@@ -150,7 +150,7 @@ def get_adsorption_structures(get_structures_from : str,
     #get structures from database
     rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
 
-    if get_structures_from == 'structures':
+    if get_structures_from == 'ml_opt':
         rows_original = Database.get_structures(calc_ids=calc_ids)
         constraints = [row.get('constraints') for row in rows_original]
 
