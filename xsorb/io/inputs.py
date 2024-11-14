@@ -102,8 +102,9 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
         if ask_before_overwrite and (Path(in_file_path).exists() or Path(out_file_path).exists()) \
             and not answer_all:
             answer = overwrite_question(f'{in_file_path} or {out_file_path}')
-            if answer in ('yall', 'nall'): answer_all = True #pylint: disable=multiple-statements,invalid-name
-            if answer in ('n', 'nall'): continue  #pylint: disable=multiple-statements
+            if answer == 'yall': answer_all = True #pylint: disable=multiple-statements,invalid-name
+            elif answer == 'nall': break #pylint: disable=multiple-statements
+            elif answer == 'n': continue #pylint: disable=multiple-statements
 
             #remove the directory and all its content
             shutil.rmtree(file_dir)
@@ -196,8 +197,9 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
         if ask_before_overwrite and (Path(in_file_path).exists() or Path(out_file_path).exists()) \
             and not answer_all:
             answer = overwrite_question(f'{in_file_path} or {out_file_path}')
-            if answer in ('yall', 'nall'): answer_all = True #pylint: disable=multiple-statements,invalid-name
-            if answer in ('n', 'nall'): continue  #pylint: disable=multiple-statements
+            if answer == 'yall': answer_all = True #pylint: disable=multiple-statements,invalid-name
+            elif answer == 'nall': break #pylint: disable=multiple-statements
+            elif answer == 'n': continue #pylint: disable=multiple-statements
 
             #remove the directory and all its content
             shutil.rmtree(file_dir)

@@ -193,11 +193,8 @@ class Database:
         - verbose: bool to print messages
         '''
 
-        if verbose and refresh:
-            print('Re-reading the output files, updating e_slab_mol, '\
-                   'the radii mult factor, and recalculating the bonding status...')
-
         if calc_type == 'all':
+            #recursively call the function for all the calculation types
             for ctype, db_name in Database.calc_types.items():
                 if Path(db_name).exists():
                     Database.update_calculations(calc_type=ctype,
@@ -211,6 +208,10 @@ class Database:
             if write_csv: #only write the csv file once
                 Database.write_csvfile(txt=txt, verbose=verbose)
             return
+
+        if verbose and refresh:
+            print('Re-reading the output files, updating e_slab_mol, '\
+                   'the radii mult factor, and recalculating the bonding status...')
 
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             #Get the ids and calc_ids of the (incomplete) calculations to be updated

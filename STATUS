@@ -13,12 +13,6 @@ xsorb/structures/*:             OK
 xsorb/visualize/*:              OK
 
 
-PROBLEMI:
--controllare che quando non sovrascrivo gli input i conti non vengano lanciati
-
-
-
-
 FINALLY: xfrag.
 
 TODO: in the whole code, replace strings \ with multiline strings (docstrings)
