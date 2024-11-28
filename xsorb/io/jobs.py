@@ -47,7 +47,7 @@ def launch_jobs(*,program : str,
     '''
     main_dir = os.getcwd()
 
-    submitted_jobs = []
+    submitted_jobs : list[int] = []
     for system in systems:
 
         j_dir = Path(system.in_file_path).parent
@@ -115,7 +115,7 @@ def restart_jobs(calc_type : str):
 
     #launch the calculations
     main_dir = os.getcwd()
-    submitted_jobs = []
+    submitted_jobs : list[int] = []
     for in_file, out_file, log_file in zip(in_files, out_files, log_files):
 
         j_dir = Path(in_file).parent
@@ -169,7 +169,7 @@ def scancel():
     if Path(".submitted_jobs.txt").exists():
         with open(".submitted_jobs.txt", "r",encoding=sys.getfilesystemencoding()) as f:
             submitted_jobs = f.readlines()
-            submitted_job_ids.extend([job.strip() for job in submitted_jobs])
+            submitted_job_ids.extend([int(job.strip()) for job in submitted_jobs])
 
     running_jobs = get_running_jobs()
     job_ids_to_cancel = [job for job in running_jobs if job in submitted_job_ids]

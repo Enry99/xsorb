@@ -384,14 +384,14 @@ class Database:
 
 
     @staticmethod
-    def get_all_job_ids() -> list:
+    def get_all_job_ids() -> list[int]:
         '''
         Get all the job ids from the databases
 
         Returns:
         - list of integers with the job ids
         '''
-        job_ids = []
+        job_ids : list[int] = []
         calc_types = Database.calc_types.copy()
 
         for calc_type in calc_types.values():
