@@ -20,11 +20,11 @@ from xsorb.ase_custom.io import ase_custom_read as read
 def main():
     '''
     Command-line script to optimize a structure using a ML calculator.
-    Usage: python3 ml_opt.py in_file out_file log_file main_dir
+    Usage: python3 xsorb-ml-opt in_file out_file log_file main_dir
     '''
 
     if len(sys.argv) != 5:
-        raise ValueError("Usage: python3 in_file out_file log_file main_dir")
+        raise ValueError("Usage: xsorb-ml-opt in_file out_file log_file main_dir")
 
     in_file = sys.argv[1]
     out_file = sys.argv[2]
@@ -57,7 +57,7 @@ def main():
     #If not converged, try with regular BFGS
     if not converged:
         opt = BFGS(atoms, trajectory=out_file, logfile=log_file, append_trajectory=True)
-        converged = opt.run(fmax=0.01, steps=500)
+        converged = opt.run(fmax=0.01, steps=2000)
 
     with open(log_file, "a", encoding=sys.getfilesystemencoding()) as f:
         f.write(f"\nOptimization {'converged' if converged else 'NOT converged'}.\n")
