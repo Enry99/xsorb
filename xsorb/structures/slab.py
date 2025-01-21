@@ -242,13 +242,16 @@ class Slab:
 
                 # skip the site if it is already in the list of existing sites
                 if np.any([np.allclose(site_coords, ex_site.coords) for ex_site in existing_sites]):
+                    i_site += 1
                     continue
 
                 unique_id = "{0:.2f},{1:.2f}".format(*site_coords[:2]) #pylint: disable=consider-using-f-string
 
                 if selected_sites and i_site not in selected_sites:
+                    i_site += 1
                     continue
                 if any(unique_id == x.unique_id for x in existing_sites):
+                    i_site += 1
                     continue
 
 
