@@ -221,7 +221,7 @@ class Slab:
         surf = self.asf.slab.copy()
         surf.remove_sites([idx for idx, site in enumerate(surf.sites) \
                            if site in self.asf.subsurface_sites()])
-        #flatten the surface (z=0 for all)
+        #flatten the surface (z=0 for all) (only for site classification)
         for i in range(len(surf)): surf[i].z = 0 # pylint: disable=consider-using-enumerate,multiple-statements
 
         nn = MinimumDistanceNN(tol=0.2) #increased tol to identify as 3-fold the sites that are
@@ -262,6 +262,7 @@ class Slab:
 
 
                 # add further information to the site types
+                true_site_type = site_type
                 if site_type == 'ontop':
                     first_nn_species = nn_list[0].species_string
                     info = f"{site_type} {first_nn_species}"
@@ -269,6 +270,7 @@ class Slab:
                     info = f"{site_type} {coord_n}-fold"
                 elif site_type == 'bridge':
                     if coord_n>=4: #attemps to fix the problem of fake bridges for 4-fold sites
+                        true_site_type = 'hollow'
                         info = f"hollow {coord_n}-fold"
                     else:
                         if len(nn_list) >=2:
@@ -282,7 +284,7 @@ class Slab:
                 all_adsites.append(AdsorptionSiteCrystal(label=str(i_site),
                                                          coords=site_coords,
                                                          info=info,
-                                                         type=site_type))
+                                                         type=true_site_type))
                 i_site += 1
 
         return all_adsites

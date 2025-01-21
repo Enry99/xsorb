@@ -20,6 +20,7 @@ import xsorb.structures.slab
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.io.settings import Settings
 from xsorb.io.database import Database
+from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.visualize.render import render_image
 from xsorb.visualize.plot import plot_overview_grid
 from xsorb.visualize.utils import get_centered_mol_and_slab, read_custom_colors
@@ -36,7 +37,9 @@ def plot_adsorption_sites(all_sites : bool = False):
 
     settings = Settings()
 
-    slab = xsorb.structures.slab.Slab(slab_filename=settings.input.slab_filename,
+    slab = read(settings.input.slab_filename)
+
+    slab = xsorb.structures.slab.Slab(slab=slab,
             surface_thickness=settings.structure.adsorption_sites.surface_thickness,
             layers_threshold=settings.structure.constraints.layers_height,
             sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,

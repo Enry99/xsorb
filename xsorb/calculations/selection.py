@@ -79,7 +79,6 @@ def obtain_calc_indices(*,
         #just return the indices of all the configurations
         rows = Database.get_calculations(calc_type=calc_type,
                                         exclude_ids=excluded_calc_ids,
-                                        columns=['calc_id'],
                                         include_data=False)
         return [row.get('calc_id') for row in rows]
 

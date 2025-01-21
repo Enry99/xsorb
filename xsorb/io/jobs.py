@@ -60,7 +60,7 @@ def launch_jobs(*,program : str,
             lines = f.readlines()
             for i, line in enumerate(lines):
                 if "job-name" in line:
-                    prefix = jobname_prefix
+                    prefix = jobname_prefix[:4]
                     if jobname_prefix != '': prefix += '_' #pylint: disable=multiple-statements
                     if calc_type != 'isolated':
                         suffix = f'{calc_type[0]}{system.calc_id}'
