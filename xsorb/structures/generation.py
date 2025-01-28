@@ -114,7 +114,7 @@ class AdsorptionStructuresGenerator:
         structure_settings = self.settings.structure
 
         if rot_mode == 'standard':
-            if self.molecule_rotations is not None:
+            if self.molecule_rotations is not None and self.molecule_rotations[-1].mol_atom == which_index:
                 return self.molecule_rotations
             z_rot_angles : list[float | SurroundingSite] = structure_settings.molecule.z_rot_angles
             surrounding_exclude_main = False
@@ -355,6 +355,7 @@ class AdsorptionStructuresGenerator:
 
         adsorption_structures : list[AdsorptionStructure] = []
         for mol_ref_index in self.mol.reference_atom_indices:
+            print(f"Molecule atom {mol_ref_index}:")
             for adsite in adsites:
                 molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
                                                                     which_index=mol_ref_index,
