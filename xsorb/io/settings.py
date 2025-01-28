@@ -83,6 +83,10 @@ class CoordNumberParams:
         if self.max_cn is None and self.max_cn_offset is None:
             self.max_cn_offset = 2
 
+        if self.atomic_species:
+            for i, species in enumerate(self.atomic_species):
+                self.atomic_species[i] = species.capitalize()
+
 @dataclass
 class AdsorptionSitesParams:
     '''
