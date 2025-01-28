@@ -274,3 +274,6 @@ def edit_files_for_restart(program : str, paths : list[str]):
 
             #copy contcar to poscar to restart
             shutil.copyfile(contcar, poscar)
+
+        else:
+            raise ValueError(f"Program {program} not recognized")

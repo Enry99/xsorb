@@ -42,7 +42,7 @@ def override_dft_settings(dftsettings : dict,
             dftsettings['ions'].update({'upscale': dftsettings['upscale_screening']})
 
 
-        elif program == 'VASP':
+        elif program == 'vasp':
             #fix if user forgot to put the correct IBRION for relax, and add EDIFFG for screening.
             #EDIFFG is put here so that in any case this will be the final value, even if the user had
             #specified a different value explicitly in the INCAR instead of using one of the RelaxSets
@@ -63,16 +63,19 @@ def override_dft_settings(dftsettings : dict,
 
             dftsettings['incar_string'] = '\n'.join(s)
 
+        else:
+            raise ValueError(f"Program {program} not recognized")
 
-    elif calc_type == 'RELAX':
-        if program == 'ESPRESSO':
+
+    elif calc_type == 'relax':
+        if program == 'espresso':
             dftsettings['control'].update({'calculation' : 'relax'})
             dftsettings['control'].update({'restart_mode' : 'from_scratch'})
             dftsettings['control'].update({'outdir' : 'OUT'})
             if 'ions' not in dftsettings: dftsettings['ions'] = {}
 
 
-        elif program == 'VASP':
+        elif program == 'vasp':
 
             #fix if user forgot to put the correct IBRION for relax
             if 'incar_string' in dftsettings and "pymatgen_set" not in dftsettings:
@@ -84,6 +87,9 @@ def override_dft_settings(dftsettings : dict,
                 if missing_ibrion: s.append('IBRION = 2')
 
                 dftsettings['incar_string'] = '\n'.join(s)
+
+        else:
+            raise ValueError(f"Program {program} not recognized")
 
     return dftsettings
 
