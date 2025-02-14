@@ -529,12 +529,16 @@ class Slab:
             unique_id = idx
             atom_species = self.asf.slab[idx].species_string
 
+            # skip the site if it is already in the list of existing sites
+            if np.any([np.allclose(coords, ex_site.coords) for ex_site in existing_sites]):
+                i_site += 1
+                continue
+
             if selected_sites and i_site not in selected_sites:
                 continue
             if atomic_species and atom_species not in atomic_species:
                 continue
-            if any(unique_id == x.unique_id for x in existing_sites):
-                continue
+
 
             if cn <= max_cn:
                 info = f"{atom_species}(cn={cn:.1f})"
