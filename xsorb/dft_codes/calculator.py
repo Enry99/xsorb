@@ -79,12 +79,17 @@ class EspressoFakeCalculator():
     '''
 
     def __init__(self,label,directory,pseudopotentials,kpts,koffset,input_data,additional_cards):
+
+        # Remove pseudopotential from input_data if present
+        if input_data is not None:
+            self.input_data = input_data.copy()
+            self.input_data.pop('pseudopotentials', None)    
+
         self.label = label
         self.directory = Path(directory)
         self.pseudopotentials = pseudopotentials
         self.kpts = kpts
         self.koffset = koffset
-        self.input_data = input_data
         self.additional_cards = additional_cards
 
 
