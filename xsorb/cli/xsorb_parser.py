@@ -49,7 +49,7 @@ def build_xsorb_parser():
         subparser = subparsers.add_parser(
                     command,
                     formatter_class=CustomFormatter,
-                    help=cmd.__doc__.split('\n')[0],
+                    help=cmd.__doc__.split('\n')[0] if cmd.__doc__ else None,
                     description=cmd.__doc__)
         cmd.add_arguments(subparser)
         cmd.bind_function(subparser)

@@ -199,7 +199,7 @@ def plot_overview_grid(calc_type : str,
     The lowest energy is highlighted in red.
 
     Args:
-    - calc_type: 'initial','screening','relax','ml_opt'
+    - calc_type: 'initial','screening','relax','mlopt'
     - outfiles: list of the paths to the images
     - calc_indices: list of the calculation indices
     - energies: list of the energies

@@ -44,7 +44,7 @@ def is_optimization_completed(filename : str, program : str):
 
     Args:
     - filename: path to the LOG_FILE(==output file for espresso)
-    - calc_type: 'screening','relax','ml_opt'
+    - calc_type: 'screening','relax','mlopt'
 
     Returns:
     True or False
@@ -70,7 +70,7 @@ def is_scf_not_converged(filename : str, program : str):
 
     Args:
     - filename: path to the LOG_FILE(==output file for espresso)
-    - calc_type: 'screening','relax','ml_opt'
+    - calc_type: 'screening','relax','mlopt'
 
     Returns:
     True or False

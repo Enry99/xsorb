@@ -10,7 +10,7 @@ Four databases are used:
 - structures.db: Database with the initial structures
 - screening.db: Contains the results of the screening calculations
 - relaxations.db: Contains the results of the relaxations
-- ml_opt.db: Contains the results of the machine learning optimization
+- mlopt.db: Contains the results of the machine learning optimization
 
 
 The calculation databases have the following columns:
@@ -69,7 +69,7 @@ class Database:
     '''
 
     calc_types = {
-        'ml_opt': 'ml_opt.db',
+        'mlopt': 'mlopt.db',
         'screening': 'screening.db',
         'relax': 'relaxations.db',
     }
@@ -134,7 +134,7 @@ class Database:
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding
         - total_e_slab_mol: float with the total energy of the isolated molecule and slab
-        - calc_type: screening, relax or ml_opt
+        - calc_type: screening, relax or mlopt
         '''
 
         # Write the adsorption structures to the corresponding database
@@ -181,7 +181,7 @@ class Database:
         Also update the job status
 
         Args:
-        - calc_type: string with the type of calculation: 'screening'/'relax'/'ml_opt', or 'all'
+        - calc_type: string with the type of calculation: 'screening'/'relax'/'mlopt', or 'all'
         - refresh: bool to force the update of the database
         - total_e_slab_mol: float with the total energy of the isolated molecule and slab.
         - total_e_slab_mol_ml: float with the total energy of the isolated molecule and slab (for ML)
@@ -226,7 +226,7 @@ class Database:
             else:
                 mult = db.metadata.get('mult')
             total_e_slab_mol = total_e_slab_mol \
-                    if calc_type != 'ml_opt' else total_e_slab_mol_ml
+                    if calc_type != 'mlopt' else total_e_slab_mol_ml
             if total_e_slab_mol is not None:
                 db.metadata['total_e_slab_mol'] = total_e_slab_mol
             else:
@@ -355,7 +355,7 @@ class Database:
 
         Args:
         - calc_ids: list of integers with the ids of the calculations to be removed
-        - calc_type: string with the type of calculation (screening, relax, or ml_opt)
+        - calc_type: string with the type of calculation (screening, relax, or mlopt)
         '''
         with ase.db.connect(Database.calc_types[calc_type]) as db:
             for calc_id in calc_ids:
@@ -479,7 +479,7 @@ class Database:
         if include_results:
             energies_column_names = []
             for calc_type, db_name in Database.calc_types.items():
-                #order is ml_opt, screening, relax
+                #order is mlopt, screening, relax
                 atleast_one_calc = False
                 if Path(db_name).exists():
                     with ase.db.connect(db_name) as db:
@@ -533,3 +533,40 @@ class Database:
             df.to_csv('results.csv', index=False)
 
         if verbose: print('Results file written.')
+
+
+def manual_update_calculations(calc_type : str,
+                               refresh : bool = False,
+                               txt : bool = False) -> None:
+    '''
+    Manually update the calculations in the database.
+    This function is meant to be called from the CLI, to update the database
+    
+    Args:
+    - calc_type: string with the type of calculation to update
+    - refresh: bool to force the update of the database, re-reading all the output files
+      and updating the bonding status.
+    - txt: bool to write a txt file instead of a csv file
+    '''
+
+    if refresh:
+        from xsorb.io.settings import Settings
+        settings = Settings(read_energies=True)
+        total_e_slab_mol = settings.total_e_slab_mol
+        total_e_slab_mol_ml = settings.total_e_slab_mol_ml
+        mult=settings.structure.molecule.radius_scale_factor
+    else:
+        mult = None
+        total_e_slab_mol = None
+        total_e_slab_mol_ml = None
+
+        
+    Database.update_calculations(
+        calc_type,
+        refresh,
+        total_e_slab_mol=total_e_slab_mol,
+        total_e_slab_mol_ml=total_e_slab_mol_ml,
+        mult=mult,
+        txt=txt,
+        verbose=True
+    )        

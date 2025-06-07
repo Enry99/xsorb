@@ -420,8 +420,7 @@ def parse_pwo_start_custom(lines, index=0):
 
     return info
 
-#TODO: in the future, fill in with the one from MDAnalysis,
-# which hanldes the restarts.
+
 @reader
 def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_single_trajectory=False):
     """
@@ -617,6 +616,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
         # Get the structure
         # Use this for any missing data
         prev_structure = pwscf_start_info[prev_start_index]['atoms']
+        cell_alat = pwscf_start_info[prev_start_index]['alat']
         if image_index in indexes[_PW_START]:
             structure = prev_structure.copy()  # parsed from start info
         else:
@@ -635,7 +635,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
                 pwo_lines[image_index:image_index + n_atoms + 1],
                 n_atoms=n_atoms, cell=cell, alat=cell_alat)
 
-            # convert to Atoms object
+            # convert to AtomsCustom object
             symbols, tags = [], []
             for position in positions_card:
                 sybmol_plus_number = position[0]

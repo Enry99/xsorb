@@ -60,7 +60,7 @@ def obtain_calc_indices(*,
     If no criteria is specified, all the configurations are returned.
 
     Args:
-    - calc_type: type of calculation to get the indices from. Can be 'screening', 'ml_opt'
+    - calc_type: type of calculation to get the indices from. Can be 'screening', 'mlopt'
     - n_configs: number of configurations to be relaxed, starting from the one with lowest energy
     - threshold: energy threshold (in eV) from the NOT EXCLUDED lowest energy configuration.
         The configuration with E - Emin < threshold will be selected
@@ -134,13 +134,13 @@ def get_adsorption_structures(get_structures_from : str,
     '''
     Returns the a list of AdsorptionStructure objects, but with the atoms
     substituted with the ones from the previous calculation.
-    If from ml_opt, the the original constraints are set, important when
-    the ml_opt was performed by fixing the slab.
+    If from mlopt, the the original constraints are set, important when
+    the mlopt was performed by fixing the slab.
 
     Args:
     - calc_ids: list of indices of the configurations to be retrieved. If None, all are retrieved
     - get_structures_from: type of calculation to get the structures from.
-        Can be 'screening', 'ml_opt', 'structures'
+        Can be 'screening', 'mlopt', 'structures'
 
     Returns:
     - adsorption_structures: list of AdsorptionStructure objects
@@ -149,7 +149,7 @@ def get_adsorption_structures(get_structures_from : str,
     #get structures from database
     rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
 
-    if get_structures_from == 'ml_opt':
+    if get_structures_from == 'mlopt':
         rows_original = Database.get_structures(calc_ids=calc_ids)
         constraints = [row.get('constraints') for row in rows_original]
 
@@ -160,7 +160,7 @@ def get_adsorption_structures(get_structures_from : str,
         ads_struct = AdsorptionStructure.from_dict(row.data.adsorption_structure)
         atoms = AtomsCustom(row.toatoms())
 
-        if get_structures_from == 'ml_opt':
+        if get_structures_from == 'mlopt':
             atoms.set_constraint(constraints.pop(0))
 
         ads_struct.atoms = atoms

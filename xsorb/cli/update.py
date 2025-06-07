@@ -22,7 +22,7 @@ class CLICommand(CLICommandBase):
     def add_arguments(parser : argparse.ArgumentParser):
         parser.add_argument('calc_type',
                         type=str,
-                        choices=['screening', 'relax', 'ml_opt', 'all'],
+                        choices=['screening', 'relax', 'mlopt', 'all'],
                         help='''type of calculation to plot''')
         parser.add_argument('-refresh',
                         action='store_true',
@@ -36,25 +36,10 @@ class CLICommand(CLICommandBase):
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.io.database import Database
-
-        if args.refresh:
-            from xsorb.io.settings import Settings
-            settings = Settings(read_energies=True)
-            total_e_slab_mol = settings.total_e_slab_mol
-            total_e_slab_mol_ml = settings.total_e_slab_mol_ml
-            mult=settings.structure.molecule.radius_scale_factor
-        else:
-            mult = None
-            total_e_slab_mol = None
-            total_e_slab_mol_ml = None
-        Database.update_calculations(args.calc_type,
-                                     args.refresh,
-                                     total_e_slab_mol=total_e_slab_mol,
-                                     total_e_slab_mol_ml=total_e_slab_mol_ml,
-                                     mult=mult,
-                                     txt=args.txt,
-                                     verbose=True)
+        from xsorb.io.database import manual_update_calculations
+        manual_update_calculations(args.calc_type,
+                                   args.refresh,
+                                   txt=args.txt)
 
 
     @staticmethod

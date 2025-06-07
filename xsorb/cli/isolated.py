@@ -10,10 +10,11 @@ from xsorb.cli.command import CLICommandBase
 class CLICommand(CLICommandBase):
     """launch the calculations for the isolated slab, molecule or both.
 
-    Can be used for DFT or ML calculations.
+    Can be used for DFT (default) or ML (with option -ml) calculations.
 
     Example:
-    xsorb isolated -slab -mol
+    $ xsorb isolated -slab -molecule
+    $ xsorb isolated -molecule -ml
 
     """
 

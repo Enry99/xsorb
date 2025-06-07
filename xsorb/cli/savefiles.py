@@ -18,7 +18,7 @@ Example:
     def add_arguments(parser : argparse.ArgumentParser):
         parser.add_argument('calc_type',
                         type=str,
-                        choices=['screening', 'relax', 'ml_opt', 'initial'],
+                        choices=['screening', 'relax', 'mlopt', 'initial'],
                         help='''type of calculation to render''')
         parser.add_argument('format',
                         type=str,

@@ -32,14 +32,14 @@ class CLICommandBase(ABC):
 
 def nonnegative_int(value):
     '''
-    Check if a value is a positive integer.
+    Check if a value is a non-negative integer.
     '''
     ivalue = int(value)
     if ivalue < 0:
         raise argparse.ArgumentTypeError(f"{value} is negative")
     return ivalue
 
-def nonnegative_float(value):
+def positive_float(value):
     '''
     Check if a value is a positive float.
     '''
@@ -51,5 +51,5 @@ def nonnegative_float(value):
 class CustomFormatter(argparse.RawDescriptionHelpFormatter,
                       argparse.ArgumentDefaultsHelpFormatter):
     '''
-    Combine the three formatters to have a more informative help message.
+    Combine the formatters to have a more informative help message.
     '''

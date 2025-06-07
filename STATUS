@@ -1,22 +1,28 @@
-settings.toml:                  OK
+examples/settings.toml:         OK, implement range_selection, incar_path_screening, kpoints_path_screening, pwi_path_screening and remove upscale_screening from the actual code.
 
-xsorb/calculations/*:           OK
+xsorb/ase_custom:               OK
 
-xsorb/cli:                      aggiungere xfrag
+xsorb/bin:                      OK
 
-xsorb/dft_codes:                manca la parte di xfrag
+xsorb/cli:                      OK
+-----------
 
-xsorb/io/*:                     OK
+xsorb/calculations/*:           
 
-xsorb/structures/*:             OK
+xsorb/dft_codes:                
 
-xsorb/visualize/*:              OK
+xsorb/io/*:                     
+
+xsorb/structures/*:             
+
+xsorb/visualize/*:              
 
 
 FINALLY: xfrag.
 
-TODO: in the whole code, replace strings \ with multiline strings (docstrings)
+
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
 TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 TODO: mettere plot istogrammi, sia per xsorb, con le varie eads, sia in xfrag, con tutte le combinazioni.
-NOTE: dire che xsorb supporta ibrav
+
+TODO: check start of index in ase db. if 1, then replace the check_nonnegative int in argparsers to check positive int (exclude 0)

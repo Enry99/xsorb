@@ -4,7 +4,7 @@ CLI parser for command: relax
 
 import argparse
 
-from xsorb.cli.command import CLICommandBase, nonnegative_int, nonnegative_float
+from xsorb.cli.command import CLICommandBase, nonnegative_int, positive_float
 
 
 class CLICommand(CLICommandBase):
@@ -31,7 +31,7 @@ Examples:
                                 by choosing the n lowest energy ones.
                                 If --by-site is used, n configs are selected for each site''')
         relax_modes.add_argument('-t',
-                                type=nonnegative_float,
+                                type=positive_float,
                                 help='''Select the configurations for the final relaxation
                                 that have energy < min(energies) + t  (in eV)''')
         relax_modes.add_argument('-i',
@@ -64,7 +64,7 @@ Examples:
                         key in the settings file. The default value is 1.1x''')
         parser.add_argument('--from',
                         type=str,
-                        choices=['screening', 'ml_opt'],
+                        choices=['screening', 'mlopt'],
                         default='screening',
                         dest='take_from',
                         help='''Choose the results on which perform the selection, whose
@@ -75,15 +75,13 @@ Examples:
         parser.add_argument('--regenerate',
                         action='store_true',
                         help='''Re-generate the structures for the final relaxations
-                        instead of reading the positions from the screening or ml_opt''')
+                        instead of reading the positions from the screening or mlopt''')
 
     @staticmethod
     def run(args : argparse.Namespace):
         #validate args:
         if (args.by_site or args.by_mol_idx or args.chem_phys) and args.i:
-            print('Error: cannot use --by-site, --by-mol-idx or --chem-phys with --i')
-            import sys
-            sys.exit(1)
+            raise RuntimeError('Cannot use --by-site, --by-mol-idx or --chem-phys with --i')
 
         from xsorb.calculations.launchers import launch_final_relax
         launch_final_relax(n_configs=args.n,

@@ -11,6 +11,7 @@ class CLICommand(CLICommandBase):
     """plot the adsorption sites on the surface based on the current settings parameters.
 
 Example:
+ $ xsorb sites
  $ xsorb sites -all
     """
 

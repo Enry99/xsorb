@@ -4,7 +4,7 @@
 import sys
 
 from xsorb import __version__
-from xsorb.cli import build_xsorb_parser
+from xsorb.cli.xsorb_parser import build_xsorb_parser
 
 def main():
     '''

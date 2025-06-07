@@ -67,9 +67,9 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     settings=Settings(read_energies=True) #need the energies to store them into the db metadata
 
     if from_ml_opt:
-        calc_ids = obtain_calc_indices(calc_type='ml_opt')
+        calc_ids = obtain_calc_indices(calc_type='mlopt')
         adsorption_structures = get_adsorption_structures(calc_ids=calc_ids,
-                                                          get_structures_from='ml_opt')
+                                                          get_structures_from='mlopt')
     else:
         slab = read(settings.input.slab_filename)
         mol = read(settings.input.molecule_filename)
@@ -112,10 +112,10 @@ def launch_ml_opt(save_image : bool = False,):
 
     written_systems = write_inputs(adsorption_structures=adsorption_structures,
                                    settings=settings,
-                                   calc_type='ml_opt')
+                                   calc_type='mlopt')
 
     launch_jobs(program='ml',
-                calc_type='ml_opt',
+                calc_type='mlopt',
                 jobscript=settings.input.jobscript_ml_path,
                 sbatch_command=settings.input.submit_command_ml,
                 systems=written_systems,
@@ -144,7 +144,7 @@ def launch_final_relax(*,
         The configuration with E - Emin < threshold will be selected
     - calc_ids: user-specified indices, instead of identifying them according to energy
     - excluded_calc_ids: indices of the configurations to be excluded
-    - take_from: type of calculation for the selection. Can be 'screening', 'ml_opt'
+    - take_from: type of calculation for the selection. Can be 'screening', 'mlopt'
     - relax_from_initial: use the initial configuration as starting point for the relaxation
     - by_site: do the configuration identification separately for each site.
         One or more configuration for each site will be produced
@@ -155,8 +155,8 @@ def launch_final_relax(*,
 
     #Initial setup of parameters
 
-    if take_from not in ('screening', 'ml_opt'):
-        raise ValueError('Invalid value for take_from. Must be "screening" or "ml_opt".')
+    if take_from not in ('screening', 'mlopt'):
+        raise ValueError('Invalid value for take_from. Must be "screening" or "mlopt".')
 
     #check that only one between n_configs, threshold, required_calc_ids is specified,
     if np.sum([n_configs is not None, threshold is not None, calc_ids is not None]) > 1:

@@ -4,7 +4,7 @@ CLI parser for command: render
 
 import argparse
 
-from xsorb.cli.command import CLICommandBase, nonnegative_int, nonnegative_float
+from xsorb.cli.command import CLICommandBase, nonnegative_int, positive_float
 
 
 class CLICommand(CLICommandBase):
@@ -19,7 +19,7 @@ Example:
     def add_arguments(parser : argparse.ArgumentParser):
         parser.add_argument('calc_type',
                         type=str,
-                        choices=['screening', 'relax', 'ml_opt', 'initial'],
+                        choices=['screening', 'relax', 'mlopt', 'initial'],
                         help='''type of calculation to render''')
         parser.add_argument('calc_id',
                         nargs='?',
@@ -46,7 +46,7 @@ Example:
                         help='Rotation for saving images, in ASE format, e.g. 10z,5x')
         parser.add_argument('-dc','--depth-cueing',
                         nargs='?',
-                        type=nonnegative_float,
+                        type=positive_float,
                         const=1.0,
                         help='Enable depth cueing. Optional parameter: intensity (>0, default=1).')
         parser.add_argument('-rc','--range-cut',

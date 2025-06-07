@@ -38,7 +38,7 @@ def launch_jobs(*,program : str,
 
     Args:
     - program: 'espresso', 'vasp' or 'ml'
-    - calc_type: 'screening'/'relax'/'ml_opt' or 'isolated'
+    - calc_type: 'screening'/'relax'/'mlopt' or 'isolated'
     - jobscript: path of the jobscript file
     - sbatch_command: command to submit the jobscript (in Slurm it is sbatch)
     - systems: list of WrittenSystem objects containing calc_id and paths

@@ -76,7 +76,7 @@ def plot_images(calc_type : str,
     Plot images of the configurations
 
     Args:
-    - calc_type: 'initial','screening','relax','ml_opt'
+    - calc_type: 'initial','screening','relax','mlopt'
     - calc_id: index of the calculation to plot. If None, plot all
     - movie: if True, generate a movie from the images
 
@@ -91,8 +91,8 @@ def plot_images(calc_type : str,
     rotations = kwargs.pop('rotation', None)
     center_mol = kwargs.pop('center_mol', None)
 
-    if calc_type not in ('initial','screening', 'relax', 'ml_opt'):
-        raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'ml_opt'")
+    if calc_type not in ('initial','screening', 'relax', 'mlopt'):
+        raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'mlopt'")
 
     if calc_type == 'initial':
         rows = Database.get_structures(calc_ids=calc_id)
@@ -217,12 +217,12 @@ def view_config(calc_type : str, calc_id : int):
     View the selected config with ASE GUI
 
     Args:
-    - calc_type: 'initial','screening','relax','ml_opt'
+    - calc_type: 'initial','screening','relax','mlopt'
     - calc_id: index of the calculation to plot.
     '''
 
-    if calc_type not in ('initial','screening', 'relax', 'ml_opt'):
-        raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'ml_opt'")
+    if calc_type not in ('initial','screening', 'relax', 'mlopt'):
+        raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'mlopt'")
 
     if calc_type == 'initial':
         atoms = Database.get_structure(calc_id)[0].to_atoms()
@@ -237,7 +237,7 @@ def plot_energy_evolution(calc_type : str):
     Plot the energy evolution during optimization for all the configurations
 
     Args:
-    - calc_type: 'screening','relax','ml_opt'
+    - calc_type: 'screening','relax','mlopt'
     '''
 
     from matplotlib import pyplot as plt
@@ -267,7 +267,7 @@ def plot_energy_evolution(calc_type : str):
     plt.grid(linestyle='dotted')
     plt.legend(title="Config, energy",
                ncols=np.ceil(len(rows)/10),
-               prop={'size': 6  if calc_type in ('screening', 'ml_opt') else 8})
+               prop={'size': 6  if calc_type in ('screening', 'mlopt') else 8})
     energy_plot_filename = f'{calc_type}_energies.png'
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
     print(f'Plot saved in {energy_plot_filename}')
