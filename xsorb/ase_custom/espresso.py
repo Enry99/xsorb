@@ -423,7 +423,7 @@ def parse_pwo_start_custom(lines, index=0):
 #TODO: in the future, fill in with the one from MDAnalysis,
 # which hanldes the restarts.
 @reader
-def read_espresso_out_custom(fileobj, index=-1, results_required=True):
+def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_single_trajectory=False):
     """
     Custom version of ase.io.espresso.read_espresso_out
     that handles custom labels
@@ -463,6 +463,10 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
 
     # TODO: index -1 special case?
     # Index all the interesting points
+
+    _PW_POSITIONS_READ_FROM_RESTART = 'Atomic positions from file used, from input discarded'
+    _PW_NONCONVERGED = 'convergence NOT achieved'
+
     indexes = {
         _PW_START: [],
         _PW_END: [],
@@ -480,12 +484,60 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
         _PW_BANDSTRUCTURE: [],
         _PW_DIPOLE: [],
         _PW_DIPOLE_DIRECTION: [],
+
+        _PW_POSITIONS_READ_FROM_RESTART: [],
+        _PW_NONCONVERGED: []
     }
 
     for idx, line in enumerate(pwo_lines):
         for identifier in indexes:
             if identifier in line:
                 indexes[identifier].append(idx)
+
+
+    if read_single_trajectory:
+        #CASES:
+        #1. Normal restart. The new positions were written at the end of the previous file, the associated energies and forces
+        #   are at the end of the scf just after the restart. So if we just drop the beginning coordinates from the initial pwi
+        #   (PW_START) we should be fine, leaving results_required=True.
+        #2. The calculation was interrupted during an scf cycle. The situation is the same as 1: we have the coordinates in the
+        #   previous run, and the results in the new one. We only need to drop the initial coordinates from the pwi, with
+        #   results_required=True.
+        #3. The calculation crashed after writing the new positions, but before writing the update.bfgs file (very unlikely):
+        #   The previous frame will be re-calculated, so the first energy in the new run will not correspond to the last positions
+        #   of the previous run. No general way to handle this case. A possibility would be to check equality of energy and forces
+        #   between with the previous frame each time a new frame is read, and if they are equal, drop the frame. A strict check
+        #   on equality is not possible due to numerical noise, so a tolerance would have to be used. This and the fact that this
+        #   case is very unlikely makes it not worth implementing.
+
+        results_required = True #We need to enforce this so that every case is correctly handled
+
+        #If the calculation is a (non-manual) restart, drop the repetitions of the initial frame from the pwi
+        pw_start_list = indexes[_PW_START].copy()
+        indexes[_PW_START] =  []
+
+        for i_start, pwstart_line in enumerate(pw_start_list):
+
+            if len(indexes[_PW_START]) == 0: #always read the first one. TODO: fix this: use it only to read the cell,
+                # if it is a restart, and skip the first frame
+                indexes[_PW_START].append(pwstart_line)
+                continue
+
+            subsequent_positions_read = [positions_from_restart_line \
+                for positions_from_restart_line in indexes[_PW_POSITIONS_READ_FROM_RESTART] \
+                if positions_from_restart_line > pwstart_line \
+                    and (positions_from_restart_line < pw_start_list[i_start+1] \
+                         if i_start+1 < len(pw_start_list) else True)]
+            if len(subsequent_positions_read) == 0:
+                # manual restart with new positions (from scratch),
+                # so take the initial positions from pwi
+                indexes[_PW_START].append(pwstart_line)
+            elif len(subsequent_positions_read) == 1:
+                print('Subsequent positions read from restart file, skipping initial positions')
+            elif len(subsequent_positions_read) > 1:
+                raise RuntimeError('The code is not working properly.')
+        #print(pw_start_list)
+
 
     # Configurations are either at the start, or defined in ATOMIC_POSITIONS
     # in a subsequent step. Can deal with concatenated output files.
@@ -501,6 +553,13 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
     # - 'relax' and 'vc-relax' re-prints the final configuration but
     #   only 'vc-relax' recalculates.
     if results_required:
+        # fix when last scf not converged:
+        actually_present_bands_indexes=[]
+        for iii in indexes[_PW_BANDS]:
+            if iii + 2 not in indexes[_PW_NONCONVERGED]:
+                actually_present_bands_indexes.append(iii)
+        indexes[_PW_BANDS] = actually_present_bands_indexes
+
         results_indexes = sorted(indexes[_PW_TOTEN] + indexes[_PW_FORCE] +
                                  indexes[_PW_STRESS] + indexes[_PW_MAGMOM] +
                                  indexes[_PW_BANDS] +
@@ -525,6 +584,9 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
     # to add to subsequent configurations. Use None so slices know
     # when to fill in the blanks.
     pwscf_start_info = {idx: None for idx in indexes[_PW_START]}
+
+    first_n_atoms = None
+    first_cell = None
 
     for image_index in image_indexes:
         # Find the nearest calculation start to parse info. Needed in,
@@ -588,6 +650,18 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True):
             structure = AtomsCustom(symbols=symbols, positions=positions, cell=cell,
                               pbc=True, tags=tags)
             structure.set_constraint(convert_constraint_flags(constraint_flags))
+
+        if first_n_atoms is None:
+            first_n_atoms = len(structure)
+        if first_cell is None:
+            first_cell = structure.get_cell()
+
+        if read_single_trajectory and \
+            (len(structure) != first_n_atoms \
+             or not np.allclose(structure.get_cell(), first_cell)):
+            raise ValueError(f'You specified to read a single trajectory," \
+                "but a new structure with different number of" \
+                "atoms or cell was found at image index {image_index}')
 
         # Extract calculation results
         # Energy

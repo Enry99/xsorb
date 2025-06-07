@@ -89,6 +89,7 @@ def plot_images(calc_type : str,
     kwargs.pop('arrows_type', None)
     framerate = kwargs.pop('framerate', None)
     rotations = kwargs.pop('rotation', None)
+    center_mol = kwargs.pop('center_mol', None)
 
     if calc_type not in ('initial','screening', 'relax', 'ml_opt'):
         raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'ml_opt'")
@@ -124,7 +125,7 @@ def plot_images(calc_type : str,
         atoms = AtomsCustom(row.toatoms())
         mol_indices = row.data.adsorption_structure.mol_indices
 
-        if kwargs.pop('center_mol', None):
+        if center_mol:
             #use the same translation for all frames in the trajectory, to avoid jumps
             _, _, transl_vector = get_centered_mol_and_slab(atoms, mol_indices)
         else:
@@ -163,6 +164,7 @@ def plot_images(calc_type : str,
                                 transl_vector=transl_vector,
                                 custom_settings=custom_colors,
                                 depth_cueing=dc,
+                                mol_indices=mol_indices,
                                 **kwargs)
                 os.chdir(figures_dir)
 
@@ -187,6 +189,7 @@ def plot_images(calc_type : str,
                          transl_vector=transl_vector,
                          custom_settings=custom_colors,
                          depth_cueing=dc,
+                         mol_indices=mol_indices,
                          **kwargs)
                 if rot_label == rotations_labels[0]:
                     outfiles.append(f'{file_label}.png')

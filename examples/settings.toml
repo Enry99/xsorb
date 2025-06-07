@@ -21,7 +21,9 @@
 
         #[Structure.adsorption_sites.coord_number_params]
             #cn_method                  = "plain"               # method for finding coordination numbers: 'plain' (default, produces integer values), MinimumDistanceNN (Pymatgen, integer values), CrystalNN (Pymatgen)
-            #range_selection            = {mode = "max", value = 4}  # if mode is 'max', select all sites with CN <= value, if mode is 'offset', select all sites with CN = min(CN) + value
+            #max_cn = 5
+            #max_cn_offset = 2
+            ###### THIS IS NOT IMPLEMENTED, TOTO IN THE FUTURE range_selection            = {mode = "max", value = 4}  # if mode is 'max', select all sites with CN <= value, if mode is 'offset', select all sites with CN = min(CN) + value
             #include_surrounding_sites  = false                 # include also ontop sites of the atoms around the low CN ones.
             #surrounding_sites_deltaz   = 1.5                   # ontop sites for the neighbor atoms with z >= z_central_atom - surrounding_sites_deltaz will be included as surrounding sites
             #surrounding_exclude_main   = true                  # exclude the main sites (those selected by low CN criterion) from the surrounding sites (this can avoid duplicates)
