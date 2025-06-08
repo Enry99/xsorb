@@ -58,11 +58,12 @@
         #sort_atoms_by_z                = true                  # sort atoms by z coordinate in the input files (only for xyz and pwi, not VASP)
         #translate_slab                 = true                  # translate the slab upwards so that the lowest atom is exactly 1 Angstrom above the cell bottom
 
+
 [Calculation_parameters]
-    dft_program                         = "VASP"                # VASP, ESPRESSO
+    program                             = "vasp"                # vasp, espresso, ml (write ml only if you do not want to run DFT at all
 
 
-    [Calculation_parameters.VASP]
+    [Calculation_parameters.vasp]
         vasp_pp_path                    = "path/to/pseudo"      # The pseudopotentials are expected to be in: LDA: VASP_PP_PATH/potpaw/, PBE: VASP_PP_PATH/potpaw_PBE/, PW91: $VASP_PP_PATH/potpaw_GGA/ (see https://wiki.fysik.dtu.dk/ase/ase/calculators/vasp.html)
         #vasp_xc_functional             = "PBE"                 # default: PBE
         #vasp_pseudo_setups             = {"base": "recommended", "6": "C_h", "C": "_s"}  # for the default versions (without subscripts) just remove/comment this line. Options for base are "minimal", "recommended", "materialsproject", "gw" (see ase.calculators.vasp.setups)
@@ -71,10 +72,13 @@
         kpoints_path                    = "KPOINTS"             # path of the KPOINTS file
         incar_path_screening            = "INCAR_screening"     # path of the INCAR file for screening calculations (e.g. with lowered cutoff/PREC)
         kpoints_path_screening          = "KPOINTS_screening"   # path of the KPOINTS file for screening calculations (e.g. less dense k-point mesh)
-        ediffg_screening                = -0.5
+        ediffg_screening                = -0.5                  # convergence threshold for forces (eV/A, VASP units)
 
-    #[Calculation_parameters.ESPRESSO]
+    #[Calculation_parameters.espresso]
         #pwi_path                       = "template.pwi"        # path of the input file for Quantum Espresso (containing the settings, without the positions)
         #pwi_path_screening             = "template_screening.pwi"  # path of the input file for Quantum Espresso for screening calculations (e.g. with lowered cutoff/k-point mesh)
-        #etot_conv_thr_screening        = 5e-3                  # convergence threshold for energy
-        #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces
+        #etot_conv_thr_screening        = 5e-3                  # convergence threshold for energy (Ry, QE units)
+        #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces (Ry/bohr, QE units)
+
+    #[Calculation_parameters.ml]
+        #force_conv_thr                 = 0.01                  # force threshold (in eV/A) for the machine learning potential optimization
