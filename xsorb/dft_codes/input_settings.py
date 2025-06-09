@@ -12,15 +12,13 @@ from dataclasses import dataclass
 from typing import Optional
 import sys
 
-from dacite import from_dict
 from ase.io.espresso import read_fortran_namelist
 
 from xsorb.dft_codes.definitions import HYBRID_SCREENING_THRESHOLDS
-from xsorb.io import settings
 
 # dataclasses to store DFT program settings
 @dataclass
-class EspressoSettings:
+class EspressoParams:
     '''
     Dataclass to store Espresso input settings.
     '''
@@ -31,18 +29,21 @@ class EspressoSettings:
 
     # non-initialized attributes (filled in __post_init__)
     settings_dict = None
+    settings_dict_screening = None
 
-    def __post_init__(self):
-
+    def build_settings_dict(self, filepath : str):
+        '''
+        Build the settings dictionary from the input files.
+        '''
         #NOTE 1: The blocks CELL_PARAMETERS ATOMIC_POSITIONS ATOMIC_SPECIES must NOT be included
         # in input file, as they are read from the input structures
         #NOTE 2: This code does not yet support the following Espresso blocks:
         #OCCUPATIONS, CONSTRAINTS, ATOMIC_VELOCITIES, ATOMIC_FORCES, ADDITIONAL_K_POINTS, SOLVENTS
 
         # parse namelist section and extract remaining lines
-        with open(self.pwi_path, 'r') as file:
-            settings_dict, card_lines = read_fortran_namelist(file)
-            self.settings_dict = dict(settings_dict)
+        with open(filepath, 'r') as file:
+            _settings_dict, card_lines = read_fortran_namelist(file)
+            _settings_dict = dict(_settings_dict)
 
 
         #parse ATOMIC_SPECIES, K_POINTS and HUBBARD
@@ -80,7 +81,7 @@ class EspressoSettings:
             return False
 
         #ATOMIC_SPECIES
-        self.settings_dict['pseudopotentials'] = {}
+        _settings_dict['pseudopotentials'] = {}
         i = atomic_species_index+1
         while i < len(card_lines):
             line = card_lines[i]
@@ -88,20 +89,20 @@ class EspressoSettings:
             if _end_of_card(card='ATOMIC_SPECIES', line=line): break
 
             element, mass, pseudo = line.split()
-            self.settings_dict['pseudopotentials'].update({element : pseudo})
+            _settings_dict['pseudopotentials'].update({element : pseudo})
             i+=1
 
         #K_POINTS
         if 'gamma' in card_lines[k_points_index].split()[1].strip().lower():
-            self.settings_dict['kpts'] = None
-            self.settings_dict['koffset'] = None
+            _settings_dict['kpts'] = None
+            _settings_dict['koffset'] = None
         else:
             line = card_lines[k_points_index+1]
-            self.settings_dict['kpts'] = list(map(int, line.split()[:3]))
-            self.settings_dict['koffset'] = list(map(int, line.split()[3:]))
+            _settings_dict['kpts'] = list(map(int, line.split()[:3]))
+            _settings_dict['koffset'] = list(map(int, line.split()[3:]))
 
 
-        self.settings_dict['additional_cards'] = []
+        _settings_dict['additional_cards'] = []
 
         #HUBBARD
         if hubbard_index is not None:
@@ -111,12 +112,34 @@ class EspressoSettings:
 
                 if _end_of_card(card='HUBBARD', line=line): break
 
-                self.settings_dict['additional_cards'] += [line]
+                _settings_dict['additional_cards'] += [line]
                 i+=1
+
+        return _settings_dict
+
+
+    def __post_init__(self):
+
+        #read pwi file and build settings_dict
+        self.settings_dict = self.build_settings_dict(self.pwi_path)
+        self.settings_dict['control'].update({'calculation': 'relax' })
+        self.settings_dict['control'].update({'restart_mode': 'from_scratch'})
+        self.settings_dict['control'].update({'outdir': 'OUT'})
+        if 'ions' not in self.settings_dict: self.settings_dict['ions'] = {}
+
+        #if screening pwi file is provided, build screening settings_dict
+        if self.pwi_path_screening is not None:
+            self.settings_dict_screening = self.build_settings_dict(self.pwi_path_screening)
+            self.settings_dict_screening['control'].update({'etot_conv_thr': self.etot_conv_thr_screening})
+            self.settings_dict_screening['control'].update({'forc_conv_thr': self.forc_conv_thr_screening})
+            self.settings_dict_screening['control'].update({'outdir': 'OUT'})
+            self.settings_dict_screening['control'].update({'calculation': 'relax' })
+            self.settings_dict_screening['control'].update({'restart_mode': 'from_scratch'})
+            if 'ions' not in self.settings_dict_screening: self.settings_dict['ions'] = {}
 
 
 @dataclass
-class VaspSettings:
+class VaspParams:
     '''
     Dataclass to store VASP input settings.
     '''
@@ -131,11 +154,34 @@ class VaspSettings:
     vasp_xc_functional: str = "PBE"
 
     # non-initialized attributes (filled in __post_init__)
-    incar_string: Optional[str] = None
-    kpoints_string: Optional[str] = None
-    incar_string_screening: Optional[str] = None
-    kpoints_string_screening: Optional[str] = None
-    settings_dict: Optional[dict] = None
+    settings_dict = None
+    settings_dict_screening = None
+
+    def build_settings_dict(self, incar_path: str | None, kpoints_path: str | None): 
+        '''
+        Build the settings dictionary from the input files.
+        '''
+        #parse INCAR and KPOINTS files
+        _settings_dict = {}
+        if incar_path is not None:
+            with open(incar_path, 'r',encoding=sys.getfilesystemencoding()) as f:
+               incar_string = f.read()
+               _settings_dict['incar_string'] = incar_string
+               
+        if kpoints_path is not None:
+            with open(kpoints_path, 'r',encoding=sys.getfilesystemencoding()) as f:
+                kpoints_string = f.read()
+                _settings_dict['kpoints_string'] = kpoints_string
+
+        #add vasp_pp_path, vasp_pseudo_setups and pymatgen_set and vasp_xc_functional 
+        # to the settings dictionary
+        _settings_dict['vasp_pp_path'] = self.vasp_pp_path
+        _settings_dict['vasp_pseudo_setups'] = self.vasp_pseudo_setups
+        _settings_dict['pymatgen_set'] = self.pymatgen_set
+        _settings_dict['vasp_xc_functional'] = self.vasp_xc_functional
+
+        return _settings_dict
+
 
     def __post_init__(self):
 
@@ -158,32 +204,49 @@ class VaspSettings:
                                 'MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet (case insensitive).')
 
 
-        #read incar and kpoints files if provided 
-        if self.incar_path is not None:
-            with open(self.incar_path, 'r',encoding=sys.getfilesystemencoding()) as f:
-               self.incar_string = f.read()
-        if self.kpoints_path is not None:
-            with open(self.kpoints_path, 'r',encoding=sys.getfilesystemencoding()) as f:
-                self.kpoints_string = f.read()
-        if self.incar_path_screening is not None:
-            with open(self.incar_path_screening, 'r',encoding=sys.getfilesystemencoding()) as f:
-                self.incar_string_screening = f.read()
-        if self.kpoints_path_screening is not None:
-            with open(self.kpoints_path_screening, 'r',encoding=sys.getfilesystemencoding()) as f:
-                self.kpoints_string_screening = f.read()
+        #read incar and kpoints files if provided
+        if self.incar_path is not None or self.kpoints_path is not None:
+            self.settings_dict = self.build_settings_dict(self.incar_path, self.kpoints_path)
+            
+            #fix if user forgot to put the correct IBRION for relax
+            if 'incar_string' in self.settings_dict and self.pymatgen_set is None:
+                s = self.settings_dict['incar_string'].split('\n')
 
-        #if any of them is present, create a settings_dict
-        if self.incar_string or self.kpoints_string or self.incar_string_screening or self.kpoints_string_screening:
-            self.settings_dict = {
-                'incar': self.incar_string,
-                'kpoints': self.kpoints_string,
-                'incar_screening': self.incar_string_screening,
-                'kpoints_screening': self.kpoints_string_screening,
-            }
+                missing_ibrion = True
+                for i, line in enumerate(s):
+                    if 'IBRION' in line: missing_ibrion = False
+                if missing_ibrion: s.append('IBRION = 2')
+
+                self.settings_dict['incar_string'] = '\n'.join(s)
         
 
+        if self.incar_path_screening is not None or self.kpoints_path_screening is not None:
+            self.settings_dict_screening = self.build_settings_dict(
+                self.incar_path_screening, self.kpoints_path_screening)
+            
+            #fix if user forgot to put the correct IBRION for relax, and add EDIFFG for screening.
+            #EDIFFG is put here so that in any case this will be the final value, even if the user had
+            #specified a different value explicitly in the INCAR instead of using one of the RelaxSets
+            if 'incar_string' in self.settings_dict_screening and self.pymatgen_set is None:
+                s = self.settings_dict_screening['incar_string'].split('\n')
+            else: s = []
+
+            missing_ibrion = True
+            missing_ediffg = True
+            for i, line in enumerate(s):
+                if 'EDIFFG' in line:
+                    s[i] = f"EDIFFG = {self.settings_dict_screening['ediffg_screening']}"
+                    missing_ediffg = False
+                if 'IBRION' in line:
+                    missing_ibrion = False
+            if missing_ediffg: s.append(f"EDIFFG = {self.settings_dict_screening['ediffg_screening']}")
+            if missing_ibrion: s.append('IBRION = 2')
+
+            self.settings_dict_screening['incar_string'] = '\n'.join(s)
+
+
 @dataclass
-class MLSettings:
+class MLParams:
     '''
     Dataclass to store machine learning settings.
     '''
@@ -197,13 +260,10 @@ class DFTParams:
     '''
 
     program: str  # for convenience
-    vasp: Optional[VaspSettings]
-    espresso: Optional[EspressoSettings]
-    ml: Optional[MLSettings]
+    vasp: Optional[VaspParams]
+    espresso: Optional[EspressoParams]
+    ml: Optional[MLParams]
 
-
-    # non-initialized attributes (filled in __post_init__)
-    settings_dict: Optional[dict] = None
 
     def __post_init__(self):
         self.program = self.program.lower()
@@ -213,11 +273,29 @@ class DFTParams:
         if self.program == 'espresso':
             if self.espresso is None:
                 raise ValueError('espresso settings are missing.')
-            else:
-                self.settings_dict = self.espresso.settings_dict
         if self.program == 'vasp':
             if self.vasp is None:
                 raise ValueError('vasp settings are missing.')
+
+
+    def get_settings_dict(self, calc_type: str = 'relax') -> dict:
+        '''
+        Get the settings dictionary for the specified calculation type.
+        '''
+        if self.program == 'espresso':
+            if calc_type == 'screening' and self.espresso.settings_dict_screening is not None:
+                return self.espresso.settings_dict_screening
             else:
-                self.settings_dict = self.vasp.settings_dict
-        
+                return self.espresso.settings_dict
+
+        elif self.program == 'vasp':
+            if calc_type == 'screening' and self.vasp.settings_dict_screening is not None:
+                return self.vasp.settings_dict_screening
+            else:
+                return self.vasp.settings_dict
+
+        elif self.program == 'ml':
+            return {'force_conv_thr': self.ml.force_conv_thr}
+
+        else:
+            raise ValueError(f'Program {self.program} not recognized.')

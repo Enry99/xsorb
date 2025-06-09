@@ -139,7 +139,7 @@ def format_atom_position(atom, crystal_coordinates, custom_label, mask='', tidx=
     return astr
 
 @writer
-def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
+def write_espresso_in_custom(fd, atoms, input_data : dict | None, pseudopotentials : dict,
                       kspacing=None, kpts=None, koffset=(0, 0, 0),
                       crystal_coordinates=False, additional_cards=None,
                       **kwargs):
@@ -176,16 +176,16 @@ def write_espresso_in_custom(fd, atoms, input_data=None, pseudopotentials=None,
             mask = ''
         masks.append(mask)
 
-    # Species info holds the information on the pseudopotential and
-    # associated for each element
-    if pseudopotentials is None:
-        pseudopotentials = {}
-    species_info = {}
-    for species in set(atoms.get_chemical_symbols()):
-        # Look in all possible locations for the pseudos and try to figure
-        # out the number of valence electrons
-        pseudo = pseudopotentials[species]
-        species_info[species] = {'pseudo': pseudo}
+    # # Species info holds the information on the pseudopotential and
+    # # associated for each element
+    # if pseudopotentials is None:
+    #     pseudopotentials = {}
+    # species_info = {}
+    # for species in set(atoms.get_chemical_symbols()):
+    #     # Look in all possible locations for the pseudos and try to figure
+    #     # out the number of valence electrons
+    #     pseudo = pseudopotentials[species]
+    #     species_info[species] = {'pseudo': pseudo}
 
     # Convert atoms into species.
     # Each different magnetic moment needs to be a separate type even with

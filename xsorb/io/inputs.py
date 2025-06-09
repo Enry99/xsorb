@@ -23,9 +23,9 @@ from xsorb.ase_custom import write_xyz_custom
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import write_file_with_calculator
-from xsorb.dft_codes.override import override_dft_settings
 if TYPE_CHECKING:
     from xsorb.structures.properties import AdsorptionStructure
+    from ase import Atoms
 
 
 @dataclass
@@ -45,7 +45,6 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
                  settings : Settings,
                  calc_type : str | None = None,
                  calc_ids : list[int] | None = None,
-                 override_settings : bool = True,
                  ask_before_overwrite : bool = True,
                  verbose : bool = True) -> list[WrittenSystem]:
     '''
@@ -59,7 +58,6 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     - calc_type: 'screening', 'relax' or 'mlopt', or None (only generate input files)
     - calc_ids: list of the calculation IDs. If None, the IDs are automatically assigned
         They will be None when called from the generation mode (from scratch)
-    - override_settings: override some specifc settings (e.g. conv tresholds)
     - interactive: interactive mode: ask before overwriting files that are already present
 
     Returns:
@@ -67,7 +65,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
         the AdsorptionStructure object, the path to the input, output and log files.
     '''
 
-    program = settings.program if calc_type != 'mlopt' else 'ml'
+    program = settings.dft.program if calc_type != 'mlopt' else 'ml'
 
     if verbose: print('Writing input files...') #pylint: disable=multiple-statements
 
@@ -78,12 +76,6 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
     #Write the input files
     calc_type_for_writing = calc_type if calc_type is not None else 'screening'
-    if override_settings and program != 'ml' and calc_type is not None:
-        dftsettings = override_dft_settings(settings.dftprogram_settings_dict,
-                                            program=program,
-                                            calc_type=calc_type)
-    else:
-        dftsettings = settings.dftprogram_settings_dict
 
     written_systems = []
     answer_all = False #pylint: disable=invalid-name
@@ -110,11 +102,13 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             shutil.rmtree(file_dir)
 
         #initialize the Calculator and write input files
-        write_file_with_calculator(atoms=ads_structure.atoms,
-                                   program=program,
-                                   dftsettings=dftsettings,
-                                   label=file_label,
-                                   directory=file_dir)
+        write_file_with_calculator(
+            atoms=ads_structure.atoms,
+            program=program,
+            settingsdict=settings.dft.get_settings_dict(calc_type=calc_type_for_writing),
+            label=file_label,
+            directory=file_dir
+        )
 
         written_systems.append(WrittenSystem(calc_id=i,
                                              adsorption_structure=ads_structure,
@@ -158,8 +152,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
         the Atoms object, the path to the input, output and log files.
     '''
 
-    program = 'ml' if ml else settings.program
-    dftsettings = settings.dftprogram_settings_dict
+    program = 'ml' if ml else settings.dft.program
 
     structures, written_systems = [], []
     if slab is not None:
@@ -206,10 +199,10 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
 
         #initialize the Calculator and write input files
         write_file_with_calculator(atoms=atoms,
-                                   program=program,
-                                   dftsettings=dftsettings,
-                                   label=file_label,
-                                   directory=file_dir)
+            program=program,
+            settingsdict=settings.dft.get_settings_dict(calc_type='ml' if ml else 'relax'),
+            label=file_label,
+            directory=file_dir)
 
     if verbose: print('All input files written.') #pylint: disable=multiple-statements
 
