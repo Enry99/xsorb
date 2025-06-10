@@ -5,11 +5,11 @@ xsorb/ase_custom:               OK
 xsorb/bin:                      OK
 
 xsorb/cli:                      OK
+
+xsorb/dft_codes:                OK
 -----------
 
 xsorb/calculations/*:           
-
-xsorb/dft_codes:                
 
 xsorb/io/*:                     
 

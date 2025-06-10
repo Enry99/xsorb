@@ -25,8 +25,8 @@ from ase import Atoms
 from ase.constraints import FixScaled
 from ase.calculators.vasp import Vasp
 
+from xsorb.ase_custom import vasp
 from xsorb.ase_custom.espresso import write_espresso_in_custom
-from xsorb.dft_codes.definitions import IN_FILE_PATHS
 
 
 class MLFakeCalculator():
@@ -53,20 +53,8 @@ class MLFakeCalculator():
         fake_pseudo = {el: f'{el}.UPF' for el in atoms.get_chemical_symbols()}
         write_espresso_in_custom(self.directory / f'{self.label}.pwi',
                                   atoms=atoms,
+                                  input_data=None,
                                   pseudopotentials=fake_pseudo)
-
-
-def setup_ML_calculator(**kwargs) -> MLFakeCalculator:
-    '''
-    Setup the ML calculator for the optimization and returns the calculator,
-    to be used in a code-agnostic way in the write_file_with_calculator function.
-    Must have this signature to be compatible with the other calculators.
-    '''
-
-    label : str = kwargs.get("label")
-    directory : str = kwargs.get("directory")
-
-    return MLFakeCalculator(label, directory)
 
 
 class EspressoFakeCalculator():
@@ -78,7 +66,13 @@ class EspressoFakeCalculator():
     and has the same initialization parameters.
     '''
 
-    def __init__(self,label,directory,pseudopotentials,kpts,koffset,input_data,additional_cards):
+    def __init__(self, label,
+                 directory,
+                 pseudopotentials,
+                 kpts,
+                 koffset,
+                 input_data,
+                 additional_cards):
 
         # Remove pseudopotential from input_data if present
         if input_data is not None:
@@ -102,11 +96,24 @@ class EspressoFakeCalculator():
         self.directory.mkdir(exist_ok=True, parents=True)
         write_espresso_in_custom(self.directory / f'{self.label}.pwi',
                                   atoms=atoms,
+                                  input_data=self.input_data,
                                   pseudopotentials=self.pseudopotentials,
                                   kpts=self.kpts,
                                   koffset=self.koffset,
-                                  input_data=self.input_data,
                                   additional_cards=self.additional_cards)
+        
+
+def setup_ML_calculator(**kwargs) -> MLFakeCalculator:
+    '''
+    Setup the ML calculator for the optimization and returns the calculator,
+    to be used in a code-agnostic way in the write_file_with_calculator function.
+    Must have this signature to be compatible with the other calculators.
+    '''
+
+    label : str = kwargs.get("label")
+    directory : str = kwargs.get("directory")
+
+    return MLFakeCalculator(label, directory)
 
 
 def setup_Espresso_calculator(**kwargs) -> EspressoFakeCalculator:
@@ -116,7 +123,7 @@ def setup_Espresso_calculator(**kwargs) -> EspressoFakeCalculator:
     the write_file_with_calculator function.
     '''
 
-    dftsettings : dict = kwargs.get("dftsettings").copy()
+    dftsettings : dict = kwargs.get("settingsdict").copy()
     pseudopotentials = dftsettings.pop('pseudopotentials')
     label : str = kwargs.get("label")
     directory : str = kwargs.get("directory")
@@ -138,7 +145,7 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
     '''
 
     atoms : Atoms = kwargs.get("atoms")
-    dftsettings : dict = kwargs.get("dftsettings")
+    dftsettings : dict = kwargs.get("settingsdict")
     directory : str = kwargs.get("directory")
 
     preset_incar_settings = {}
@@ -192,17 +199,18 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
 
 def write_file_with_calculator(atoms : Atoms,
                                program: str,
-                               dftsettings : dict,
+                               settingsdict : dict,
                                label : str,
                                directory : str):
     '''
     Write the input files for the DFT calculation, using the specified calculator.
     '''
 
-    setup_functions : dict[str, Callable[...,Vasp|Espresso|MLFakeCalculator]] = {
+    setup_functions : dict[str, Callable[...,Vasp|EspressoFakeCalculator|MLFakeCalculator]] = {
         'espresso': setup_Espresso_calculator,
         'vasp': setup_Vasp_calculator,
-        'ml': setup_ML_calculator}
+        'ml': setup_ML_calculator
+    }
 
 
     if program not in setup_functions:
@@ -210,7 +218,7 @@ def write_file_with_calculator(atoms : Atoms,
 
 
     calc = setup_functions[program](atoms=atoms,
-                                    dftsettings=dftsettings,
+                                    settingsdict=settingsdict,
                                     label=label,
                                     directory=directory)
     calc.write_input(atoms)
@@ -250,12 +258,13 @@ def edit_files_for_restart(program : str, paths : list[str]):
                 f.writelines(lines)
 
         elif program == 'vasp':
+            parentpath = Path(path).parent.as_posix()
             poscar = path
-            contcar = poscar.replace('POSCAR', 'CONTCAR')
-            incar = poscar.replace('POSCAR', 'INCAR')
-            outcar = poscar.replace('POSCAR', 'OUTCAR')
-            vasprun = poscar.replace('POSCAR', 'vasprun.xml')
-            oszicar = poscar.replace('POSCAR', 'OSZICAR')
+            contcar = parentpath + '/CONTCAR'
+            incar = parentpath + '/INCAR'
+            outcar = parentpath + '/OUTCAR'
+            vasprun = parentpath + '/vasprun.xml'
+            oszicar = parentpath + '/OSZICAR'
 
             with open(incar, 'r',encoding=sys.getfilesystemencoding()) as f:
                 lines = f.readlines()
