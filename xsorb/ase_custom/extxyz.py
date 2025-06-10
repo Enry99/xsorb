@@ -21,6 +21,11 @@ from xsorb.ase_custom.atoms import AtomsCustom, extract_number_from_string
 
 def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
                     nvec=0):
+    """
+    Custom version of ase.io.extxyz._read_xyz_frame to handle custom labels
+    ---
+    """
+
     # comment line
     line = next(lines).strip()
     if nvec > 0:
@@ -112,6 +117,7 @@ def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
     numbers = arrays.pop('numbers', None)
     symbols = arrays.pop('symbols', None)
 
+    ##### CUSTOM PART #####
     if symbols is not None:
         symbols_plus_numbers = symbols.copy()
         symbols, tags = [], []
@@ -132,6 +138,7 @@ def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
                   pbc=pbc,
                   info=info,
                   tags=tags)
+    ##### END CUSTOM PART #####
 
     # Read and set constraints
     if 'move_mask' in arrays:
@@ -158,7 +165,7 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
     """
     Custom version of ase.io.extxyz.write_xyz to handle custom_labels
     if custom_labels_as_symbols is True, custom_labels will be written as symbols
-
+    ---
 
 
     Write output in extended XYZ format
@@ -277,8 +284,10 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
             else:
                 raise ValueError(f'Missing array "{column}"')
 
+        ##### CUSTOM PART #####
         if custom_labels_as_symbols:
             arrays['symbols'] = atoms.custom_labels
+        ##### END CUSTOM PART #####
 
         comm, ncols, dtype, fmt = output_column_format(atoms,
                                                        fr_cols,

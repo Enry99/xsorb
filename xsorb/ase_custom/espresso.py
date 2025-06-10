@@ -30,8 +30,9 @@ from xsorb.ase_custom.atoms import AtomsCustom, extract_number_from_string
 
 @reader
 def read_espresso_in_custom(fileobj):
-    """Patched version of ase.io.espresso.read_espresso_in to include custom labels,
+    """Custom version of ase.io.espresso.read_espresso_in to include custom labels,
     e.g. 'Fe1', 'H2'.
+    ----
     """
     # parse namelist section and extract remaining lines
     data, card_lines = read_fortran_namelist(fileobj)
@@ -59,7 +60,9 @@ def read_espresso_in_custom(fileobj):
         card_lines, n_species=data['system']['ntyp'])
     species_info = {}
     for ispec, (label, weight, pseudo) in enumerate(species_card):
-        symbol = label   # NOTE: changed to handle custom labels
+        #### CUSTOM PART ####
+        symbol = label
+        #### END CUSTOM PART ####
 
         # starting_magnetization is in fractions of valence electrons
         magnet_key = f"starting_magnetization({ispec + 1})"
@@ -71,6 +74,7 @@ def read_espresso_in_custom(fileobj):
     positions_card = get_atomic_positions(
         card_lines, n_atoms=data['system']['nat'], cell=cell, alat=alat)
 
+    #### CUSTOM PART ####
     symbols, tags = [], []
     for position in positions_card:
         sybmol_plus_number = position[0]
@@ -80,15 +84,17 @@ def read_espresso_in_custom(fileobj):
         tags.append(number)
     if not tags:
         tags = None
+    #### END CUSTOM PART ####
     positions = [position[1] for position in positions_card]
     constraint_flags = [position[2] for position in positions_card]
     magmoms = [species_info[symbol]["magmom"] for symbol in symbols]
 
-
     # TODO: put more info into the atoms object
     # e.g magmom, forces.
+    #### CUSTOM PART ####
     atoms = AtomsCustom(symbols=symbols, positions=positions, cell=cell, pbc=True,
                   magmoms=magmoms, tags=tags)
+    #### END CUSTOM PART ####
     atoms.set_constraint(convert_constraint_flags(constraint_flags))
 
     return atoms
@@ -97,6 +103,7 @@ def read_espresso_in_custom(fileobj):
 def format_atom_position(atom, crystal_coordinates, custom_label, mask='', tidx=None):
     """
     Custom version to handle custom labels
+    -----
 
     Format one line of atomic positions in
     Quantum ESPRESSO ATOMIC_POSITIONS card.
@@ -127,7 +134,9 @@ def format_atom_position(atom, crystal_coordinates, custom_label, mask='', tidx=
         coords = [atom.a, atom.b, atom.c]
     else:
         coords = atom.position
+    #### CUSTOM PART ####
     line_fmt = f'{custom_label}'
+    #### END CUSTOM PART ####
     inps = dict(atom=atom)
     if tidx is not None:
         line_fmt += '{tidx}'
@@ -144,9 +153,10 @@ def write_espresso_in_custom(fd, atoms, input_data : dict | None, pseudopotentia
                       crystal_coordinates=False, additional_cards=None,
                       **kwargs):
     """
-    Patched version of ase.io.espresso.write_espresso_in,
+    Custom version of ase.io.espresso.write_espresso_in,
     which simply passes through the pseudopotentials, leaving the order unchanged,
     and keeps the labels of the atoms
+    -----
     """
 
 
@@ -176,6 +186,7 @@ def write_espresso_in_custom(fd, atoms, input_data : dict | None, pseudopotentia
             mask = ''
         masks.append(mask)
 
+    #### CUSTOM PART ####
     # # Species info holds the information on the pseudopotential and
     # # associated for each element
     # if pseudopotentials is None:
@@ -196,7 +207,6 @@ def write_espresso_in_custom(fd, atoms, input_data : dict | None, pseudopotentia
     atomic_species_str = []
     atomic_positions_str = []
 
-    #do not force spin on, simply passthrough
     # nspin = input_parameters['system'].get('nspin', 1)  # 1 is the default
     # noncolin = input_parameters['system'].get('noncolin', False)
     # rescale_magmom_fac = kwargs.get('rescale_magmom_fac', 1.0)
@@ -234,23 +244,30 @@ def write_espresso_in_custom(fd, atoms, input_data : dict | None, pseudopotentia
     #                 atom, crystal_coordinates, mask=mask, tidx=tidx)
     #         )
     # else:
-    # Do nothing about magnetisation
+    #     # Do nothing about magnetisation
+    #     for atom, mask in zip(atoms, masks):
+    #         if atom.symbol not in atomic_species:
+    #             atomic_species[atom.symbol] = True  # just a placeholder
+    #             species_pseudo = species_info[atom.symbol]['pseudo']
+    #             atomic_species_str.append(
+    #                 f"{atom.symbol} {atom.mass} {species_pseudo}\n")
+    #         # construct line for atomic positions
+    #         atomic_positions_str.append(
+    #             format_atom_position(atom, crystal_coordinates, mask=mask)
+    #         )
 
     #CHANGED THIS PART FOR PASSTHROUGH AND HANDLE CUSTOM LABELS
     for label, pseudo in pseudopotentials.items():
         atomic_species[label] = True  # just a placeholder
         atomic_species_str.append(
-                '{label} {mass} {pseudo}\n'.format(
-                    label=label,
-                    mass=Atom(label_to_symbol(label)).mass,
-                    pseudo=pseudo))
+                f'{label} {Atom(label_to_symbol(label)).mass} {pseudo}\n')
 
     for atom, mask, custom_label in zip(atoms, masks, atoms.custom_labels):
         # construct line for atomic positions
         atomic_positions_str.append(
             format_atom_position(atom, crystal_coordinates, custom_label, mask=mask)
         )
-    ##########################################################
+    #### END CUSTOM PART ####
 
     # Add computed parameters
     # different magnetisms means different types
@@ -305,6 +322,14 @@ def write_espresso_in_custom(fd, atoms, input_data : dict | None, pseudopotentia
     elif isinstance(kgrid, str) and (kgrid == "gamma"):
         pwi.append('K_POINTS gamma\n')
         pwi.append('\n')
+    elif isinstance(kgrid, np.ndarray):
+        if np.shape(kgrid)[1] != 4:
+            raise ValueError('Only Nx4 kgrids are supported right now.')
+        pwi.append('K_POINTS crystal\n')
+        pwi.append(f'{len(kgrid)}\n')
+        for k in kgrid:
+            pwi.append(f"{k[0]:.14f} {k[1]:.14f} {k[2]:.14f} {k[3]:.14f}\n")
+        pwi.append('\n')
     else:
         pwi.append('K_POINTS automatic\n')
         pwi.append(f"{kgrid[0]} {kgrid[1]} {kgrid[2]} "
@@ -343,37 +368,7 @@ def parse_pwo_start_custom(lines, index=0):
     """
     Custom version of ase.io.espresso.parse_pwo_start
     that handles custom labels
-
-    Parse Quantum ESPRESSO calculation info from lines,
-    starting from index. Return a dictionary containing extracted
-    information.
-
-    - `celldm(1)`: lattice parameters (alat)
-    - `cell`: unit cell in Angstrom
-    - `symbols`: element symbols for the structure
-    - `positions`: cartesian coordinates of atoms in Angstrom
-    - `atoms`: an `ase.Atoms` object constructed from the extracted data
-
-    Parameters
-    ----------
-    lines : list[str]
-        Contents of PWSCF output file.
-    index : int
-        Line number to begin parsing. Only first calculation will
-        be read.
-
-    Returns
-    -------
-    info : dict
-        Dictionary of calculation parameters, including `celldm(1)`, `cell`,
-        `symbols`, `positions`, `atoms`.
-
-    Raises
-    ------
-    KeyError
-        If interdependent values cannot be found (especially celldm(1))
-        an error will be raised as other quantities cannot then be
-        calculated (e.g. cell and positions).
+    -----
     """
 
     info = {}
@@ -393,6 +388,7 @@ def parse_pwo_start_custom(lines, index=0):
                 [float(x) for x in lines[idx + 2].split()[3:6]],
                 [float(x) for x in lines[idx + 3].split()[3:6]]])
         elif 'positions (alat units)' in line:
+            #### CUSTOM PART ####
             info['symbols'], info['positions'], info['tags'] = [], [], []
 
             for at_line in lines[idx + 1:idx + 1 + info['nat']]:
@@ -401,6 +397,7 @@ def parse_pwo_start_custom(lines, index=0):
                 symbol = label_to_symbol(sybmol_plus_number)
                 number = extract_number_from_string(sybmol_plus_number, symbol)
                 info['symbols'].append(symbol)
+                #### END CUSTOM PART ####
                 info['tags'].append(number)
                 info['positions'].append([x * info['celldm(1)'],
                                           y * info['celldm(1)'],
@@ -410,6 +407,7 @@ def parse_pwo_start_custom(lines, index=0):
             # Will need to be extended for DFTCalculator info.
             break
 
+    #### CUSTOM PART ####
     if not info['tags']:
         info['tags'] = None
 
@@ -417,6 +415,7 @@ def parse_pwo_start_custom(lines, index=0):
     info['atoms'] = AtomsCustom(symbols=info['symbols'],
                           positions=info['positions'],
                           cell=info['cell'], pbc=True, tags=info['tags'])
+    #### END CUSTOM PART ####
 
     return info
 
@@ -424,37 +423,10 @@ def parse_pwo_start_custom(lines, index=0):
 @reader
 def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_single_trajectory=False):
     """
-    Custom version of ase.io.espresso.read_espresso_out
-    that handles custom labels
-
-
-    Reads Quantum ESPRESSO output files.
-
-    The atomistic configurations as well as results (energy, force, stress,
-    magnetic moments) of the calculation are read for all configurations
-    within the output file.
-
-    Will probably raise errors for broken or incomplete files.
-
-    Parameters
-    ----------
-    fileobj : file|str
-        A file like object or filename
-    index : slice
-        The index of configurations to extract.
-    results_required : bool
-        If True, atomistic configurations that do not have any
-        associated results will not be included. This prevents double
-        printed configurations and incomplete calculations from being
-        returned as the final configuration with no results data.
-
-    Yields
-    ------
-    structure : Atoms
-        The next structure from the index slice. The Atoms has a
-        SinglePointCalculator attached with any results parsed from
-        the file.
-
+    Custom version of ase.io.espresso.read_espresso_out to:
+    - handle custom labels
+    - skip the repetition of initial positions from restarts in the same pwo
+    - handle constraints
 
     """
     # work with a copy in memory for faster random access
@@ -463,6 +435,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
     # TODO: index -1 special case?
     # Index all the interesting points
 
+    #### CUSTOM PART ####
     _PW_POSITIONS_READ_FROM_RESTART = 'Atomic positions from file used, from input discarded'
     _PW_NONCONVERGED = 'convergence NOT achieved'
 
@@ -487,13 +460,14 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
         _PW_POSITIONS_READ_FROM_RESTART: [],
         _PW_NONCONVERGED: []
     }
+    #### END CUSTOM PART ####
 
     for idx, line in enumerate(pwo_lines):
         for identifier in indexes:
             if identifier in line:
                 indexes[identifier].append(idx)
 
-
+    #### CUSTOM PART ####
     if read_single_trajectory:
         #CASES:
         #1. Normal restart. The new positions were written at the end of the previous file, the associated energies and forces
@@ -536,6 +510,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
             elif len(subsequent_positions_read) > 1:
                 raise RuntimeError('The code is not working properly.')
         #print(pw_start_list)
+    #### END CUSTOM PART ####
 
 
     # Configurations are either at the start, or defined in ATOMIC_POSITIONS
@@ -552,12 +527,14 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
     # - 'relax' and 'vc-relax' re-prints the final configuration but
     #   only 'vc-relax' recalculates.
     if results_required:
+        #### CUSTOM PART ####
         # fix when last scf not converged:
         actually_present_bands_indexes=[]
         for iii in indexes[_PW_BANDS]:
             if iii + 2 not in indexes[_PW_NONCONVERGED]:
                 actually_present_bands_indexes.append(iii)
         indexes[_PW_BANDS] = actually_present_bands_indexes
+        #### END CUSTOM PART ####
 
         results_indexes = sorted(indexes[_PW_TOTEN] + indexes[_PW_FORCE] +
                                  indexes[_PW_STRESS] + indexes[_PW_MAGMOM] +
@@ -584,8 +561,10 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
     # when to fill in the blanks.
     pwscf_start_info = {idx: None for idx in indexes[_PW_START]}
 
+    #### CUSTOM PART ####
     first_n_atoms = None
     first_cell = None
+    #### END CUSTOM PART ####
 
     for image_index in image_indexes:
         # Find the nearest calculation start to parse info. Needed in,
@@ -600,8 +579,10 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
 
         # add structure to reference if not there
         if pwscf_start_info[prev_start_index] is None:
+            #### CUSTOM PART ####
             pwscf_start_info[prev_start_index] = parse_pwo_start_custom(
                 pwo_lines, prev_start_index)
+            #### END CUSTOM PART ####
 
         # Get the bounds for information for this structure. Any associated
         # values will be between the image_index and the following one,
@@ -622,7 +603,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
         else:
             if _PW_CELL in pwo_lines[image_index - 5]:
                 # CELL_PARAMETERS would be just before positions if present
-                cell, cell_alat = get_cell_parameters(
+                cell, _ = get_cell_parameters(
                     pwo_lines[image_index - 5:image_index])
             else:
                 cell = prev_structure.cell
@@ -635,6 +616,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
                 pwo_lines[image_index:image_index + n_atoms + 1],
                 n_atoms=n_atoms, cell=cell, alat=cell_alat)
 
+            #### CUSTOM PART ####
             # convert to AtomsCustom object
             symbols, tags = [], []
             for position in positions_card:
@@ -651,6 +633,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
                               pbc=True, tags=tags)
             structure.set_constraint(convert_constraint_flags(constraint_flags))
 
+
         if first_n_atoms is None:
             first_n_atoms = len(structure)
         if first_cell is None:
@@ -662,6 +645,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
             raise ValueError(f'You specified to read a single trajectory," \
                 "but a new structure with different number of" \
                 "atoms or cell was found at image index {image_index}')
+            #### END CUSTOM PART ####
 
         # Extract calculation results
         # Energy
@@ -757,10 +741,7 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
                 continue
 
             # QE prints the k-points in units of 2*pi/alat
-            # with alat defined as the length of the first
-            # cell vector
             cell = structure.get_cell()
-            alat = np.linalg.norm(cell[0])
             ibzkpts = []
             weights = []
             for i in range(nkpts):
@@ -768,12 +749,11 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
                 weights.append(float(L[-1]))
                 coord = np.array([L[-6], L[-5], L[-4].strip('),')],
                                  dtype=float)
-                coord *= 2 * np.pi / alat
+                coord *= 2 * np.pi / cell_alat
                 coord = kpoint_convert(cell, ckpts_kv=coord)
                 ibzkpts.append(coord)
             ibzkpts = np.array(ibzkpts)
             weights = np.array(weights)
-
 
         # Bands
         kpts = None

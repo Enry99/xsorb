@@ -17,23 +17,20 @@ import numpy as np
 import ase.io.vasp
 from ase import Atoms
 from ase.utils import reader
-from ase.io.vasp import get_atomtypes_from_formula, atomtypes_outpot, set_constraints
+from ase.io.vasp import (get_atomtypes_from_formula, atomtypes_outpot,
+    set_constraints, parse_poscar_scaling_factor)
 
 @reader
-def read_vasp(filename='CONTCAR'):
+def read_vasp_configuration_custom(fd):
     """
-    Mod to ase.io.vasp.read_vasp to add resorting for POSCAR if ase-sort.dat is present.
+    Custom mod to ase.io.vasp.read_vasp_configuration to add resorting
+    for POSCAR if ase-sort.dat is present.
+    ----
 
-    Import POSCAR/CONTCAR type file.
-
-    Reads unitcell, atom positions and constraints from the POSCAR/CONTCAR
-    file and tries to read atom types from POSCAR/CONTCAR header, if this
-    fails the atom types are read from OUTCAR or POTCAR file.
+    Read common POSCAR/CONTCAR/CHGCAR/CHG quantities and return Atoms.
     """
-
     from ase.data import chemical_symbols
 
-    fd = filename
     # The first line is in principle a comment line, however in VASP
     # 4.x a common convention is to have it contain the atom symbols,
     # eg. "Ag Ge" in the same order as later in the file (and POTCAR
@@ -43,21 +40,14 @@ def read_vasp(filename='CONTCAR'):
     # file.
     line1 = fd.readline()
 
-    # Scaling factor
-    # This can also be one negative number or three positive numbers.
-    # https://www.vasp.at/wiki/index.php/POSCAR#Full_format_specification
-    scale = np.array(fd.readline().split()[:3], dtype=float)
-    if len(scale) not in [1, 3]:
-        raise RuntimeError('The number of scaling factors must be 1 or 3.')
-    if len(scale) == 3 and np.any(scale < 0.0):
-        raise RuntimeError('All three scaling factors must be positive.')
+    scale = parse_poscar_scaling_factor(fd.readline())
 
     # Now the lattice vectors
     cell = np.array([fd.readline().split()[:3] for _ in range(3)], dtype=float)
     # Negative scaling factor corresponds to the cell volume.
     if scale[0] < 0.0:
         scale = np.cbrt(-1.0 * scale / np.linalg.det(cell))
-    cell *= scale
+    cell *= scale  # This works for both one and three scaling factors.
 
     # Number of atoms. Again this must be in the same order as
     # in the first line
@@ -139,6 +129,7 @@ def read_vasp(filename='CONTCAR'):
         atoms_pos[atom] = [float(_) for _ in ac[0:3]]
         if selective_dynamics:
             selective_flags[atom] = [_ == 'F' for _ in ac[3:6]]
+
     atoms = Atoms(symbols=atom_symbols, cell=cell, pbc=True)
     if cartesian:
         atoms_pos *= scale
@@ -148,18 +139,20 @@ def read_vasp(filename='CONTCAR'):
     if selective_dynamics:
         set_constraints(atoms, selective_flags)
 
+    #### CUSTOM PART ####
     # Resort if ase-sort.dat is present
     sortfile = f'{Path(fd.name).parent}/ase-sort.dat'
     if Path(sortfile).exists():
         resort_list = []
-        with open(sortfile, 'r', encoding=sys.getfilesystemencoding()) as fd:
-            for line in fd:
+        with open(sortfile, 'r') as ff:
+            for line in ff:
                 sort, resort = line.split()
                 resort_list.append(int(resort))
 
         atoms = atoms[resort_list]
+    #### END CUSTOM PART ####
 
     return atoms
 
 # Runtime patching
-ase.io.vasp.read_vasp = read_vasp
+ase.io.vasp.read_vasp_configuration = read_vasp_configuration_custom
