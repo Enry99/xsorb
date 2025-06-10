@@ -36,7 +36,7 @@ class CLICommand(CLICommandBase):
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.io.database import manual_update_calculations
+        from xsorb.io.database import manual_update_calculations # pylint: disable=import-outside-toplevel
         manual_update_calculations(args.calc_type,
                                    args.refresh,
                                    txt=args.txt)

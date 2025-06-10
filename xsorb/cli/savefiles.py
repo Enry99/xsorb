@@ -26,7 +26,7 @@ Example:
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.io.inputs import saveas
+        from xsorb.io.inputs import saveas # pylint: disable=import-outside-toplevel
         saveas(args.calc_type, saveas_format=args.format)
 
 

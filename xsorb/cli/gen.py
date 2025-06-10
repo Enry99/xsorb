@@ -24,7 +24,7 @@ The structures are added to the structures.db database.
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.calculations.launchers import generate
+        from xsorb.calculations.launchers import generate # pylint: disable=import-outside-toplevel
         generate(save_image=args.save_images)
 
 

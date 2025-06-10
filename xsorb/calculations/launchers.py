@@ -25,8 +25,6 @@ from xsorb.io.database import Database
 from xsorb.io.utils import continue_even_if_not_all_completed_question
 from xsorb.calculations.selection import obtain_calc_indices, get_adsorption_structures
 
-N_RELAX_DEFAULT = 5
-
 
 def generate(save_image : bool = False):
     '''
@@ -163,13 +161,7 @@ def launch_final_relax(*,
         raise RuntimeError('Only one between n_configs, threshold, '\
                            'required_calc_ids can be specified.')
     if n_configs is None and threshold is None and calc_ids is None:
-        #none specified, use n_configs method, with default values
-        #this should never be the case, as the user should specify at least one
-        #in the current implementation of the arg parser
-        if by_site:
-            n_configs = 1
-        else:
-            n_configs = N_RELAX_DEFAULT
+        raise RuntimeError('At least one of n_configs, threshold, required_calc_ids must be specified.')
 
 
     #Retrieve the structures

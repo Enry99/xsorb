@@ -6,6 +6,7 @@ import argparse
 
 from xsorb.cli.command import CLICommandBase, nonnegative_int, positive_float
 
+N_RELAX_DEFAULT = 5
 
 class CLICommand(CLICommandBase):
     """Select the configurations for the final relaxation, and launch the calculations
@@ -20,7 +21,6 @@ Examples:
 
     @staticmethod
     def add_arguments(parser : argparse.ArgumentParser):
-        from xsorb.calculations.launchers import N_RELAX_DEFAULT
         relax_modes = parser.add_mutually_exclusive_group(required=True)
         relax_modes.add_argument('-n',
                                 nargs='?',
@@ -83,7 +83,7 @@ Examples:
         if (args.by_site or args.by_mol_idx or args.chem_phys) and args.i:
             raise RuntimeError('Cannot use --by-site, --by-mol-idx or --chem-phys with --i')
 
-        from xsorb.calculations.launchers import launch_final_relax
+        from xsorb.calculations.launchers import launch_final_relax # pylint: disable=import-outside-toplevel
         launch_final_relax(n_configs=args.n,
                            threshold=args.t,
                            calc_ids=args.i,

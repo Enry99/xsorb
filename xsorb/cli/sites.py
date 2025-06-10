@@ -26,8 +26,3 @@ Example:
     def run(args : argparse.Namespace):
         from xsorb.visualize.images import plot_adsorption_sites
         plot_adsorption_sites(all_sites=args.all)
-
-
-    @staticmethod
-    def bind_function(parser: argparse.ArgumentParser):
-        parser.set_defaults(func=CLICommand.run)

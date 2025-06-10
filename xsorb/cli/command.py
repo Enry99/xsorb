@@ -17,17 +17,26 @@ class CLICommandBase(ABC):
     @staticmethod
     @abstractmethod
     def add_arguments(parser : argparse.ArgumentParser):
-        ...
+        '''
+        Add arguments to the parser for this command.
+        This method should be implemented by all subclasses.
+        '''
 
     @staticmethod
     @abstractmethod
     def run(args : argparse.Namespace):
-        ...
+        '''
+        Run the command with the given arguments.
+        This method should be implemented by all subclasses.
+        '''
 
     @staticmethod
     @abstractmethod
     def bind_function(parser: argparse.ArgumentParser):
-        ...
+        '''
+        Bind the run method to the parser.
+        This method should be implemented by all subclasses.
+        '''
 
 
 def nonnegative_int(value):

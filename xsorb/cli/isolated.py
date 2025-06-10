@@ -38,7 +38,7 @@ class CLICommand(CLICommandBase):
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.calculations.launchers import launch_isolated_slab_and_molecule
+        from xsorb.calculations.launchers import launch_isolated_slab_and_molecule # pylint: disable=import-outside-toplevel
         launch_isolated_slab_and_molecule(ml=args.ml,
                                           launch_slab=args.slab,
                                           launch_mol=args.molecule,

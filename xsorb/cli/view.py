@@ -27,7 +27,7 @@ Example:
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.visualize.images import view_config
+        from xsorb.visualize.images import view_config # pylint: disable=import-outside-toplevel
         view_config(args.calc_type, args.calc_id)
 
 

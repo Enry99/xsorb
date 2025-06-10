@@ -24,7 +24,7 @@ Example:
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.visualize.images import plot_energy_evolution
+        from xsorb.visualize.images import plot_energy_evolution # pylint: disable=import-outside-toplevel
         plot_energy_evolution(args.calc_type)
 
 

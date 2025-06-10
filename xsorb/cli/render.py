@@ -95,7 +95,7 @@ Example:
         calc_id = args_dict.pop('calc_id')
         movie = args_dict.pop('movie')
 
-        from xsorb.visualize.images import plot_images
+        from xsorb.visualize.images import plot_images # pylint: disable=import-outside-toplevel
         plot_images(calc_type=calc_type, calc_id=calc_id, movie=movie, **args_dict)
 
 

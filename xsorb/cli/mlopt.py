@@ -26,7 +26,7 @@ class CLICommand(CLICommandBase):
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.calculations.launchers import launch_ml_opt
+        from xsorb.calculations.launchers import launch_ml_opt # pylint: disable=import-outside-toplevel
         launch_ml_opt(save_image=args.save_images)
 
 

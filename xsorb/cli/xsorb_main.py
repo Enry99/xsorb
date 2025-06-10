@@ -15,7 +15,7 @@ def main():
 
     if len(sys.argv) == 1:
         print("No command provided. The program will now terminate.")
-        return 1
+        return
 
     #parse the command line arguments
     parser = build_xsorb_parser()
@@ -24,12 +24,11 @@ def main():
     #run the command
     try:
         args.func(args)
-    except Exception as e:
+    except Exception as e: #pylint: disable=broad-except
         if args.traceback:
             raise
-        else:
-            print(f'Error: {e}')
-            return 1
+        print(f'Error: {e}')
+        return
 
 if __name__ == '__main__':
     sys.exit(main())

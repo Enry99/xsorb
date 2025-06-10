@@ -23,7 +23,7 @@ Example:
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.io.jobs import restart_jobs
+        from xsorb.io.jobs import restart_jobs # pylint: disable=import-outside-toplevel
         restart_jobs(args.calc_type)
 
 

@@ -31,7 +31,7 @@ class CLICommand(CLICommandBase):
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.calculations.launchers import launch_screening
+        from xsorb.calculations.launchers import launch_screening # pylint: disable=import-outside-toplevel
         launch_screening(from_ml_opt=args.from_ml, save_image=args.save_images)
 
 
