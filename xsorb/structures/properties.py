@@ -29,7 +29,7 @@ class MoleculeRotation:
     - xrot: string with the x rotation angle
     - yrot: string with the y rotation angle
     - zrot: string with the z rotation angle
-    - reference_atom: int, index of the reference atom in the moelcule
+    - mol_atom: int, index of the reference atom in the moelcule
 
     Properties:
     - unique_id: string that fully identifies the rotation
@@ -73,7 +73,7 @@ class AdsorptionSite:
     Base class of Adsorption Site, to be inherited by the two different modes.
 
     Contains:
-    - label: str, numeric label of the site as it appears in the adsorption sites figure.
+    - label: str, label of the site as it appears in the adsorption sites figure, e.g. "1" or "2.1"
     - coords: list[float], x,y,z coordinates of the site
     - info: str, additional information about the site
 
@@ -117,6 +117,7 @@ class AdsorptionSiteCrystal(AdsorptionSite):
     - label: str, numeric label of the site as it appears in the adsorption sites figure.
     - coords: list[float], x,y,z coordinates of the site
     - info: str, additional information about the site, e.g. "ontop Cu" or "hollow 3-fold"
+    - type: str, type of the site, e.g. "ontop", "bridge", "hollow", etc.
 
     Properties:
     - unique_id: string that fully identifies the site
@@ -190,9 +191,8 @@ class AdsorptionStructure:
     - atoms: Atoms object of the adsorption structure
     - adsite: AdsorptionSite object of the adsorption site
     - mol_rot: MoleculeRotation object of the rotated molecule
-    - distance: float, distance between the reference atom of the molecule
+    - distance: float, distance between the reference atom of the molecule and the adsorption site
     - mol_indices: list[int], indices of the atoms of the molecule
-    and the adsorption site
 
     Methods:
     - to_info_dict: returns a dictionary with the information of the AdsorptionStructure object

@@ -9,6 +9,8 @@ Module to customize the ASE interface to Quantum Espresso.
 It includes custom labels for atoms, and the ability to pass through pseudopotentials.
 '''
 
+from __future__ import annotations
+
 import warnings
 import re
 
