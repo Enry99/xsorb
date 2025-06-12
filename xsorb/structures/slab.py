@@ -27,7 +27,7 @@ from ase.geometry.geometry import get_layers
 
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.visualize.plot import plot_adsites_image
-from xsorb.structures.properties import (AdsorptionSite, AdsorptionSiteCrystal,
+from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, AdsorptionSiteCrystal,
     AdsorptionSiteAmorphous, SurroundingSite)
 
 

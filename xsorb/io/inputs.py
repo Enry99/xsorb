@@ -24,21 +24,11 @@ from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import write_file_with_calculator
 if TYPE_CHECKING:
-    from xsorb.structures.properties import AdsorptionStructure
+    from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
     from ase import Atoms
 
 
-@dataclass
-class WrittenSystem:
-    '''
-    Small dataclass to store info about the written systems
-    '''
-    calc_id: int | str #index or 'slab'/'mol'
-    adsorption_structure: AdsorptionStructure
-    in_file_path: str
-    out_file_path: str
-    log_file_path: str
-    job_id: int | None = None
+
 
 
 def write_inputs(*,adsorption_structures : list[AdsorptionStructure],

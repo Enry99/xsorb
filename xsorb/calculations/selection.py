@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.io.database import Database
-from xsorb.structures.properties import AdsorptionStructure
+from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
 
 
 def select_calculations(rows : list,

@@ -22,20 +22,7 @@ from xsorb.dft_codes.definitions import (OUT_FILE_PATHS,
 if TYPE_CHECKING:
     from xsorb.io.inputs import WrittenSystem
 
-@dataclass
-class CalculationResults:
-    '''
-    Dataclass to store the results of a calculation
-    '''
-    atoms: Atoms
-    adsorption_energy: float
-    status : str #'completed', 'incomplete'
-    scf_nonconverged : bool
-    bonds : str
-    job_status : str
-    trajectory : list[Atoms]
-    adsorption_energy_evol: list[float]
-    final_dz: float
+
 
 
 def is_optimization_completed(filename : str, program : str):

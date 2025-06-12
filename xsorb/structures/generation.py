@@ -21,7 +21,7 @@ from xsorb.ase_custom import AtomsCustom
 from xsorb.io.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
-from xsorb.structures.properties import (AdsorptionSite, AdsorptionSiteAmorphous,
+from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, AdsorptionSiteAmorphous,
     MoleculeRotation, AdsorptionStructure, SurroundingSite)
 
 TOL = 0.01 #tolerance for checking if an atom is outside the cell (scaled positions)

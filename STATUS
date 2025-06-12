@@ -7,15 +7,19 @@ xsorb/bin:                      OK
 xsorb/cli:                      OK
 
 xsorb/dft_codes:                OK
+
+xsorb/settings:                 OK
+
+xsorb/adsorptiondata            OK
 -----------
 
-xsorb/calculations/*:           
+xsorb/calculations/*:
 
-xsorb/io/*:                     
+xsorb/io/*:
 
-xsorb/structures/*:             
+xsorb/structures/*:
 
-xsorb/visualize/*:              
+xsorb/visualize/*:
 
 
 FINALLY: xfrag.
