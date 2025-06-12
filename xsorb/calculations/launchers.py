@@ -17,7 +17,7 @@ import sys
 import numpy as np
 
 from xsorb.structures.generation import AdsorptionStructuresGenerator
-from xsorb.io.settings import Settings
+from xsorb.settings import Settings
 from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.io.inputs import write_inputs, write_slab_mol_inputs
 from xsorb.io.jobs import launch_jobs
@@ -69,19 +69,20 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
         adsorption_structures = get_adsorption_structures(calc_ids=calc_ids,
                                                           get_structures_from='mlopt')
     else:
+        calc_ids = None # generate the ids when inserting the structures into the database
         slab = read(settings.input.slab_filename)
         mol = read(settings.input.molecule_filename)
         gen = AdsorptionStructuresGenerator(slab, mol, settings, verbose=True)
         adsorption_structures = gen.generate_adsorption_structures(write_sites=True,
                                                                     save_image=save_image)
-        calc_ids = None
+
 
     written_systems = write_inputs(adsorption_structures=adsorption_structures,
                                    settings=settings,
                                    calc_type='screening',
                                    calc_ids=calc_ids)
 
-    launch_jobs(program=settings.program,
+    launch_jobs(program=settings.dft.program,
                 calc_type='screening',
                 jobscript=settings.input.jobscript_path,
                 sbatch_command=settings.input.submit_command,
@@ -111,6 +112,10 @@ def launch_ml_opt(save_image : bool = False,):
     written_systems = write_inputs(adsorption_structures=adsorption_structures,
                                    settings=settings,
                                    calc_type='mlopt')
+
+    if settings.input.jobscript_ml_path is None or settings.input.submit_command_ml is None:
+        raise ValueError('jobscript_ml_path is not defined in the settings file. '\
+                         'Please define it to launch the machine learning optimization.')
 
     launch_jobs(program='ml',
                 calc_type='mlopt',
@@ -161,7 +166,8 @@ def launch_final_relax(*,
         raise RuntimeError('Only one between n_configs, threshold, '\
                            'required_calc_ids can be specified.')
     if n_configs is None and threshold is None and calc_ids is None:
-        raise RuntimeError('At least one of n_configs, threshold, required_calc_ids must be specified.')
+        raise RuntimeError(
+            'At least one of n_configs, threshold, required_calc_ids must be specified.')
 
 
     #Retrieve the structures
@@ -195,7 +201,7 @@ def launch_final_relax(*,
                                    calc_type='relax',
                                    calc_ids=calc_ids)
 
-    launch_jobs(program=settings.program,
+    launch_jobs(program=settings.dft.program,
                 calc_type='relax',
                 jobscript=settings.input.jobscript_path,
                 sbatch_command=settings.input.submit_command,
@@ -204,7 +210,8 @@ def launch_final_relax(*,
 
 
 
-def launch_isolated_slab_and_molecule(ml : bool,
+def launch_isolated_slab_and_molecule(*,
+                                      ml : bool,
                                       launch_slab : bool = True,
                                       launch_mol: bool = True,
                                       samecell : bool = False):
@@ -246,11 +253,22 @@ def launch_isolated_slab_and_molecule(ml : bool,
                                             settings=settings,
                                             ml=ml)
 
-    launch_jobs(program='ml' if ml else settings.program,
+    if ml:
+        if (settings.input.jobscript_ml_path is None \
+               or settings.input.submit_command_ml is None):
+            raise ValueError('jobscript_ml_path is not defined in the settings file. '\
+                'Please define it to launch the machine learning optimization.')
+        program = 'ml'
+        jobscript = settings.input.jobscript_ml_path
+        sbatch_command = settings.input.submit_command_ml
+    else:
+        program = settings.dft.program
+        jobscript = settings.input.jobscript_path
+        sbatch_command = settings.input.submit_command
+
+    launch_jobs(program=program,
                 calc_type='isolated',
-                jobscript=settings.input.jobscript_path if not ml \
-                    else settings.input.jobscript_ml_path,
-                sbatch_command=settings.input.submit_command if not ml \
-                    else settings.input.submit_command_ml,
+                jobscript=jobscript,
+                sbatch_command=sbatch_command,
                 systems=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)

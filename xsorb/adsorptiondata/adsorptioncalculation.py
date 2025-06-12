@@ -12,7 +12,7 @@ from xsorb.ase_custom import AtomsCustom
 
 
 @dataclass
-class CalculationFilesInfo(JsonableBase):
+class CalculationInfo(JsonableBase):
     '''
     Small dataclass to store info about the written systems
     '''
@@ -27,10 +27,12 @@ class CalculationFilesInfo(JsonableBase):
     __xsorb_objtype__ = 'CalculationFilesInfo'
 
     def todict(self) -> dict:
-        return self.__dict__
+        dct = self.__dict__.copy()
+        dct = {k: v for k, v in dct.items() if v is not None}
+        return dct
 
     @classmethod
-    def fromdict(cls, dct: dict) -> 'CalculationFilesInfo':
+    def fromdict(cls, dct: dict) -> 'CalculationInfo':
         """
         Create an instance of the class from a dictionary.
         Used by xsorb to reconstruct objects after reading from JSON or database.
@@ -78,16 +80,19 @@ class CalculationResults(JsonableBase):
     adsorption_energy: float
     status : str #'completed', 'incomplete'
     scf_nonconverged : bool
-    bonds : list[BondInfo]
-
-    trajectory : list[AtomsCustom]
     adsorption_energy_evol: list[float]
     final_dz: float
+
+    bonds : list[BondInfo] | None
+    trajectory : list[AtomsCustom] | None
+
 
     __xsorb_objtype__ = 'CalculationResults'
 
     def todict(self) -> dict:
-        return self.__dict__
+        dct = self.__dict__.copy()
+        dct = {k: v for k, v in dct.items() if v is not None}
+        return dct
 
     @classmethod
     def fromdict(cls, dct: dict) -> 'CalculationResults':
@@ -97,8 +102,10 @@ class CalculationResults(JsonableBase):
         """
         # Convert nested objects
         dct['atoms'] = AtomsCustom.fromdict(dct['atoms'])
-        dct['trajectory'] = [AtomsCustom.fromdict(atoms) for atoms in dct['trajectory']]
-        dct['bonds'] = [BondInfo.fromdict(bond) for bond in dct['bonds']]
+        if 'trajectory' in dct:
+            dct['trajectory'] = [AtomsCustom.fromdict(atoms) for atoms in dct['trajectory']]
+        if 'bonds' in dct:
+            dct['bonds'] = [BondInfo.fromdict(bond) for bond in dct['bonds']]
         return cls(**dct)
 
 
@@ -106,16 +113,23 @@ class CalculationResults(JsonableBase):
 class AdsorptionCalculation(JsonableBase):
     """
     Class that contains all the information about an adsorption calculation.
+    Used to pack all the three main components of the calculation:
+    - AdsorptionStructure: the structure of the slab and the molecule
+    - CalculationInfo: information about the files used in the calculation
+    - CalculationResults: the results of the calculation
+
     """
 
     adsorption_structure: AdsorptionStructure
-    filesinfo: Optional[CalculationFilesInfo]
-    results: Optional[CalculationResults]
+    calc_info: Optional[CalculationInfo]
+    calc_results: Optional[CalculationResults]
 
     __xsorb_objtype__ = 'AdsorptionCalculation'
 
     def todict(self) -> dict:
-        return self.__dict__
+        dct = self.__dict__.copy()
+        dct = {k: v for k, v in dct.items() if v is not None}
+        return dct
 
     @classmethod
     def fromdict(cls, dct: dict) -> 'AdsorptionCalculation':
@@ -125,8 +139,8 @@ class AdsorptionCalculation(JsonableBase):
         """
         # Convert nested objects
         dct['adsorption_structure'] = AdsorptionStructure.fromdict(dct['adsorption_structure'])
-        if dct['filesinfo'] is not None:
-            dct['filesinfo'] = CalculationFilesInfo.fromdict(dct['filesinfo'])
-        if dct['results'] is not None:
-            dct['results'] = CalculationResults.fromdict(dct['results'])
+        if dct['calc_info'] is not None:
+            dct['calc_info'] = CalculationInfo.fromdict(dct['calc_info'])
+        if dct['calc_results'] is not None:
+            dct['calc_results'] = CalculationResults.fromdict(dct['calc_results'])
         return cls(**dct)

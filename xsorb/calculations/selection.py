@@ -15,7 +15,7 @@ from xsorb.io.database import Database
 from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
 
 
-def select_calculations(rows : list,
+def _select_calculations(rows : list,
                         n_configs : int | None = None,
                         threshold : float | None = None) -> list:
     '''
@@ -44,7 +44,6 @@ def select_calculations(rows : list,
     return calc_indices
 
 
-
 def obtain_calc_indices(*,
                         calc_type : str,
                         n_configs: int | None = None,
@@ -55,7 +54,7 @@ def obtain_calc_indices(*,
                         separate_chem_phys : bool = False,
                         verbose : bool = True) -> list[int]:
     '''
-    Returns a list with the indices of the configurations to be relaxed,
+    Returns a list with the indices of the configurations from previous calculations,
     according to the specified criteria.
     If no criteria is specified, all the configurations are returned.
 
@@ -75,56 +74,95 @@ def obtain_calc_indices(*,
     - selected_calc_ids: list of indices of the configurations to be relaxed
     '''
 
+    # check the input parameters
+    if n_configs is not None and threshold is not None:
+        raise ValueError('Only one between n_configs and threshold can be specified.')
+
+    if verbose:
+        print(f'Collecting results from {calc_type}...')
+        if excluded_calc_ids is not None:
+            print(f'Configurations {excluded_calc_ids} will be excluded, as requested.')
+
+
+    #### start collecting the results from the database ####
+
+    # case 1: no criteria specified, just return all the indices of the configurations
     if n_configs is None and threshold is None:
-        #just return the indices of all the configurations
         rows = Database.get_calculations(calc_type=calc_type,
                                         exclude_ids=excluded_calc_ids,
                                         include_data=False)
         return [row.get('calc_id') for row in rows]
 
-    if n_configs is not None and threshold is not None:
-        raise ValueError('Only one between n_configs and threshold can be specified.')
 
-    if verbose: print(f'Collecting results from {calc_type}...') #pylint: disable=multiple-statements
+    # case 2: some criteria specified, so we need to select the configurations
 
-    if excluded_calc_ids is not None and verbose:
-        print(f'Configurations {excluded_calc_ids} will be excluded, as requested.')
-
-
-    selected_calc_ids = []
-    #select only rows that have energy
+    #select only rows that have energy, sorting them from lowest to highest energy
     rows = Database.get_calculations(calc_type=calc_type,
                                     selection='energy',
                                     exclude_ids=excluded_calc_ids,
                                     #columns=['energy', 'calc_id', 'site', 'bonds'],
                                     sort_key='energy',
                                     include_data=False)
-    if separate_chem_phys:
-        selections = [[row for row in rows if row.bonds != 'none'],
-                     [row for row in rows if row.bonds == 'none']]
-    else:
-        selections = [rows]
 
-    for selection in selections:
-        if by_mol_atom:
-            for mol_atom in set(row.get('mol_atom') for row in selection):
-                rows_mol_atom = [row for row in selection if row.get('mol_atom')  == mol_atom]
 
-                if by_site:
-                    for site in set(row.get('site') for row in rows_mol_atom):
-                        rows_site = [row for row in rows_mol_atom if row.get('site') == site]
-                        selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
-                else:
-                    selected_calc_ids += select_calculations(rows_mol_atom, n_configs, threshold)
+    # helper functions to make the code a bit cleaner
+    def _chemphys_subsets(rows_list: list, choose_by_subsets: bool) -> list[list]:
+        '''
+        Returns either [chemisorption_rows, physisorption_rows]
+        or [all_rows] depending on the choose_by_subsets flag.
+        '''
+        if choose_by_subsets:
+            return [[row for row in rows_list if row.bonds != 'none'],
+                        [row for row in rows_list if row.bonds == 'none']]
         else:
-            if by_site:
-                for site in set(row.get('site') for row in selection):
-                    rows_site = [row for row in selection if row.get('site') == site]
-                    selected_calc_ids += select_calculations(rows_site, n_configs, threshold)
-            else:
-                selected_calc_ids += select_calculations(selection, n_configs, threshold)
+            return [rows_list]
 
-    print(f'{calc_type} results collected.')
+    def _mol_atoms_subsets(rows_list: list, choose_by_subsets: bool) -> list:
+        '''
+        Returns either [rows_mol_atom1, rows_mol_atom2, ...]
+        or [all_rows] depending on the choose_by_subsets flag.
+        '''
+        if choose_by_subsets:
+            local_rows = []
+            for mol_atom in set(row.get('mol_atom') for row in rows_list):
+                local_rows.append([row for row in rows_list if row.get('mol_atom') == mol_atom])
+            return local_rows
+        else:
+            return [rows_list]
+
+
+    def _site_subsets(rows_list: list, choose_by_subsets: bool) -> list:
+        '''
+        Returns either [rows_site1, rows_site2, ...]
+        or [all_rows] depending on the choose_by_subsets flag.
+        '''
+        if choose_by_subsets:
+            local_rows = []
+            for site in set(row.get('site') for row in rows_list):
+                local_rows.append([row for row in rows_list if row.get('site') == site])
+            return local_rows
+        else:
+            return [rows_list]
+
+
+    # loop over the subsets, adding the ids as a flat list
+    selected_calc_ids = []
+    for chemphys_subset in _chemphys_subsets(rows, separate_chem_phys):
+        for mol_atom_subset in _mol_atoms_subsets(chemphys_subset, by_mol_atom):
+            for site_subset in _site_subsets(mol_atom_subset, by_site):
+
+                calc_ids = _select_calculations(rows=site_subset,
+                                                n_configs=n_configs,
+                                                threshold=threshold)
+
+                selected_calc_ids.extend(calc_ids)
+
+    # DEBUG: check that no duplicates are present
+    if len(selected_calc_ids) != len(set(selected_calc_ids)):
+        raise ValueError('Duplicate calculation IDs found in the selected configurations.')
+
+
+    if verbose: print(f'{calc_type} results collected.') #pylint: disable=multiple-statements
 
     return selected_calc_ids
 
@@ -134,7 +172,7 @@ def get_adsorption_structures(get_structures_from : str,
     '''
     Returns the a list of AdsorptionStructure objects, but with the atoms
     substituted with the ones from the previous calculation.
-    If from mlopt, the the original constraints are set, important when
+    If from mlopt, the the original constraints for dft are set, important when
     the mlopt was performed by fixing the slab.
 
     Args:
@@ -148,20 +186,19 @@ def get_adsorption_structures(get_structures_from : str,
 
     #get structures from database
     rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
+    rows_original = Database.get_structures(calc_ids=calc_ids)
 
-    if get_structures_from == 'mlopt':
-        rows_original = Database.get_structures(calc_ids=calc_ids)
-        constraints = [row.get('constraints') for row in rows_original]
 
-    # prepare the structures by substituting the atoms with the one from the
-    # previous calculation
+    # prepare the structures by substituting the atoms with the one from the previous calculation
     adsorption_structures : list [AdsorptionStructure] = []
-    for row in rows:
-        ads_struct = AdsorptionStructure.from_dict(row.data.adsorption_structure)
+
+    for row, row_original in zip(rows, rows_original):
+        ads_struct = AdsorptionStructure.fromdict(
+            row.data.adsorption_calculation.adsorption_structure)
         atoms = AtomsCustom(row.toatoms())
 
         if get_structures_from == 'mlopt':
-            atoms.set_constraint(constraints.pop(0))
+            atoms.set_constraint(row_original.get('constraints'))
 
         ads_struct.atoms = atoms
         adsorption_structures.append(ads_struct)

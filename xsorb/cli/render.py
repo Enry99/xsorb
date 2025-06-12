@@ -4,7 +4,7 @@ CLI parser for command: render
 
 import argparse
 
-from xsorb.cli.command import CLICommandBase, nonnegative_int, positive_float
+from xsorb.cli.command import CLICommandBase, positive_int, positive_float
 
 
 class CLICommand(CLICommandBase):
@@ -23,7 +23,7 @@ Example:
                         help='''type of calculation to render''')
         parser.add_argument('calc_id',
                         nargs='?',
-                        type=nonnegative_int,
+                        type=positive_int,
                         help='''ID of the calculation to render''')
         parser.add_argument('-pov','--povray',
                         action='store_true',
@@ -31,7 +31,7 @@ Example:
                         help='Use povray for rendering (much better quality).')
         parser.add_argument('-s','--supercell',
                         nargs = 3,
-                        type=nonnegative_int,
+                        type=positive_int,
                         metavar=('nx', 'ny', 'nz'),
                         help="Replicate the cell nx ny nz times along the three cell vectors.")
         parser.add_argument('-wr', '--wrap',
@@ -76,7 +76,7 @@ Example:
                         action='store_true',
                         default=False, help='Do not show bonds' )
         parser.add_argument('-w', '--width-res',
-                        type=nonnegative_int,
+                        type=positive_int,
                         default=700,
                         help='Horizontal resolution in pixels.')
         parser.add_argument('-m','--movie',
@@ -84,7 +84,7 @@ Example:
                         default=False,
                         help='Create movie from the frames.')
         parser.add_argument('-f', '--framerate',
-                        type=nonnegative_int,
+                        type=positive_int,
                         default=10,
                         help='Framerate of the movie (frames per second). Default = 10.')
 

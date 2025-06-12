@@ -18,6 +18,7 @@ from ase.data import covalent_radii
 from ase.data.vdw_alvarez import vdw_radii
 
 from xsorb.ase_custom import AtomsCustom
+from xsorb.io.utils import progressbar
 from xsorb.io.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
@@ -356,7 +357,7 @@ class AdsorptionStructuresGenerator:
         adsorption_structures : list[AdsorptionStructure] = []
         for mol_ref_index in self.mol.reference_atom_indices:
             print(f"Molecule atom {mol_ref_index}:")
-            for adsite in adsites:
+            for adsite in progressbar(adsites, "Generating structures for each site:"):
                 molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
                                                                     which_index=mol_ref_index,
                                                                     adsite=adsite,

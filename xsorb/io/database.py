@@ -240,7 +240,7 @@ class Database:
                                      ) for row in rows]
 
             #Get the results of the calculations
-            results = xsorb.calculations.results.get_calculations_results(
+            results = xsorb.calculations.results.update_calculations_results(
                     systems=systems,
                     program=program,
                     mult=mult,
@@ -541,7 +541,7 @@ def manual_update_calculations(calc_type : str,
     '''
     Manually update the calculations in the database.
     This function is meant to be called from the CLI, to update the database
-    
+
     Args:
     - calc_type: string with the type of calculation to update
     - refresh: bool to force the update of the database, re-reading all the output files
@@ -560,7 +560,7 @@ def manual_update_calculations(calc_type : str,
         total_e_slab_mol = None
         total_e_slab_mol_ml = None
 
-        
+
     Database.update_calculations(
         calc_type,
         refresh,
@@ -569,4 +569,4 @@ def manual_update_calculations(calc_type : str,
         mult=mult,
         txt=txt,
         verbose=True
-    )        
+    )

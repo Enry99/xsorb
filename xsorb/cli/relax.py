@@ -4,7 +4,7 @@ CLI parser for command: relax
 
 import argparse
 
-from xsorb.cli.command import CLICommandBase, nonnegative_int, positive_float
+from xsorb.cli.command import CLICommandBase, positive_int, positive_float
 
 N_RELAX_DEFAULT = 5
 
@@ -24,7 +24,7 @@ Examples:
         relax_modes = parser.add_mutually_exclusive_group(required=True)
         relax_modes.add_argument('-n',
                                 nargs='?',
-                                type=nonnegative_int,
+                                type=positive_int,
                                 const=N_RELAX_DEFAULT,
                                 default=None,
                                 help='''Select the configurations for the final relaxation
@@ -36,12 +36,12 @@ Examples:
                                 that have energy < min(energies) + t  (in eV)''')
         relax_modes.add_argument('-i',
                                 nargs='+',
-                                type=nonnegative_int,
+                                type=positive_int,
                                 help='''Manually select the configurations for the final relaxation
-                                by their IDs''')
+                                by their IDs (starting from 1).''')
         parser.add_argument('--exclude',
                         nargs='+',
-                        type=nonnegative_int,
+                        type=positive_int,
                         help='''Exclude the configurations with the given IDs
                         from the final relaxation''')
         parser.add_argument('--by-site',

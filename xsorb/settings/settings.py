@@ -23,8 +23,8 @@ from dacite import from_dict, Config
 
 from xsorb.settings.input_settings import InputParams, StructureParams
 from xsorb.dft_codes.input_settings import DFTParams
-from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.dft_codes.definitions import OUT_FILE_PATHS
+from xsorb.ase_custom.io import ase_custom_read as read
 
 
 class Settings:
@@ -110,7 +110,7 @@ class Settings:
             try:
                 self.input.E_slab_mol[0] = \
                     read(OUT_FILE_PATHS['slab'][self.dft.program]).get_potential_energy()
-            except Exception as e: # pylint: disable=broad-except
+            except Exception: # pylint: disable=broad-except
                 try:
                     self.input.E_slab_mol[0] = read(self.input.slab_filename).get_potential_energy()
                 except Exception as e: # pylint: disable=broad-except
@@ -121,7 +121,7 @@ class Settings:
                 self.input.E_slab_mol[1] = \
                     read(OUT_FILE_PATHS['mol'][self.dft.program]).get_potential_energy()
 
-            except Exception as e: # pylint: disable=broad-except
+            except Exception: # pylint: disable=broad-except
                 try:
                     self.input.E_slab_mol[1] = read(self.input.molecule_filename).get_potential_energy()
                 except Exception as e: # pylint: disable=broad-except

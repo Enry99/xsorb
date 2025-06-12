@@ -10,10 +10,10 @@ xsorb/dft_codes:                OK
 
 xsorb/settings:                 OK
 
-xsorb/adsorptiondata            OK
------------
+xsorb/adsorptiondata:           OK
 
-xsorb/calculations/*:
+xsorb/calculations/             OK
+-----------
 
 xsorb/io/*:
 
@@ -28,5 +28,4 @@ FINALLY: xfrag.
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
 TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 TODO: mettere plot istogrammi, sia per xsorb, con le varie eads, sia in xfrag, con tutte le combinazioni.
-
-TODO: check start of index in ase db. if 1, then replace the check_nonnegative int in argparsers to check positive int (exclude 0)
+TODO: add conformers from PubChem

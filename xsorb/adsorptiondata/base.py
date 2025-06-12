@@ -12,7 +12,9 @@ class JsonableBase(ABC):
 
     @abstractmethod
     def todict(self) -> dict:
-        """Convert class instance to a dictionary, used by ase json and db"""
+        """Convert class instance to a dictionary, used by ase json and db.
+        None values are not allowed in the dictionary and must be removed.
+        """
 
     @classmethod
     @abstractmethod

@@ -184,16 +184,19 @@ class AdsorptionSiteAmorphous(AdsorptionSite):
     __xsorb_objtype__ = "AdsorptionSiteAmorphous"
 
     def todict(self):
-        return self.__dict__
+        #remove None values from the dictionary to write into ase db
+        dct = self.__dict__.copy()
+        dct = {k: v for k, v in dct.items() if v is not None}
+        return dct
 
     @classmethod
     def fromdict(cls, dct: dict):
         '''
         Creates an AdsorptionSiteAmorphous object from a dictionary
         '''
-        dct['surrounding_sites'] = [SurroundingSite.fromdict(ss) \
-                for ss in dct['surrounding_sites']] \
-            if dct.get('surrounding_sites') else None
+        if 'surrounding_sites' in dct:
+            dct['surrounding_sites'] = [SurroundingSite.fromdict(ss) \
+                    for ss in dct['surrounding_sites']]
         return cls(**dct)
 
 

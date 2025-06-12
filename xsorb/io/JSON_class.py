@@ -90,12 +90,18 @@ x = prova(
 from ase.db import connect
 db = connect('test.json')
 
-db.write(atoms, data={'prova': x})
+db.write(atoms, bonds=[])
 
-
-# Read the data back
 for row in db.select():
     print("Row ID:", row.id)
-    xxx = row.data['prova']
-    new_aaa = prova.fromdict(xxx)
-    print("Decoded object:", new_aaa)
+    print("bonds:", row.bonds)
+
+# db.write(atoms, data={'prova': x})
+
+
+# # Read the data back
+# for row in db.select():
+#     print("Row ID:", row.id)
+#     xxx = row.data['prova']
+#     new_aaa = prova.fromdict(xxx)
+#     print("Decoded object:", new_aaa)
