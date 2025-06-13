@@ -19,7 +19,7 @@ from ase.data.vdw_alvarez import vdw_radii
 
 from xsorb.ase_custom import AtomsCustom
 from xsorb.io.utils import progressbar
-from xsorb.io.settings import Settings
+from xsorb.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
 from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, AdsorptionSiteAmorphous,

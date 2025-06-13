@@ -5,8 +5,7 @@
 # @author: Enrico Pedretti
 
 """
-Module that contains the class Molecule, used to read a molecule from file and
-generate the rotations
+Module that contains the class Molecule, used to generate the rotations
 """
 
 from __future__ import annotations
@@ -24,14 +23,16 @@ from xsorb.adsorptiondata.adsorptionstructure import MoleculeRotation, Surroundi
 
 class Molecule:
     '''
-        Class to read molecule from file (e.g. Quantum ESPRESSO pwi/pwo or VASP POSCAR),
-        find adsorption sites on the surface, and generate the adsorption structures with a molecule
-        by placing the molecule on all the different sites
+        Class to generate the rotations of the molecule around a reference atom.
+        The molecule is aligned to the x-axis, and the rotations are performed around
+        the reference atom, which is translated to the origin.
+        The molecule can be rotated around the x, y and z axes, with the angles specified
+        in the `generate_molecule_rotations` method.
 
         Initialization parameters:
         - mol: Atoms object of the molecule
         - atom_indexes: list of indices of the reference atom (indexing starting from 0,
-            in the order of the input file)
+            in the order of the input file). If -1, use geometry center of the molecule.
         - molecule_axis_atoms: indices of the two atoms defining the x-axis
             of the molecule (a = r2 - r1)
         - axis_vector: [ax, ay, az] of the vector that is considered as the x-axis of the molecule
@@ -121,7 +122,7 @@ class Molecule:
         for atom_index in self.reference_atom_indices:
             mol = self.mol_ase.copy()
             if atom_index != -1:
-                mol.translate(-self.mol_ase.get_positions()[atom_index])
+                mol.translate(-self.mol_ase.positions[atom_index])
             else:
                 #center of positions (not of mass)
                 mol.translate(-self.mol_ase.positions.mean(axis=0))

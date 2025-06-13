@@ -13,6 +13,8 @@ from ase import Atoms
 from ase.constraints import FixCartesian
 from ase.neighborlist import NeighborList, natural_cutoffs
 
+from xsorb.adsorptiondata.adsorptioncalculation import BondInfo
+
 
 def set_fixed_slab_constraints(atoms : Atoms, slab_indices : list | None = None) -> None:
     '''
@@ -26,10 +28,11 @@ def set_fixed_slab_constraints(atoms : Atoms, slab_indices : list | None = None)
     atoms.set_constraint(slab_constraints + mol_constraints)
 
 
-def slab_mol_bonds(slab : Atoms, mol: Atoms, mult : float = 1.1) -> str:
+def slab_mol_bonds(slab : Atoms, mol: Atoms, mult : float = 1.1) -> list[BondInfo] | None:
     '''
-    Returns the list of the bonds between the molecule and the slab.
-    Based on covalent radii (with mult factor of 1.15)
+    Returns a list of BondInfo objects representing the bonds between the slab and the molecule,
+    or None if no bonds are found.
+    Based on covalent radii (with mult factor of 1.1)
 
     Args:
     - slab: Atoms object for the slab
@@ -37,22 +40,31 @@ def slab_mol_bonds(slab : Atoms, mol: Atoms, mult : float = 1.1) -> str:
     - mult: factor to multiply the covalent radii
 
     Returns:
-    - str, list of the bonds in the format 'Cu1-O2,Cu5-O3', or 'none' if no bonds are found
+    - List of BondInfo objects if bonds are found, otherwise None
     '''
 
-    atoms = slab+mol
+    atoms : Atoms = slab+mol
     cutoffs = natural_cutoffs(atoms, mult=mult)
     nl = NeighborList(cutoffs, skin=0, self_interaction=False, bothways=True)
     nl.update(atoms)
     cm = nl.get_connectivity_matrix()
+    dm = atoms.get_all_distances(mic=True)
 
-    bonds_list = []
+    bonds_list : list[BondInfo] = []
     for i in range(len(slab)):
         for j in range(len(mol)):
             if cm[i, len(slab)+j]:
-                bonds_list.append(f'{mol.symbols[j]}{j}-{slab.symbols[i]}{i}')
+                bonds_list.append(
+                    BondInfo(
+                        slab_atom_id=i,
+                        mol_atom_id=j,
+                        slab_atom_species=slab.get_chemical_symbols()[i],
+                        mol_atom_species=mol.get_chemical_symbols()[j],
+                        length=dm[i, len(slab)+j]
+                    )
+                )
 
     if len(bonds_list) == 0:
-        return 'none'
+        return None
     else:
-        return ','.join(bonds_list)
+        return bonds_list

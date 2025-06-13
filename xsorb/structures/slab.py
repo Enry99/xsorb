@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Callable
 import warnings
 from pathlib import Path
+import json
 
 import numpy as np
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
@@ -33,9 +34,8 @@ from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, Adsorption
 
 class Slab:
     '''
-        Class to read slab from file (e.g. Quantum ESPRESSO pwi/pwo or VASP POSCAR),
-        find adsorption sites on the surface, and generate the adsorption structures with a molecule
-        by placing the molecule on all the different sites
+        Class to find adsorption sites on the surface and generate the adsorption structures
+        with a molecule by placing the molecule on all the different sites
 
         Initialization parameters:
         - slab: Atoms object of the slab
@@ -143,28 +143,39 @@ class Slab:
     @staticmethod
     def read_sites() -> list[AdsorptionSiteCrystal | AdsorptionSiteAmorphous]:
         """
-        Read already existing sites from previous calculations, stored in a sites.npy file
+        Read already existing sites from previous calculations, stored in a adsites.json file
 
         Returns:
         - list of AdsorptionSite objects
         """
 
         if Path('adsites.npy').is_file():
-            existing_sites : list = np.load('adsites.npy', allow_pickle=True).tolist()
-            return existing_sites
+            sites = json.load(open('adsites.json', 'r'))
+            converted_sites = []
+            for site in sites:
+                if site['__xsorb_objtype__'] == 'AdsorptionSiteCrystal':
+                    site = AdsorptionSiteCrystal.fromdict(site)
+                elif site['__xsorb_objtype__'] == 'AdsorptionSiteAmorphous':
+                    site = AdsorptionSiteAmorphous.fromdict(site)
+                else:
+                    raise ValueError(f"Unknown site type: {site['__xsorb_objtype__']}")
+                converted_sites.append(site)
+            return converted_sites
         else:
             return []
 
     @staticmethod
     def write_sites(sites : list[AdsorptionSite]) -> None:
         """
-        Write the sites to a sites.npy file
+        Write the sites to a adsites.json file, to be used in the future.
 
         Args:
         - sites: list of AdsorptionSite objects
         """
 
-        np.save('adsites.npy', sites, allow_pickle=True)
+        json.dump([site.todict() for site in sites],
+                  open('adsites.json', 'w'),
+                  indent=4)
 
 
     def _get_symmetrically_equivalent_sets(self, coords_set : list, threshold : float =1e-6):
