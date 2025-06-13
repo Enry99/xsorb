@@ -4,6 +4,7 @@ Module containing the AdsorptionCalculation class.
 
 from __future__ import annotations
 from dataclasses import dataclass
+import re
 from typing import Optional
 
 from xsorb.adsorptiondata.base import JsonableBase
@@ -25,6 +26,18 @@ class CalculationInfo(JsonableBase):
     job_status : str | None = None # 'running', 'completed', 'failed', 'cancelled', None
 
     __xsorb_objtype__ = 'CalculationFilesInfo'
+
+
+    def dict_keys(self) -> dict:
+        """
+        Returns a dictionary with the keys to be explicitly stored in the database.
+        """
+        return {
+            'in_file_path': self.in_file_path,
+            'out_file_path': self.out_file_path,
+            'job_id': self.job_id,
+            'job_status': self.job_status
+        }
 
     def todict(self) -> dict:
         dct = self.__dict__.copy()
@@ -89,6 +102,24 @@ class CalculationResults(JsonableBase):
 
     __xsorb_objtype__ = 'CalculationResults'
 
+
+    def db_keys(self) -> dict:
+        """
+        Returns a dictionary with the keys to be explicitly stored in the database.
+        """
+
+        dct = {
+            'adsorption_energy': self.adsorption_energy,
+            'status': self.status,
+            'scf_nonconverged': self.scf_nonconverged,
+            'final_dz': self.final_dz,
+        }
+        if self.bonds is not None:
+            dct['bonds'] = ','.join(str(bond) for bond in self.bonds)
+
+        return dct
+
+
     def todict(self) -> dict:
         dct = self.__dict__.copy()
         dct = {k: v for k, v in dct.items() if v is not None}
@@ -125,6 +156,22 @@ class AdsorptionCalculation(JsonableBase):
     calc_results: Optional[CalculationResults]
 
     __xsorb_objtype__ = 'AdsorptionCalculation'
+
+
+    def db_keys(self) -> dict:
+        """
+        Returns a dictionary with the keys to be explicitly stored in the database.
+        """
+
+        # merge db_keys from nested objects
+        dct = self.adsorption_structure.db_keys()
+        if self.calc_info is not None:
+            dct.update(self.calc_info.dict_keys())
+        if self.calc_results is not None:
+            dct.update(self.calc_results.db_keys())
+
+        return dct
+
 
     def todict(self) -> dict:
         dct = self.__dict__.copy()

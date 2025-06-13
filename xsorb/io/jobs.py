@@ -16,11 +16,11 @@ import subprocess
 import sys
 
 import xsorb.io.database
-from xsorb.io.settings import Settings
+from xsorb.settings import Settings
 from xsorb.dft_codes.definitions import SBATCH_POSTFIX
 from xsorb.dft_codes.calculator import edit_files_for_restart
 if TYPE_CHECKING:
-    from xsorb.io.inputs import WrittenSystem
+    from xsorb.adsorptiondata.adsorptioncalculation import CalculationInfo
 
 
 TEST = False
@@ -30,11 +30,11 @@ def launch_jobs(*,program : str,
                 calc_type : str,
                 jobscript : str,
                 sbatch_command : str,
-                systems : list[WrittenSystem],
+                systems : list[CalculationInfo],
                 jobname_prefix : str = ''):
     '''
     Launch the calculations.
-    Writes the job ids in the database.
+    Writes the job ids in the database
 
     Args:
     - program: 'espresso', 'vasp' or 'ml'
@@ -85,7 +85,9 @@ def launch_jobs(*,program : str,
         os.chdir(main_dir) ####################
 
     if calc_type not in ('isolated'): #no database for slab/molecule
-        xsorb.io.database.Database.add_job_ids(calc_type, [system.calc_id for system in systems], submitted_jobs)
+        xsorb.io.database.Database.add_job_ids(calc_type,
+                                               [system.calc_id for system in systems],
+                                               submitted_jobs)
     else:
         with open(".submitted_jobs.txt", "a",encoding=sys.getfilesystemencoding()) as f:
             f.writelines([f'{job}\n' for job in submitted_jobs])
@@ -111,7 +113,7 @@ def restart_jobs(calc_type : str):
     log_files = [row.log_file_path for row in rows]
 
     #edit input files
-    edit_files_for_restart(settings.program, in_files)
+    edit_files_for_restart(settings.dft.program, in_files)
 
     #launch the calculations
     main_dir = os.getcwd()
@@ -121,7 +123,7 @@ def restart_jobs(calc_type : str):
         j_dir = Path(in_file).parent
         os.chdir(j_dir)
 
-        postfix = SBATCH_POSTFIX[settings.program].format(in_file=Path(in_file).name,
+        postfix = SBATCH_POSTFIX[settings.dft.program].format(in_file=Path(in_file).name,
                                                  out_file=Path(out_file).name,
                                                  log_file=Path(log_file).name,
                                                  main_dir=main_dir)

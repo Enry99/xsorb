@@ -47,6 +47,18 @@ class MoleculeRotation(JsonableBase):
 
     __xsorb_objtype__ = "MoleculeRotation"
 
+
+    def db_keys(self) -> dict:
+        """
+        Returns a dictionary with the keys to be explicitly stored in the database.
+        """
+        return {
+            'xrot': self.xrot,
+            'yrot': self.yrot,
+            'zrot': self.zrot,
+            'mol_atom': self.mol_atom
+        }
+
     @property
     def unique_id(self):
         '''
@@ -94,6 +106,16 @@ class AdsorptionSite(JsonableBase):
     info: str
 
     __xsorb_objtype__ = "AdsorptionSite"
+
+
+    def db_keys(self) -> dict:
+        """
+        Returns a dictionary with the keys to be explicitly stored in the database.
+        """
+        return {
+            'site': self.label,
+            'site_info': self.info
+        }
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -263,6 +285,17 @@ class AdsorptionStructure(JsonableBase):
     mol_indices: list[int]
 
     __xsorb_objtype__ = "AdsorptionStructure"
+
+
+    def db_keys(self) -> dict:
+        """
+        Returns a dictionary with the keys to be explicitly stored in the database.
+        """
+        dct = self.adsite.db_keys()
+        dct.update(self.mol_rot.db_keys())
+        dct.update({'initial_dz': self.distance})
+
+        return dct
 
     @property
     def slab_indices(self):

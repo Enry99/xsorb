@@ -1,4 +1,4 @@
-examples/settings.toml:         OK, implement range_selection, incar_path_screening, kpoints_path_screening, pwi_path_screening and remove upscale_screening from the actual code.
+examples/settings.toml:         OK
 
 xsorb/ase_custom:               OK
 
@@ -12,12 +12,12 @@ xsorb/settings:                 OK
 
 xsorb/adsorptiondata:           OK
 
-xsorb/calculations/             OK
+xsorb/calculations:             OK
+
+xsorb/structures:               OK
 -----------
 
 xsorb/io/*:
-
-xsorb/structures/*:
 
 xsorb/visualize/*:
 
@@ -29,3 +29,4 @@ TODO: add check for scf not converged in vasp, and reaching max steps in qe, at 
 TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 TODO: mettere plot istogrammi, sia per xsorb, con le varie eads, sia in xfrag, con tutte le combinazioni.
 TODO: add conformers from PubChem
+TODO: sostituire print con logging, salvando tutto su file, e solo le info principali su console

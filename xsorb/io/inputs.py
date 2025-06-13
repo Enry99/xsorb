@@ -11,11 +11,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import shutil
 from pathlib import Path
-from dataclasses import dataclass
 
 
 from xsorb.structures.utils import set_fixed_slab_constraints
-from xsorb.io.settings import Settings
+from xsorb.settings import Settings
 import xsorb.io.database
 from xsorb.io.utils import overwrite_question
 from xsorb.ase_custom.io import write
@@ -23,12 +22,11 @@ from xsorb.ase_custom import write_xyz_custom
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import write_file_with_calculator
+
+from xsorb.adsorptiondata import CalculationInfo
 if TYPE_CHECKING:
-    from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
     from ase import Atoms
-
-
-
+    from xsorb.adsorptiondata import AdsorptionStructure
 
 
 def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
@@ -36,7 +34,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
                  calc_type : str | None = None,
                  calc_ids : list[int] | None = None,
                  ask_before_overwrite : bool = True,
-                 verbose : bool = True) -> list[WrittenSystem]:
+                 verbose : bool = True) -> list[CalculationInfo]:
     '''
     Writes the input files for all the adsorption configurations,
     updating the corresponding database(s).
@@ -100,8 +98,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             directory=file_dir
         )
 
-        written_systems.append(WrittenSystem(calc_id=i,
-                                             adsorption_structure=ads_structure,
+        written_systems.append(CalculationInfo(calc_id=i,
                                              in_file_path=in_file_path,
                                              out_file_path=out_file_path,
                                              log_file_path=log_file_path))
@@ -126,7 +123,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
                           settings : Settings,
                           ml : bool,
                           ask_before_overwrite : bool = True,
-                          verbose : bool = True) -> list[WrittenSystem]:
+                          verbose : bool = True) -> list[CalculationInfo]:
     '''
     Writes the input files for slab and/or molecule.
 
@@ -147,16 +144,14 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
     structures, written_systems = [], []
     if slab is not None:
         structures.append(slab)
-        written_systems.append(WrittenSystem(calc_id='slab',
-                                             adsorption_structure=None,
+        written_systems.append(CalculationInfo(calc_id='slab',
                                              in_file_path=IN_FILE_PATHS['slab'][program],
                                              out_file_path=OUT_FILE_PATHS['slab'][program],
                                              log_file_path=LOG_FILE_PATHS['slab'][program]))
 
     if molecule is not None:
         structures.append(molecule)
-        written_systems.append(WrittenSystem(calc_id='mol',
-                                             adsorption_structure=None,
+        written_systems.append(CalculationInfo(calc_id='mol',
                                              in_file_path=IN_FILE_PATHS['mol'][program],
                                              out_file_path=OUT_FILE_PATHS['mol'][program],
                                              log_file_path=LOG_FILE_PATHS['mol'][program]))
@@ -172,7 +167,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
         if ml and system.calc_id == 'slab' and settings.structure.constraints.fix_slab_ml_opt:
             set_fixed_slab_constraints(atoms)
 
-        file_label : str = system.calc_id
+        file_label : str = str(system.calc_id)
         in_file_path = system.in_file_path
         out_file_path = system.out_file_path
         file_dir = Path(in_file_path).parent.as_posix()
