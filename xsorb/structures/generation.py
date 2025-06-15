@@ -23,7 +23,7 @@ from xsorb.settings import Settings
 from xsorb.structures.molecule import Molecule
 from xsorb.structures.slab import Slab
 from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, AdsorptionSiteAmorphous,
-    MoleculeRotation, AdsorptionStructure, SurroundingSite)
+    MoleculeRotation, AdsorptionStructure)
 
 TOL = 0.01 #tolerance for checking if an atom is outside the cell (scaled positions)
 
@@ -79,14 +79,11 @@ class AdsorptionStructuresGenerator:
         #Molecule import from file
         if verbose:
             print('Loading molecule...')
+
         self.mol = Molecule(mol=mol,
                     atom_indexes=settings.structure.molecule.selected_atom_indexes,
-                    molecule_axis_atoms=settings.structure.molecule.molecule_axis["values"] \
-                        if settings.structure.molecule.molecule_axis["mode"] == "atom_indices" \
-                            else None,
-                    axis_vector=settings.structure.molecule.molecule_axis["values"] \
-                        if settings.structure.molecule.molecule_axis["mode"] == "vector" \
-                            else None,
+                    molecule_axis_mode=settings.structure.molecule.molecule_axis.mode,
+                    molecule_axis_values=settings.structure.molecule.molecule_axis.values,
                     fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
                     fix_mol_xyz=settings.structure.constraints.fix_mol_xyz)
         if verbose:
@@ -105,7 +102,7 @@ class AdsorptionStructuresGenerator:
 
         Args:
         - rot_mode: 'standard' for the standard mode, 'surrounding' for the surrounding mode
-        - which_index: index of the atom to be used as reference for the rotations in the list of indexes
+        - which_index: index of the atom to be used as reference in the list of indexes
         - adsite: for the surrounding mode, AdsorptionSiteAmorphous object that contains info to
             rotate the molecule towards the surrounding sites
         - save_image: save an image of the molecule rotations
@@ -115,17 +112,31 @@ class AdsorptionStructuresGenerator:
         structure_settings = self.settings.structure
 
         if rot_mode == 'standard':
-            if self.molecule_rotations is not None and self.molecule_rotations[-1].mol_atom == which_index:
+            if self.molecule_rotations is not None and \
+                self.molecule_rotations[-1].mol_atom == which_index:
                 return self.molecule_rotations
-            z_rot_angles : list[float | SurroundingSite] = structure_settings.molecule.z_rot_angles
-            surrounding_exclude_main = False
-        else:
+
+            assert isinstance(structure_settings.molecule.z_rot_angles, list), \
+                "z_rot_angles must be a list for standard mode"
+            z_rot_angles = structure_settings.molecule.z_rot_angles
+
+        elif rot_mode == 'surrounding':
+            assert isinstance(adsite, AdsorptionSiteAmorphous), \
+                "adsite must be an instance of AdsorptionSiteAmorphous for surrounding mode"
+            assert isinstance(structure_settings.molecule.z_rot_angles, str) and \
+                structure_settings.molecule.z_rot_angles == 'surrounding', \
+                "z_rot_angles must be 'surrounding' for surrounding mode"
+
+            if structure_settings.adsorption_sites.coord_number_params is None:
+                raise ValueError("coord_number_params must be present "\
+                                 "in settings file for amorphous mode")
             if adsite is None:
                 raise ValueError("adsite must be provided for surrounding mode")
+
             z_rot_angles = adsite.surrounding_sites
-            surrounding_exclude_main = \
-                structure_settings.adsorption_sites.coord_number_params.surrounding_exclude_main
             verbose = False
+        else:
+            raise ValueError("rot_mode must be either 'standard' or 'surrounding'")
 
         molecule_rotations = self.mol.generate_molecule_rotations(
             which_index=which_index,
@@ -134,7 +145,6 @@ class AdsorptionStructuresGenerator:
             z_rot_angles=z_rot_angles,
             vert_angles_list=structure_settings.molecule.vertical_angles,
             individual_rotations=structure_settings.molecule.individual_rotations,
-            surrounding_exclude_main=surrounding_exclude_main,
             save_image=save_image,
             verbose=verbose)
 
@@ -281,6 +291,10 @@ class AdsorptionStructuresGenerator:
         - adsorption_structures: list of AdsorptionStructure objects
         '''
 
+        if adsite.surrounding_sites is None:
+            raise ValueError("adsite must have surrounding_sites "\
+                             "defined for vertical surrounding sites")
+
         adsorption_structures : list[AdsorptionStructure] = []
 
         for surr_site in adsite.surrounding_sites:
@@ -348,8 +362,7 @@ class AdsorptionStructuresGenerator:
         if verbose:
             print('Generating adsorption structures...')
 
-        if sites_settings.mode == 'coord_number'\
-            and sites_settings.coord_number_params.include_surrounding_sites:
+        if self.settings.structure.molecule.z_rot_angles == 'surrounding':
             rot_mode = 'surrounding'
         else:
             rot_mode = 'standard'
@@ -369,7 +382,9 @@ class AdsorptionStructuresGenerator:
 
 
                 #handle the case of vertical molecule on surrounding sites
-                if rot_mode == 'surrounding':
+                if sites_settings.coord_number_params is not None and \
+                        sites_settings.coord_number_params.include_surrounding_sites and \
+                        rot_mode == 'standard' and isinstance(adsite, AdsorptionSiteAmorphous):
                     adsorption_structures.extend(
                         self._get_structures_for_vertical_surrounding_sites(adsite))
 

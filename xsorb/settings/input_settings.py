@@ -134,7 +134,7 @@ class MoleculeParams:
     selected_atom_indexes: list[int]
     x_rot_angles: list[float]
     y_rot_angles: list[float]
-    z_rot_angles: list[float]
+    z_rot_angles: list[float] | str
 
     individual_rotations: Optional[list[list[float]]]
 
@@ -145,6 +145,12 @@ class MoleculeParams:
     radius_scale_factor: float = 1.1
 
     def __post_init__(self):
+
+        if isinstance(self.z_rot_angles, str):
+            if self.z_rot_angles != 'surrounding':
+                raise ValueError('z_rot_angles must be either a list of angles or "surrounding".')
+
+
         if self.adsorption_distance_mode is not None and \
             self.adsorption_distance_mode not in ['value', 'covalent_radius', 'vdw_radius']:
             raise ValueError('adsorption_distance_mode must be either value, \
@@ -164,6 +170,8 @@ class MoleculeParams:
             if self.vertical_angles == 'x':
                 self.vertical_angles = self.x_rot_angles
             elif self.vertical_angles == 'z':
+                if isinstance(self.z_rot_angles, str):
+                    raise ValueError('z_rot_angles must be a list when vertical_angles is "z".')
                 self.vertical_angles = self.z_rot_angles
             elif self.vertical_angles == 'none':
                 self.vertical_angles = None

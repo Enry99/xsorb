@@ -20,11 +20,13 @@ def set_fixed_slab_constraints(atoms : Atoms, slab_indices : list | None = None)
     '''
     Inplace modifies the Atoms object to fully fix the slab atoms.
     '''
-    indices = slab_indices if slab_indices is not None else list(range(len(atoms)))
+    if slab_indices is None:
+        slab_indices = list(range(len(atoms)))
+    mol_indices = [i for i in range(len(atoms)) if i not in slab_indices]
+
     #get indices of already present constraints
-    slab_constraints = [FixCartesian(atom_index) for atom_index in indices]
-    mol_constraints = [constraint for constraint in atoms.constraints \
-                       if constraint.index[0] not in slab_indices]
+    slab_constraints = [FixCartesian(atom_index) for atom_index in slab_indices]
+    mol_constraints = atoms.constraints[mol_indices]
     atoms.set_constraint(slab_constraints + mol_constraints)
 
 

@@ -149,8 +149,8 @@ class Slab:
         - list of AdsorptionSite objects
         """
 
-        if Path('adsites.npy').is_file():
-            sites = json.load(open('adsites.json', 'r'))
+        if Path('adsites.npy').is_file(): # pylint: disable=no-else-return
+            sites = json.load(open('adsites.json', 'r')) #pylint: disable=consider-using-with,unspecified-encoding
             converted_sites = []
             for site in sites:
                 if site['__xsorb_objtype__'] == 'AdsorptionSiteCrystal':
@@ -174,7 +174,7 @@ class Slab:
         """
 
         json.dump([site.todict() for site in sites],
-                  open('adsites.json', 'w'),
+                  open('adsites.json', 'w'), #pylint: disable=consider-using-with,unspecified-encoding
                   indent=4)
 
 

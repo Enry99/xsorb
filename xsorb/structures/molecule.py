@@ -12,9 +12,8 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
-from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen.core.bonds import CovalentBond
 from ase.constraints import FixCartesian
+from ase.build import connected_indices, split_bond
 
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.visualize.plot import plot_rotations_images
@@ -33,9 +32,10 @@ class Molecule:
         - mol: Atoms object of the molecule
         - atom_indexes: list of indices of the reference atom (indexing starting from 0,
             in the order of the input file). If -1, use geometry center of the molecule.
-        - molecule_axis_atoms: indices of the two atoms defining the x-axis
-            of the molecule (a = r2 - r1)
-        - axis_vector: [ax, ay, az] of the vector that is considered as the x-axis of the molecule
+        - molecule_axis_mode: 'atoms' or 'vector'
+        - molecule_axis_values: values defining the x-axis of the molecule:
+            'atoms' mode: indices of the two atoms (a = r2 - r1)
+            'vector' mode: [ax, ay, az] vector that will be aligned to the x-axis.
         - atoms_subset: indices of the atoms to include. Only removes atom NOT in this list,
             does not check if the atoms in the list actually exist in the molecule
         - break_bond_indices: indices of the two atoms of the bond to be broken.
@@ -49,8 +49,8 @@ class Molecule:
 
     def __init__(self, mol: AtomsCustom,
                  atom_indexes: list[int],
-                 molecule_axis_atoms : list[int] | None = None,
-                 axis_vector: list[float] | None = None,
+                 molecule_axis_mode: str,
+                 molecule_axis_values : list,
                  atoms_subset : list[int] | None = None,
                  break_bond_indices : list[int] | None = None,
                  fixed_indices_mol : list[int] | None = None,
@@ -60,15 +60,18 @@ class Molecule:
         self.mol_ase = mol.copy()
 
         #align axis to x axis
-        if molecule_axis_atoms and axis_vector:
-            raise ValueError("molecule axis cannot be given simultaneously \
-                             as vector and by two atoms.")
-        if molecule_axis_atoms:
-            x1 = self.mol_ase.positions[molecule_axis_atoms[0]]
-            x2 = self.mol_ase.positions[molecule_axis_atoms[1]]
+        if molecule_axis_mode == 'atoms':
+            if len(molecule_axis_values) != 2:
+                raise ValueError('molecule_axis_values must contain exactly two atom indices.')
+            x1 = self.mol_ase.positions[molecule_axis_values[0]]
+            x2 = self.mol_ase.positions[molecule_axis_values[1]]
             self.mol_ase.rotate(x2-x1, 'x')
-        elif axis_vector:
-            self.mol_ase.rotate(axis_vector, 'x')
+        elif molecule_axis_mode == 'vector':
+            if len(molecule_axis_values) != 3:
+                raise ValueError('molecule_axis_values must contain exactly three values.')
+            self.mol_ase.rotate(molecule_axis_values, 'x')
+        else:
+            raise ValueError('molecule_axis_mode must be either "atoms" or "vector".')
 
         #SET CONSTRAINTS
         if fixed_indices_mol:
@@ -87,25 +90,17 @@ class Molecule:
             self.mol_ase = self.mol_ase[atoms_subset]
 
         elif break_bond_indices:
-            with warnings.catch_warnings():
-                #to suppress the warning about constraints not supported in pymatgen
-                warnings.simplefilter("ignore")
-                mol_pymat = AseAtomsAdaptor.get_molecule(self.mol_ase)
+            if len(break_bond_indices) != 2:
+                raise ValueError('break_bond_indices must contain exactly two atom indices.')
 
-            if not CovalentBond.is_bonded(mol_pymat[break_bond_indices[0]],
-                                          mol_pymat[break_bond_indices[1]]):
-                raise ValueError('The two selected atoms to split the molecule are not bonded.')
+            # check if the two indices are connected
+            connected = connected_indices(self.mol_ase, break_bond_indices[0])
+            if break_bond_indices[1] not in connected:
+                raise ValueError('The two atoms in break_bond_indices are not bonded.')
 
-            mol_pymat = mol_pymat.break_bond(break_bond_indices[0], break_bond_indices[1])[0]
-
-            included_indices = []
-            for mol_atom in self.mol_ase:
-                for frag_atom in mol_pymat:
-                    if np.allclose(mol_atom.position, frag_atom.coords):
-                        included_indices.append(mol_atom.index)
-                        break
-
-            self.mol_ase = self.mol_ase[included_indices]
+            # split the bond and keep the fragment containing the first atom
+            self.mol_ase = split_bond(self.mol_ase, break_bond_indices[0],
+                                      break_bond_indices[1])[0]
 
         #retrieve the correct index of the reference atoms after subsetting
         for i, atom_pos in enumerate(atom_indexes_positions):

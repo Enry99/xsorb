@@ -4,7 +4,6 @@ Module containing the AdsorptionCalculation class.
 
 from __future__ import annotations
 from dataclasses import dataclass
-import re
 from typing import Optional
 
 from xsorb.adsorptiondata.base import JsonableBase
@@ -22,8 +21,6 @@ class CalculationInfo(JsonableBase):
     in_file_path: str
     out_file_path: str
     log_file_path: str
-    job_id: int | None = None
-    job_status : str | None = None # 'running', 'completed', 'failed', 'cancelled', None
 
     __xsorb_objtype__ = 'CalculationFilesInfo'
 
@@ -35,8 +32,6 @@ class CalculationInfo(JsonableBase):
         return {
             'in_file_path': self.in_file_path,
             'out_file_path': self.out_file_path,
-            'job_id': self.job_id,
-            'job_status': self.job_status
         }
 
     def todict(self) -> dict:
