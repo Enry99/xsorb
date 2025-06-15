@@ -8,6 +8,7 @@ Module for launching the calculations
 '''
 
 from __future__ import annotations
+import sched
 from typing import TYPE_CHECKING
 import os
 from pathlib import Path
@@ -19,6 +20,7 @@ import xsorb.io.database
 from xsorb.settings import Settings
 from xsorb.dft_codes.definitions import SBATCH_POSTFIX
 from xsorb.dft_codes.calculator import edit_files_for_restart
+from xsorb.io.scheduler import JobScheduler
 if TYPE_CHECKING:
     from xsorb.adsorptiondata.adsorptioncalculation import CalculationInfo
 
@@ -29,7 +31,7 @@ TEST = False
 def launch_jobs(*,program : str,
                 calc_type : str,
                 jobscript : str,
-                sbatch_command : str,
+                scheduler_name : str,
                 systems : list[CalculationInfo],
                 jobname_prefix : str = ''):
     '''
@@ -40,14 +42,17 @@ def launch_jobs(*,program : str,
     - program: 'espresso', 'vasp' or 'ml'
     - calc_type: 'screening'/'relax'/'mlopt' or 'isolated'
     - jobscript: path of the jobscript file
-    - sbatch_command: command to submit the jobscript (in Slurm it is sbatch)
+    - scheduler_name: name of the scheduler, e.g. 'slurm'
     - systems: list of WrittenSystem objects containing calc_id and paths
     - jobname_prefix: prefix for the job name
 
     '''
+
+    scheduler = JobScheduler(scheduler_name)
+
     main_dir = os.getcwd()
 
-    submitted_jobs : list[int] = []
+    submitted_jobs : list[str] = []
     for system in systems:
 
         j_dir = Path(system.in_file_path).parent
@@ -56,32 +61,31 @@ def launch_jobs(*,program : str,
         os.chdir(j_dir)   ####################
 
         #change job title (only for slumr jobscripts)
-        with open('jobscript.sh', 'r',encoding=sys.getfilesystemencoding()) as f:
-            lines = f.readlines()
-            for i, line in enumerate(lines):
-                if "job-name" in line:
-                    prefix = jobname_prefix[:4]
-                    if jobname_prefix != '': prefix += '_' #pylint: disable=multiple-statements
-                    if calc_type != 'isolated':
-                        suffix = f'{calc_type[0]}{system.calc_id}'
-                    else:
-                        suffix = system.calc_id
-                    lines[i] = f"{line.split('=')[0]}={prefix}{suffix}\n"
-                    break
-        with open('jobscript.sh', 'w',encoding=sys.getfilesystemencoding()) as f:
-            f.writelines(lines)
+        if scheduler.scheduler_name == 'slurm':
+            with open('jobscript.sh', 'r',encoding=sys.getfilesystemencoding()) as f:
+                lines = f.readlines()
+                for i, line in enumerate(lines):
+                    if "job-name" in line:
+                        prefix = jobname_prefix[:4]
+                        if jobname_prefix != '': prefix += '_' #pylint: disable=multiple-statements
+                        if calc_type != 'isolated':
+                            suffix = f'{calc_type[0]}{system.calc_id}'
+                        else:
+                            suffix = system.calc_id
+                        lines[i] = f"{line.split('=')[0]}={prefix}{suffix}\n"
+                        break
+            with open('jobscript.sh', 'w',encoding=sys.getfilesystemencoding()) as f:
+                f.writelines(lines)
 
         postfix = SBATCH_POSTFIX[program].format(
             in_file=Path(system.in_file_path).name,
             out_file=Path(system.out_file_path).name,
             log_file=Path(system.log_file_path).name,
             main_dir=main_dir)
-        launch_string = f"{sbatch_command} jobscript.sh {postfix}"
-        if TEST: print(launch_string) #pylint: disable=multiple-statements
-        else:
-            outstring = subprocess.getoutput(launch_string) #launches the jobscript from j_dir
-            print(outstring)
-            submitted_jobs.append(int(outstring.split()[-1]))
+
+        jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
+        submitted_jobs.append(jobid)
+
         os.chdir(main_dir) ####################
 
     if calc_type not in ('isolated'): #no database for slab/molecule
@@ -97,17 +101,19 @@ def restart_jobs(calc_type : str):
     '''
     Restart the uncompleted dft calculations.
     Associated to the command 'xsorb restart screening/relax' in the CLI.
-    Beware:n o restart for ML!
+    Beware:no restart for ML!
 
     Args:
     - calc_type: 'screening' or 'relax'.
     '''
 
-    settings = Settings()
+    settings = Settings(verbose=False)
+    scheduler = JobScheduler(settings.input.scheduler)
+    active_jobs = scheduler.get_active_job_ids()
 
     rows = xsorb.io.database.Database.get_calculations(calc_type,
-                                     selection='status=incomplete,job_status=terminated')
-    indices_to_restart = [row.calc_id for row in rows]
+                                     selection='status=incomplete')
+    indices_to_restart = [row.calc_id for row in rows if row.job_id not in active_jobs]
     in_files = [row.in_file_path for row in rows]
     out_files = [row.out_file_path for row in rows]
     log_files = [row.log_file_path for row in rows]
@@ -117,7 +123,7 @@ def restart_jobs(calc_type : str):
 
     #launch the calculations
     main_dir = os.getcwd()
-    submitted_jobs : list[int] = []
+    submitted_jobs : list[str] = []
     for in_file, out_file, log_file in zip(in_files, out_files, log_files):
 
         j_dir = Path(in_file).parent
@@ -127,42 +133,23 @@ def restart_jobs(calc_type : str):
                                                  out_file=Path(out_file).name,
                                                  log_file=Path(log_file).name,
                                                  main_dir=main_dir)
-        launch_string = f"{settings.input.submit_command} jobscript.sh {postfix}"
 
-        if TEST: print(launch_string) #pylint: disable=multiple-statements
-        else:
-            outstring = subprocess.getoutput(launch_string) #launches the jobscript from j_dir
-            print(outstring)
-            submitted_jobs.append(int(outstring.split()[-1]))
+        jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
+        submitted_jobs.append(jobid)
+
         os.chdir(main_dir) ####################
 
     xsorb.io.database.Database.add_job_ids(calc_type, indices_to_restart, submitted_jobs)
 
 
-#TODO: generalize to other schedulers, replace with regex
-def get_running_jobs():
-    '''
-    Get the running jobs by interrogating the scheduler
-    '''
-    running_jobs = subprocess.getoutput("squeue --me").split("\n")[1:]
-    running_job_ids = [int(job.split()[0]) for job in running_jobs]
-
-    return running_job_ids
-
-
-def _cancel_jobs(ids : list[int]):
-    '''
-    Cancel the jobs with the given ids
-    '''
-    for job_id in ids:
-        os.system(f"scancel {job_id}")
-
-
-def scancel():
+def cancel_jobs():
     '''
     Cancel all the running jobs For the current Xsorb session.
-    Associated to the command 'xsorb scancel' in the CLI.
+    Associated to the command 'xsorb cancel' in the CLI.
     '''
+
+    settings = Settings(verbose=False)
+    scheduler = JobScheduler(settings.input.scheduler)
 
     #add jobs from the database(s)
     submitted_job_ids = xsorb.io.database.Database.get_all_job_ids()
@@ -173,13 +160,16 @@ def scancel():
             submitted_jobs = f.readlines()
             submitted_job_ids.extend([int(job.strip()) for job in submitted_jobs])
 
-    running_jobs = get_running_jobs()
-    job_ids_to_cancel = [job for job in running_jobs if job in submitted_job_ids]
+    active_jobs = scheduler.get_active_job_ids()
+    job_ids_to_cancel = [job for job in active_jobs if job in submitted_job_ids]
 
     if len(job_ids_to_cancel) == 0:
         print("No jobs to cancel.")
         return
 
     print(f"Cancelling jobs {job_ids_to_cancel}.")
-    _cancel_jobs(job_ids_to_cancel)
+
+    for job_id in job_ids_to_cancel:
+        scheduler.cancel_job(job_id)
+
     print("All jobs cancelled.")

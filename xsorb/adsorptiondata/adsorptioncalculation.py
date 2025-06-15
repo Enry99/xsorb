@@ -17,7 +17,7 @@ class CalculationInfo(JsonableBase):
     Small dataclass to store info about the written systems
     '''
 
-    calc_id: int | str #index or 'slab'/'mol'
+    calc_id: str #index(number) or 'slab'/'mol'
     in_file_path: str
     out_file_path: str
     log_file_path: str

@@ -18,8 +18,8 @@ class CLICommand(CLICommandBase):
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.io.jobs import scancel # pylint: disable=import-outside-toplevel
-        scancel()
+        from xsorb.io.jobs import cancel_jobs # pylint: disable=import-outside-toplevel
+        cancel_jobs()
 
 
     @staticmethod

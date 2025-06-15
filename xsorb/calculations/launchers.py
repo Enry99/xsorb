@@ -85,7 +85,7 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     launch_jobs(program=settings.dft.program,
                 calc_type='screening',
                 jobscript=settings.input.jobscript_path,
-                sbatch_command=settings.input.submit_command,
+                scheduler_name=settings.input.scheduler,
                 systems=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)
 
@@ -120,7 +120,7 @@ def launch_ml_opt(save_image : bool = False,):
     launch_jobs(program='ml',
                 calc_type='mlopt',
                 jobscript=settings.input.jobscript_ml_path,
-                sbatch_command=settings.input.submit_command_ml,
+                scheduler_name=settings.input.scheduler,
                 systems=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)
 
@@ -204,7 +204,7 @@ def launch_final_relax(*,
     launch_jobs(program=settings.dft.program,
                 calc_type='relax',
                 jobscript=settings.input.jobscript_path,
-                sbatch_command=settings.input.submit_command,
+                scheduler_name=settings.input.scheduler,
                 systems=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)
 
@@ -260,15 +260,13 @@ def launch_isolated_slab_and_molecule(*,
                 'Please define it to launch the machine learning optimization.')
         program = 'ml'
         jobscript = settings.input.jobscript_ml_path
-        sbatch_command = settings.input.submit_command_ml
     else:
         program = settings.dft.program
         jobscript = settings.input.jobscript_path
-        sbatch_command = settings.input.submit_command
 
     launch_jobs(program=program,
                 calc_type='isolated',
                 jobscript=jobscript,
-                sbatch_command=sbatch_command,
+                scheduler_name=settings.input.scheduler,
                 systems=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)

@@ -10,6 +10,8 @@ from typing import Optional
 
 from ase.data import chemical_symbols
 
+from xsorb.io.scheduler import SCHEDULER_CONFIG
+
 @dataclass
 class InputParams:
     '''
@@ -20,7 +22,7 @@ class InputParams:
     slab_filename: str
     molecule_filename: str
     jobscript_path: str
-    submit_command: str
+    scheduler: str
     E_slab_mol : Optional[list[float]] # pylint: disable=invalid-name
     jobscript_ml_path: Optional[str]
     submit_command_ml: Optional[str]
@@ -31,8 +33,9 @@ class InputParams:
             if len(self.E_slab_mol) != 2:
                 raise ValueError("E_slab_mol must be a list of two floats.")
 
-        if self.jobscript_ml_path is not None and self.submit_command_ml is None:
-            raise ValueError("jobscript_ml_path is provided but submit_command_ml is not.")
+        if self.scheduler not in SCHEDULER_CONFIG:
+            raise ValueError(f"Scheduler {self.scheduler} is not supported. \
+                                Supported schedulers are: {', '.join(SCHEDULER_CONFIG.keys())}.")
 
 @dataclass
 class HighSymmetryParams:

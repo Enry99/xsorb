@@ -5,9 +5,8 @@
     #E_slab_mol                         = [0.0, 0.0]            # slab and isolated molecule energies ***in eV !***
     jobscript_path                      = "jobscript.sh"        # path of a jobscript for running the DFT code
     #jobscript_ml_path                  = "jobscript_ml.sh"     # path of a jobscript for running the machine learning model
-    submit_command                      = "sbatch"              # command for submitting the jobscript to the job scheduler
-    #submit_command_ml                  = "sbatch"              # command executing or submitting the jobscript_ml
-    #jobname_prefix                     = "ads"                 # prefix for the job names (max 3 letters, exceeding letters will be discarded)
+    scheduler                           = "slurm"               # scheduler name (supported: slur, pbs, lsf, condor/htcondor, sge, toreue. If you use a different scheduler, please add it to the list in xsorb/io/scheduler.py)
+    #jobname_prefix                     = "ads"                 # prefix for the job names (max 3 letters, exceeding letters will be discarded). works only for Slurm
 
 [Structure]
 
