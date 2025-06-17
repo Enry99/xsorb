@@ -27,6 +27,7 @@ from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
 from xsorb.ase_custom.atoms import AtomsCustom
+from xsorb.structures import ADSITES_FILENAME
 from xsorb.visualize.plot import plot_adsites_image
 from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, AdsorptionSiteCrystal,
     AdsorptionSiteAmorphous, SurroundingSite)
@@ -143,14 +144,14 @@ class Slab:
     @staticmethod
     def read_sites() -> list[AdsorptionSiteCrystal | AdsorptionSiteAmorphous]:
         """
-        Read already existing sites from previous calculations, stored in a adsites.json file
+        Read already existing sites from previous calculations, stored in a json file
 
         Returns:
         - list of AdsorptionSite objects
         """
 
-        if Path('adsites.npy').is_file(): # pylint: disable=no-else-return
-            sites = json.load(open('adsites.json', 'r')) #pylint: disable=consider-using-with,unspecified-encoding
+        if Path(ADSITES_FILENAME).is_file(): # pylint: disable=no-else-return
+            sites = json.load(open(ADSITES_FILENAME, 'r')) #pylint: disable=consider-using-with,unspecified-encoding
             converted_sites = []
             for site in sites:
                 if site['__xsorb_objtype__'] == 'AdsorptionSiteCrystal':
@@ -167,14 +168,14 @@ class Slab:
     @staticmethod
     def write_sites(sites : list[AdsorptionSite]) -> None:
         """
-        Write the sites to a adsites.json file, to be used in the future.
+        Write the sites to a json file, to be used in the future.
 
         Args:
         - sites: list of AdsorptionSite objects
         """
 
         json.dump([site.todict() for site in sites],
-                  open('adsites.json', 'w'), #pylint: disable=consider-using-with,unspecified-encoding
+                  open(ADSITES_FILENAME, 'w'), #pylint: disable=consider-using-with,unspecified-encoding
                   indent=4)
 
 

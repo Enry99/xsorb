@@ -7,35 +7,45 @@
 Module to handle the ase database
 
 Four databases are used:
-- structures.db: Database with the initial structures
-- screening.db: Contains the results of the screening calculations
-- relaxations.db: Contains the results of the relaxations
-- mlopt.db: Contains the results of the machine learning optimization
+- structures.json: Database with the initial structures
+- screening.json: Contains the results of the screening calculations
+- relaxations.json: Contains the results of the relaxations
+- mlopt.json: Contains the results of the machine learning optimization
 
 
 The calculation databases have the following columns:
+
+--- Default columns from ase.db ---
 - id (int): unique id of the row
-- calc_id (int): unique id of the calculation
 - atoms (Atoms): Atoms object with the structure
-- constraints (list): list of constraints applied to the structure. May not be there
-- energy (float): total energy of the structure. May not be there
-- status (str): status of the calculation (incomplete, completed)
-- scf_nonconverged (bool): True if the SCF did not converge
-- job_id (int): id of the job in the scheduler
-- job_status (str): status of the job in the scheduler
+- energy (float): total energy of the structure (optional)
+
+--- Extra columns, defined in xsorb.adsorptiondata.AdsorptionCalculation.db_keys() ---
+AdsorptionStructure data:
+- "site", "site_info", "xrot", "yrot", "zrot", "mol_atom", "coords", "initial_dz"
+
+CalculationInfo data:
+- calc_id (str): unique id of the calculation (consistent with numeration in structures.json)
 - in_file_path (str): path to the input file
 - out_file_path (str): path to the output file
 - log_file_path (str): path to the log file
-- the "site_info", "x", "y", "z", "initial_dz", "xrot", "yrot", "zrot" keys
-    from AdsorptionStructure.dataframe_column_names
+
+CalculationResults data:
 - adsorption_energy (float): adsorption energy of the structure
-- bonds (list): list of bonds in the structure
+- status (str): status of the calculation (incomplete, completed)
+- scf_nonconverged (bool): True if the SCF did not converge
+- bonds (str): string with the bonds between the molecule and the slab
 - final_dz (float): final vertical distance between the reference atom of the molecule
     and the adsorption site
-- data (dict): dictionary with additional data, namely
-    -the AdsorptionStructure object,
-    -the 'trajectory'
-    -the 'adsorption_energy_evolution'
+
+--- Extra columns to handle job submission ---
+- job_id (str): id of the job in the scheduler
+
+
+--- data (dict) from ase, used to store more complex data structures ---
+- data contains a dictionary with xsorb.adsorptiondata.AdsorptionCalculation,
+    which can be converted back to an object using
+
 
 Each database also has the following metadata:
 - program (str): name of the program used for the calculations
@@ -47,19 +57,18 @@ Each database also has the following metadata:
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from pathlib import Path
-from dataclasses import asdict
 
 import pandas as pd
 import ase.db
-import ase.db.core
 
 import xsorb.calculations.results
 import xsorb.io.inputs
+
+from xsorb.io.filenames import DB_NAMES
 from xsorb.ase_custom.atoms import AtomsCustom
 if TYPE_CHECKING:
-    from xsorb.structures.generation import AdsorptionStructure
-
-DATAFRAME_COLUMNS_NAMES = ("site", "site_info", "mol_atom", "initial_dz", "xrot", "yrot", "zrot")
+    from xsorb.adsorptiondata import CalculationInfo
+    from xsorb.adsorptiondata import AdsorptionStructure, AdsorptionCalculation
 
 
 class Database:
@@ -67,12 +76,6 @@ class Database:
     Collection of static functions to read/write generated structures and calculations
     results to ase db
     '''
-
-    calc_types = {
-        'mlopt': 'mlopt.db',
-        'screening': 'screening.db',
-        'relax': 'relaxations.db',
-    }
 
 
     @staticmethod
@@ -87,13 +90,14 @@ class Database:
         - write_csv: write the info to a csv file
 
         Returns:
-        - list of integers with the calc_ids of the structures
+        - list[int] with the row ids of the structures,
+            which will become the calc_ids for the calculations
         '''
 
         # Write the adsorption structures to the database
         # excluding those that are already present
-        calc_ids = []
-        with ase.db.connect('structures.db') as db:
+        calc_ids : list[int] = []
+        with ase.db.connect(DB_NAMES['structures']) as db:
             for ads_struct in adsorption_structures:
                 already_present = False
                 for row in db.select(include_data=False):
@@ -102,13 +106,9 @@ class Database:
                         calc_ids.append(row.id)
                         break
                 if not already_present:
-                    atoms = ads_struct.atoms.copy()
-                    #remove constraints in the ads_struct atoms object
-                    ads_struct.atoms.set_constraint()
-                    ads_struct.mol_rot.atoms.set_constraint()
-                    calc_id = db.write(atoms,
-                                       data={'adsorption_structure': asdict(ads_struct)},
-                                       **ads_struct.to_info_dict())
+                    calc_id = db.write(ads_struct.atoms,
+                                       data={'AdsorptionStructure': ads_struct},
+                                       **ads_struct.db_keys())
                     calc_ids.append(calc_id)
 
         if write_csv:
@@ -118,7 +118,7 @@ class Database:
 
 
     @staticmethod
-    def add_calculations(systems : list [xsorb.io.inputs.WrittenSystem],
+    def add_calculations(systems : list [AdsorptionCalculation],
                          program : str,
                          mult : float,
                          total_e_slab_mol : float | None,
@@ -127,7 +127,7 @@ class Database:
         Write new calculations to corresponding database
 
         Args:
-        - systems: list of WrittenSystem objects, each containing
+        - systems: list of CalculationInfo objects, each containing
             'calc_id', 'adsorption_structure', 'in_file_path', 'out_file_path'
         - program: string with the name of the program used for the calculations:
             'vasp', 'espresso', 'ml'
@@ -138,7 +138,7 @@ class Database:
         '''
 
         # Write the adsorption structures to the corresponding database
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
+        with ase.db.connect(DB_NAMES[calc_type]) as db:
 
             db.metadata = {'program': program,
                            'mult': mult,
@@ -147,25 +147,17 @@ class Database:
             for system in systems:
                 try:
                     #if the calculation is already present in the database, remove it
-                    del db[db.get(f'calc_id={system.calc_id}').id]
+                    del db[db.get(f'calc_id={int(system.calc_info.calc_id)}').id]
                 except KeyError:
                     #if the calculation is not present, do nothing
                     pass
 
                 #write the new calculation in any case
                 ads_struct : AdsorptionStructure = system.adsorption_structure
-                atoms = ads_struct.atoms.copy()
-                #remove constraints in the ads_struct atoms object
-                ads_struct.atoms.set_constraint()
-                ads_struct.mol_rot.atoms.set_constraint()
-                db.write(atoms,
-                        calc_id=system.calc_id,
-                        status='incomplete',
-                        in_file_path=system.in_file_path,
-                        out_file_path=system.out_file_path,
-                        log_file_path=system.log_file_path,
-                        data={'adsorption_structure': asdict(ads_struct)},
-                        **ads_struct.to_info_dict())
+                db.write(ads_struct.atoms,
+                        data={'AdsorptionCalculation': system},
+                        **ads_struct.db_keys())
+
 
     @staticmethod
     def update_calculations(calc_type : str,
@@ -195,7 +187,7 @@ class Database:
 
         if calc_type == 'all':
             #recursively call the function for all the calculation types
-            for ctype, db_name in Database.calc_types.items():
+            for ctype, db_name in DB_NAMES.items():
                 if Path(db_name).exists():
                     Database.update_calculations(calc_type=ctype,
                                                  refresh=refresh,
@@ -213,7 +205,7 @@ class Database:
             print('Re-reading the output files, updating e_slab_mol, '\
                    'the radii mult factor, and recalculating the bonding status...')
 
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
+        with ase.db.connect(DB_NAMES[calc_type]) as db:
             #Get the ids and calc_ids of the (incomplete) calculations to be updated
             selection = 'status=incomplete' if not refresh else None
             rows = list(db.select(selection, include_data=True))
@@ -276,17 +268,17 @@ class Database:
     @staticmethod
     def get_structures(calc_ids : list[int] | int | None = None) -> list:
         '''
-        Get the structures from the structures database
+        Get the rows from the structures database
 
         Args:
-        - calc_ids: list of integers with the ids of the structures to be included,
+        - calc_ids: list of strings with the ids of the structures to be included,
             or a single integer with the id of the structure to be included.
             If None, all the structures are included
 
         Returns:
         - list of rows
         '''
-        with ase.db.connect('structures.db') as db:
+        with ase.db.connect(DB_NAMES['structures']) as db:
             rows = list(db.select())
             for row in rows:
                 row.__dict__.update({'calc_id': row.id})
@@ -326,14 +318,14 @@ class Database:
         if selection is not None and calc_ids is not None:
             raise ValueError('Cannot use both selection and calc_ids')
 
-        if not Path(Database.calc_types[calc_type]).exists():
+        if not Path(DB_NAMES[calc_type]).exists():
             print(f'Warning: No {calc_type} calculations present in the database.')
             return []
 
         #Make sure that the database is up to date
         Database.update_calculations(calc_type, verbose=False)
 
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
+        with ase.db.connect(DB_NAMES[calc_type]) as db:
             rows = list(db.select(selection=selection,
                              columns=columns,
                              sort=sort_key,
@@ -357,7 +349,7 @@ class Database:
         - calc_ids: list of integers with the ids of the calculations to be removed
         - calc_type: string with the type of calculation (screening, relax, or mlopt)
         '''
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
+        with ase.db.connect(DB_NAMES[calc_type]) as db:
             for calc_id in calc_ids:
                 try:
                     row_id = db.get(f'calc_id={calc_id}', include_data=False).id
@@ -368,7 +360,7 @@ class Database:
 
 
     @staticmethod
-    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[int]) -> None:
+    def add_job_ids(calc_type : str, calc_ids : list[str], job_ids : list[str]) -> None:
         '''
         Add the job ids to the corresponding database
 
@@ -377,10 +369,10 @@ class Database:
         - calc_ids: list of integers with the calculation ids
         - job_ids: list of integers with the job ids
         '''
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
+        with ase.db.connect(DB_NAMES[calc_type]) as db:
             for calc_id, job_id in zip(calc_ids, job_ids):
                 row_id = db.get(f'calc_id={calc_id}', include_data=False).id
-                db.update(id=row_id, job_id=job_id, job_status='submitted')
+                db.update(id=row_id, job_id=job_id)
 
 
     @staticmethod
@@ -391,10 +383,9 @@ class Database:
         Returns:
         - list of integers with the job ids
         '''
-        job_ids : list[int] = []
-        calc_types = Database.calc_types.copy()
 
-        for calc_type in calc_types.values():
+        job_ids : list[int] = []
+        for calc_type in DB_NAMES.values():
             if Path(calc_type).exists():
                 with ase.db.connect(calc_type) as db:
                     for row in db.select(include_data=False):
@@ -415,7 +406,7 @@ class Database:
     #     Returns:
     #     - list of strings with the adsorption sites
     #     '''
-    #     with ase.db.connect(Database.calc_types[calc_type]) as db:
+    #     with ase.db.connect(DB_NAMES[calc_type]) as db:
     #         return list(set(row.get('site') for row in db.select(include_data=False)))
 
     #@db_getter
@@ -431,13 +422,13 @@ class Database:
         - bool: True if all the calculations are completed, False otherwise
         '''
 
-        if not Path(Database.calc_types[calc_type]).exists():
+        if not Path(DB_NAMES[calc_type]).exists():
             return False
 
         #Make sure that the database is up to date
         Database.update_calculations(calc_type, verbose=False)
 
-        with ase.db.connect(Database.calc_types[calc_type]) as db:
+        with ase.db.connect(DB_NAMES[calc_type]) as db:
             return len(list(db.select('status=incomplete', include_data=False))) == 0
 
 
@@ -478,7 +469,7 @@ class Database:
         last_calc_e_column_name = None
         if include_results:
             energies_column_names = []
-            for calc_type, db_name in Database.calc_types.items():
+            for calc_type, db_name in DB_NAMES.items():
                 #order is mlopt, screening, relax
                 atleast_one_calc = False
                 if Path(db_name).exists():

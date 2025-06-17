@@ -90,11 +90,11 @@ x = prova(
 from ase.db import connect
 db = connect('test.json')
 
-db.write(atoms, bonds=[])
+# db.write(atoms, bonds=[])
 
-for row in db.select():
-    print("Row ID:", row.id)
-    print("bonds:", row.bonds)
+# for row in db.select():
+#     print("Row ID:", row.id)
+#     print("bonds:", row.bonds)
 
 # db.write(atoms, data={'prova': x})
 
@@ -105,3 +105,13 @@ for row in db.select():
 #     xxx = row.data['prova']
 #     new_aaa = prova.fromdict(xxx)
 #     print("Decoded object:", new_aaa)
+
+
+
+from ase.constraints import FixCartesian
+
+c = FixCartesian(a=0, mask=[True, False, True])
+
+atoms.set_constraint(c)
+
+db.write(atoms)

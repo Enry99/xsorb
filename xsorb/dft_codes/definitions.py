@@ -8,11 +8,16 @@ Constants related to DFT codes and their usage in the workflow,
 such as file paths, completion checks, etc.
 '''
 
-SUPPORTED_PROGRAMS = ['vasp', 'espresso', 'ml']
+from xsorb.io.filenames import (
+    SCREENING_OUTDIR,
+    RELAX_OUTDIR,
+    ML_OPT_OUTDIR,
+    SLAB_OUTDIR,
+    MOL_OUTDIR
+)
 
-SCREENING_OUTDIR            = 'screening_outdirs'
-RELAX_OUTDIR                = 'relax_outdirs'
-ML_OPT_OUTDIR               = 'ml_opt_outdirs'
+
+SUPPORTED_PROGRAMS = ['vasp', 'espresso', 'ml']
 
 
 HYBRID_SCREENING_THRESHOLDS = {
@@ -40,15 +45,15 @@ IN_FILE_PATHS = {
     },
 
     'slab': {
-        'vasp': 'slab/DFT/POSCAR',
-        'espresso': 'slab/DFT/slab.pwi',
-        'ml': 'slab/ML/slab.pwi'
+        'vasp': SLAB_OUTDIR+'/DFT/POSCAR',
+        'espresso': SLAB_OUTDIR+'/DFT/slab.pwi',
+        'ml': SLAB_OUTDIR+'/ML/slab.pwi'
     },
 
     'mol': {
-        'vasp': 'mol/DFT/POSCAR',
-        'espresso': 'mol/DFT/mol.pwi',
-        'ml': 'mol/ML/mol.pwi'
+        'vasp': MOL_OUTDIR+'/DFT/POSCAR',
+        'espresso': MOL_OUTDIR+'/DFT/mol.pwi',
+        'ml': MOL_OUTDIR+'/ML/mol.pwi'
     },
 
 }
@@ -69,15 +74,15 @@ OUT_FILE_PATHS = {
     },
 
     'slab': {
-        'vasp': 'slab/DFT/vasprun.xml',
-        'espresso': 'slab/DFT/slab.pwo',
-        'ml': 'slab/ML/slab.traj'
+        'vasp': SLAB_OUTDIR+'/DFT/vasprun.xml',
+        'espresso': SLAB_OUTDIR+'/DFT/slab.pwo',
+        'ml': SLAB_OUTDIR+'/ML/slab.traj'
     },
 
     'mol': {
-        'vasp': 'mol/DFT/vasprun.xml',
-        'espresso': 'mol/DFT/mol.pwo',
-        'ml': 'mol/ML/mol.traj'
+        'vasp': MOL_OUTDIR+'/DFT/vasprun.xml',
+        'espresso': MOL_OUTDIR+'/DFT/mol.pwo',
+        'ml': MOL_OUTDIR+'/ML/mol.traj'
     }
 }
 
@@ -97,15 +102,15 @@ LOG_FILE_PATHS = {
     },
 
     'slab': {
-        'vasp': 'slab/DFT/vasprun.xml',
-        'espresso': 'slab/DFT/slab.pwo',
-        'ml': 'slab/ML/slab.log'
+        'vasp': SLAB_OUTDIR+'/DFT/vasprun.xml',
+        'espresso': SLAB_OUTDIR+'/DFT/slab.pwo',
+        'ml': SLAB_OUTDIR+'/ML/slab.log'
     },
 
     'mol': {
-        'vasp': 'mol/DFT/vasprun.xml',
-        'espresso': 'mol/DFT/mol.pwo',
-        'ml': 'mol/ML/mol.log'
+        'vasp': MOL_OUTDIR+'/DFT/vasprun.xml',
+        'espresso': MOL_OUTDIR+'/DFT/mol.pwo',
+        'ml': MOL_OUTDIR+'/ML/mol.log'
     }
 }
 

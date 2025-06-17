@@ -8,12 +8,10 @@ Module for launching the calculations
 '''
 
 from __future__ import annotations
-import sched
 from typing import TYPE_CHECKING
 import os
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 
 import xsorb.io.database
@@ -21,6 +19,7 @@ from xsorb.settings import Settings
 from xsorb.dft_codes.definitions import SBATCH_POSTFIX
 from xsorb.dft_codes.calculator import edit_files_for_restart
 from xsorb.io.scheduler import JobScheduler
+from xsorb.io.filenames import JOBS_FILENAME
 if TYPE_CHECKING:
     from xsorb.adsorptiondata.adsorptioncalculation import CalculationInfo
 
@@ -93,7 +92,7 @@ def launch_jobs(*,program : str,
                                                [system.calc_id for system in systems],
                                                submitted_jobs)
     else:
-        with open(".submitted_jobs.txt", "a",encoding=sys.getfilesystemencoding()) as f:
+        with open(JOBS_FILENAME, "a",encoding=sys.getfilesystemencoding()) as f:
             f.writelines([f'{job}\n' for job in submitted_jobs])
 
 
@@ -155,8 +154,8 @@ def cancel_jobs():
     submitted_job_ids = xsorb.io.database.Database.get_all_job_ids()
 
     #also add jobs from .submitted_jobs.txt
-    if Path(".submitted_jobs.txt").exists():
-        with open(".submitted_jobs.txt", "r",encoding=sys.getfilesystemencoding()) as f:
+    if Path(JOBS_FILENAME).exists():
+        with open(JOBS_FILENAME, "r",encoding=sys.getfilesystemencoding()) as f:
             submitted_jobs = f.readlines()
             submitted_job_ids.extend([int(job.strip()) for job in submitted_jobs])
 

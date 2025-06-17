@@ -23,7 +23,7 @@ from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
 from xsorb.dft_codes.calculator import write_file_with_calculator
 
-from xsorb.adsorptiondata import CalculationInfo
+from xsorb.adsorptiondata import AdsorptionCalculation, CalculationInfo
 if TYPE_CHECKING:
     from ase import Atoms
     from xsorb.adsorptiondata import AdsorptionStructure
@@ -34,7 +34,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
                  calc_type : str | None = None,
                  calc_ids : list[int] | None = None,
                  ask_before_overwrite : bool = True,
-                 verbose : bool = True) -> list[CalculationInfo]:
+                 verbose : bool = True) -> list[AdsorptionCalculation]:
     '''
     Writes the input files for all the adsorption configurations,
     updating the corresponding database(s).
@@ -49,8 +49,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     - interactive: interactive mode: ask before overwriting files that are already present
 
     Returns:
-    - written_systems: list of WrittenSystem objects, containing the calc_id,
-        the AdsorptionStructure object, the path to the input, output and log files.
+    - written_systems: list[AdsorptionCalculation]
     '''
 
     program = settings.dft.program if calc_type != 'mlopt' else 'ml'
@@ -65,7 +64,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     #Write the input files
     calc_type_for_writing = calc_type if calc_type is not None else 'screening'
 
-    written_systems = []
+    written_systems : list[AdsorptionCalculation] = []
     answer_all = False #pylint: disable=invalid-name
     for i, ads_structure in zip(calc_ids, adsorption_structures):
 
@@ -98,10 +97,17 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             directory=file_dir
         )
 
-        written_systems.append(CalculationInfo(calc_id=i,
-                                             in_file_path=in_file_path,
-                                             out_file_path=out_file_path,
-                                             log_file_path=log_file_path))
+        adsorptioncalc = AdsorptionCalculation(
+            adsorption_structure=ads_structure,
+            calc_info=CalculationInfo(
+                calc_id=str(i),
+                in_file_path=in_file_path,
+                out_file_path=out_file_path,
+                log_file_path=log_file_path
+            )
+        )
+
+        written_systems.append(adsorptioncalc)
 
 
     #if we are not in generation mode, update the databases.

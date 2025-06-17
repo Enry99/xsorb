@@ -146,8 +146,6 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
     - mult: multiplicative factor for the covalent radii to determine bonding.
     '''
 
-    running_jobs = xsorb.io.jobs.get_running_jobs()
-
     for system in systems:
         assert system.calc_info is not None #DEBUG
 
@@ -191,16 +189,13 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
                 mol_ref_index = mol_ref_idx + mol_indices[0]
                 final_dz = atoms[mol_ref_index].position[2] - adsize_z
 
-            job_status = 'running' if system.calc_info.job_id in running_jobs else 'terminated'
-
-
             #inplace update of the calculation info and results
-            system.calc_info.job_status = job_status
+            system.calc_info.status = status
+            system.calc_info.scf_nonconverged = scf_nonconverged
+
             system.calc_results = CalculationResults(
                 atoms=atoms,
                 adsorption_energy=adsorption_energy,
-                status=status,
-                scf_nonconverged=scf_nonconverged,
                 bonds=bonds,
                 trajectory=traj,
                 adsorption_energy_evol=adsorption_energy_evol,

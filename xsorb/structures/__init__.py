@@ -7,4 +7,3 @@ User-exposed classes and functions:
 - slab_mol_bonds: function to get the bonds between a slab and a molecule
 
 """
-

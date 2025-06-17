@@ -114,6 +114,7 @@ class AdsorptionSite(JsonableBase):
         """
         return {
             'site': self.label,
+            'coords': self.unique_id,
             'site_info': self.info
         }
 

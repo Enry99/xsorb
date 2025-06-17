@@ -4,7 +4,7 @@ Module containing the AdsorptionCalculation class.
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 
 from xsorb.adsorptiondata.base import JsonableBase
 from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
@@ -21,17 +21,40 @@ class CalculationInfo(JsonableBase):
     in_file_path: str
     out_file_path: str
     log_file_path: str
+    scf_nonconverged : bool = False
+    _status: str = 'incomplete' # 'completed', 'incomplete'
 
     __xsorb_objtype__ = 'CalculationFilesInfo'
 
+    def __post_init__(self) -> None:
+        """
+        Post-initialization to ensure that the status is set correctly.
+        """
+        if self.status not in ['completed', 'incomplete']:
+            raise ValueError("Status must be either 'completed' or 'incomplete'.")
 
-    def dict_keys(self) -> dict:
+    # make status a property to ensure it is always set correctly
+    @property
+    def status(self) -> str:
+        return self._status
+
+    @status.setter
+    def status(self, value: str) -> None:
+        if value not in ['completed', 'incomplete']:
+            raise ValueError("Status must be either 'completed' or 'incomplete'.")
+        self._status = value
+
+
+    def db_keys(self) -> dict:
         """
         Returns a dictionary with the keys to be explicitly stored in the database.
         """
         return {
+            'calc_id': int(self.calc_id) if self.calc_id.isdigit() else self.calc_id,
             'in_file_path': self.in_file_path,
             'out_file_path': self.out_file_path,
+            'status': self.status,
+            'scf_nonconverged': self.scf_nonconverged,
         }
 
     def todict(self) -> dict:
@@ -86,8 +109,6 @@ class CalculationResults(JsonableBase):
 
     atoms: AtomsCustom
     adsorption_energy: float
-    status : str #'completed', 'incomplete'
-    scf_nonconverged : bool
     adsorption_energy_evol: list[float]
     final_dz: float
 
@@ -103,10 +124,8 @@ class CalculationResults(JsonableBase):
         Returns a dictionary with the keys to be explicitly stored in the database.
         """
 
-        dct = {
+        dct : dict[str, Any] = {
             'adsorption_energy': self.adsorption_energy,
-            'status': self.status,
-            'scf_nonconverged': self.scf_nonconverged,
             'final_dz': self.final_dz,
         }
         if self.bonds is not None:
@@ -147,8 +166,8 @@ class AdsorptionCalculation(JsonableBase):
     """
 
     adsorption_structure: AdsorptionStructure
-    calc_info: Optional[CalculationInfo]
-    calc_results: Optional[CalculationResults]
+    calc_info: Optional[CalculationInfo] = None
+    calc_results: Optional[CalculationResults] = None
 
     __xsorb_objtype__ = 'AdsorptionCalculation'
 
@@ -161,7 +180,7 @@ class AdsorptionCalculation(JsonableBase):
         # merge db_keys from nested objects
         dct = self.adsorption_structure.db_keys()
         if self.calc_info is not None:
-            dct.update(self.calc_info.dict_keys())
+            dct.update(self.calc_info.db_keys())
         if self.calc_results is not None:
             dct.update(self.calc_results.db_keys())
 

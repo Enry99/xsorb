@@ -1,5 +1,5 @@
 '''
-CLI parser for command: scancel
+CLI parser for command: cancel
 '''
 
 import argparse

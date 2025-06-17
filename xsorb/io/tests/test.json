@@ -1,0 +1,12 @@
+{"1": {
+ "cell": {"__ndarray__": [[3, 3], "float64", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]},
+ "constraints": [{"name": "FixCartesian", "kwargs": {"a": [0], "mask": [true, false, true]}}],
+ "ctime": 25.459411489254983,
+ "mtime": 25.459411489254983,
+ "numbers": {"__ndarray__": [[3], "int32", [1, 1, 8]]},
+ "pbc": {"__ndarray__": [[3], "bool", [false, false, false]]},
+ "positions": {"__ndarray__": [[3, 3], "float64", [0.0, 0.0, 0.0, 0.0, 0.757, 0.587, 0.0, -0.757, 0.587]]},
+ "unique_id": "8355bc8d9aae4579950b08f63b1d7843",
+ "user": null},
+"ids": [1],
+"nextid": 2}

@@ -35,6 +35,7 @@ def build_xsorb_parser():
         ('isolated', 'xsorb.cli.isolated'),
         ('restart', 'xsorb.cli.restart'),
         ('cancel', 'xsorb.cli.cancel'),
+        ('cleanup', 'xsorb.cli.cleanup'),
         ('sites', 'xsorb.cli.sites'),
         ('render', 'xsorb.cli.render'),
         ('view', 'xsorb.cli.view'),
