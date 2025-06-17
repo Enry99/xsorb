@@ -171,10 +171,12 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
             adsorption_energy_evol = \
                     [at.get_potential_energy() - total_e_slab_mol for at in traj]
 
-            status = 'completed' if is_optimization_completed(
-                system.calc_info.log_file_path, program) else 'incomplete'
-
-            scf_nonconverged = is_scf_not_converged(system.calc_info.log_file_path, program)
+            if is_optimization_completed(system.calc_info.log_file_path, program):
+                status = 'completed'
+            elif is_scf_not_converged(system.calc_info.log_file_path, program):
+                status = 'scf_nonconverged'
+            else:
+                status = 'incomplete'
 
             mol_indices = system.adsorption_structure.mol_indices
             bonds = get_bond_status(atoms, mol_indices, mult)
@@ -191,7 +193,6 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
 
             #inplace update of the calculation info and results
             system.calc_info.status = status
-            system.calc_info.scf_nonconverged = scf_nonconverged
 
             system.calc_results = CalculationResults(
                 atoms=atoms,

@@ -6,7 +6,7 @@ import os
 import shutil
 
 from xsorb.io.filenames import (
-    DB_NAMES, ADSITES_FILENAME, JOBS_FILENAME,
+    ALL_DB_NAMES, ADSITES_FILENAME, JOBS_FILENAME,
     outdirs, all_files_and_dirs)
 
 def cleanup_xsorb_run(calc_only: bool = False):
@@ -32,7 +32,7 @@ def cleanup_xsorb_run(calc_only: bool = False):
         return
 
     # Remove all database files
-    for db_name in DB_NAMES.values():
+    for db_name in ALL_DB_NAMES.values():
         if os.path.exists(db_name):
             os.remove(db_name)
             print(f"Removed database file: {db_name}")

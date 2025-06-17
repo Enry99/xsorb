@@ -15,9 +15,9 @@ xsorb/adsorptiondata:           OK
 xsorb/calculations:             OK
 
 xsorb/structures:               OK
------------
 
-xsorb/io/*:
+xsorb/io:                       OK
+-----------
 
 xsorb/visualize/*:
 

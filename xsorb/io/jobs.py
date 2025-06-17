@@ -89,7 +89,7 @@ def launch_jobs(*,program : str,
 
     if calc_type not in ('isolated'): #no database for slab/molecule
         xsorb.io.database.Database.add_job_ids(calc_type,
-                                               [system.calc_id for system in systems],
+                                               [int(system.calc_id) for system in systems],
                                                submitted_jobs)
     else:
         with open(JOBS_FILENAME, "a",encoding=sys.getfilesystemencoding()) as f:
@@ -111,7 +111,7 @@ def restart_jobs(calc_type : str):
     active_jobs = scheduler.get_active_job_ids()
 
     rows = xsorb.io.database.Database.get_calculations(calc_type,
-                                     selection='status=incomplete')
+                                     selection='status!=completed')
     indices_to_restart = [row.calc_id for row in rows if row.job_id not in active_jobs]
     in_files = [row.in_file_path for row in rows]
     out_files = [row.out_file_path for row in rows]

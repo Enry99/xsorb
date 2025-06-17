@@ -10,6 +10,7 @@ from xsorb.adsorptiondata.base import JsonableBase
 from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
 from xsorb.ase_custom import AtomsCustom
 
+ALLOWED_STATUSES = ('completed', 'incomplete', 'scf_nonconverged')
 
 @dataclass
 class CalculationInfo(JsonableBase):
@@ -21,8 +22,8 @@ class CalculationInfo(JsonableBase):
     in_file_path: str
     out_file_path: str
     log_file_path: str
-    scf_nonconverged : bool = False
-    _status: str = 'incomplete' # 'completed', 'incomplete'
+    _status: str = 'incomplete' # 'completed', 'incomplete', 'scf_nonconverged'
+
 
     __xsorb_objtype__ = 'CalculationFilesInfo'
 
@@ -30,8 +31,9 @@ class CalculationInfo(JsonableBase):
         """
         Post-initialization to ensure that the status is set correctly.
         """
-        if self.status not in ['completed', 'incomplete']:
-            raise ValueError("Status must be either 'completed' or 'incomplete'.")
+
+        if self.status not in ALLOWED_STATUSES:
+            raise ValueError(f"Status must be one of {ALLOWED_STATUSES}.")
 
     # make status a property to ensure it is always set correctly
     @property
@@ -40,8 +42,8 @@ class CalculationInfo(JsonableBase):
 
     @status.setter
     def status(self, value: str) -> None:
-        if value not in ['completed', 'incomplete']:
-            raise ValueError("Status must be either 'completed' or 'incomplete'.")
+        if value not in ALLOWED_STATUSES:
+            raise ValueError(f"Status must be one of {ALLOWED_STATUSES}.")
         self._status = value
 
 
@@ -54,7 +56,6 @@ class CalculationInfo(JsonableBase):
             'in_file_path': self.in_file_path,
             'out_file_path': self.out_file_path,
             'status': self.status,
-            'scf_nonconverged': self.scf_nonconverged,
         }
 
     def todict(self) -> dict:

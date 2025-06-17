@@ -32,8 +32,7 @@ CalculationInfo data:
 
 CalculationResults data:
 - adsorption_energy (float): adsorption energy of the structure
-- status (str): status of the calculation (incomplete, completed)
-- scf_nonconverged (bool): True if the SCF did not converge
+- status (str): status of the calculation (incomplete, completed, scf_nonconverged)
 - bonds (str): string with the bonds between the molecule and the slab
 - final_dz (float): final vertical distance between the reference atom of the molecule
     and the adsorption site
@@ -55,7 +54,6 @@ Each database also has the following metadata:
 
 '''
 from __future__ import annotations
-from typing import TYPE_CHECKING
 from pathlib import Path
 
 import pandas as pd
@@ -64,11 +62,10 @@ import ase.db
 import xsorb.calculations.results
 import xsorb.io.inputs
 
-from xsorb.io.filenames import DB_NAMES
+from xsorb.io.filenames import STRUCTURES_DB_NAME, CALC_DB_NAMES
 from xsorb.ase_custom.atoms import AtomsCustom
-if TYPE_CHECKING:
-    from xsorb.adsorptiondata import CalculationInfo
-    from xsorb.adsorptiondata import AdsorptionStructure, AdsorptionCalculation
+from xsorb.adsorptiondata import AdsorptionCalculation
+from xsorb.adsorptiondata import AdsorptionStructure
 
 
 class Database:
@@ -97,7 +94,7 @@ class Database:
         # Write the adsorption structures to the database
         # excluding those that are already present
         calc_ids : list[int] = []
-        with ase.db.connect(DB_NAMES['structures']) as db:
+        with ase.db.connect(STRUCTURES_DB_NAME) as db:
             for ads_struct in adsorption_structures:
                 already_present = False
                 for row in db.select(include_data=False):
@@ -138,7 +135,7 @@ class Database:
         '''
 
         # Write the adsorption structures to the corresponding database
-        with ase.db.connect(DB_NAMES[calc_type]) as db:
+        with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
 
             db.metadata = {'program': program,
                            'mult': mult,
@@ -160,9 +157,9 @@ class Database:
 
 
     @staticmethod
-    def update_calculations(calc_type : str,
+    def update_calc_db(calc_type : str,
                             refresh : bool = False,
-                            total_e_slab_mol : float | None = None,
+                            total_e_slab_mol_dft : float | None = None,
                             total_e_slab_mol_ml : float | None = None,
                             mult : float | None = None,
                             write_csv : bool = True,
@@ -175,8 +172,8 @@ class Database:
         Args:
         - calc_type: string with the type of calculation: 'screening'/'relax'/'mlopt', or 'all'
         - refresh: bool to force the update of the database
-        - total_e_slab_mol: float with the total energy of the isolated molecule and slab.
-        - total_e_slab_mol_ml: float with the total energy of the isolated molecule and slab (for ML)
+        - total_e_slab_mol_dft: float with the dft total energy of the isolated molecule and slab.
+        - total_e_slab_mol_ml: float with total energy of the isolated molecule and slab (for ML)
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding. Needs to be passed when refreshing the database
             if the value was changed from the settings
@@ -185,85 +182,109 @@ class Database:
         - verbose: bool to print messages
         '''
 
-        if calc_type == 'all':
-            #recursively call the function for all the calculation types
-            for ctype, db_name in DB_NAMES.items():
-                if Path(db_name).exists():
-                    Database.update_calculations(calc_type=ctype,
-                                                 refresh=refresh,
-                                                 total_e_slab_mol=total_e_slab_mol,
-                                                 total_e_slab_mol_ml=total_e_slab_mol_ml,
-                                                 mult=mult,
-                                                 write_csv=False,
-                                                 verbose=verbose)
-
-            if write_csv: #only write the csv file once
-                Database.write_csvfile(txt=txt, verbose=verbose)
-            return
-
-        if verbose and refresh:
-            print('Re-reading the output files, updating e_slab_mol, '\
-                   'the radii mult factor, and recalculating the bonding status...')
-
-        with ase.db.connect(DB_NAMES[calc_type]) as db:
+        with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
             #Get the ids and calc_ids of the (incomplete) calculations to be updated
-            selection = 'status=incomplete' if not refresh else None
+            selection = 'status!=completed' if not refresh else None
             rows = list(db.select(selection, include_data=True))
 
-            row_ids = [row.id for row in rows]
+            ### read stuff from the database metadata ###
+            try:
+                program = db.metadata.get('program')
+            except KeyError as exc:
+                raise RuntimeError(f'No program metadata found in {calc_type} database') from exc
 
-            program = db.metadata.get('program')
+
             if mult is not None:
                 db.metadata['mult'] = mult
             else:
-                mult = db.metadata.get('mult')
-            total_e_slab_mol = total_e_slab_mol \
-                    if calc_type != 'mlopt' else total_e_slab_mol_ml
-            if total_e_slab_mol is not None:
-                db.metadata['total_e_slab_mol'] = total_e_slab_mol
-            else:
-                total_e_slab_mol = db.metadata.get('total_e_slab_mol')
-            systems = [xsorb.io.inputs.WrittenSystem(calc_id='',
-                                     adsorption_structure=row.data.adsorption_structure,
-                                     in_file_path=row.get('in_file_path'),
-                                     out_file_path=row.get('out_file_path'),
-                                     log_file_path=row.get('log_file_path'),
-                                     job_id=row.get('job_id')
-                                     ) for row in rows]
+                try:
+                    mult = db.metadata.get('mult')
+                except KeyError as exc:
+                    raise RuntimeError(f'No mult metadata found in {calc_type} database') from exc
 
-            #Get the results of the calculations
-            results = xsorb.calculations.results.update_calculations_results(
+            if calc_type == 'mlopt':
+                if total_e_slab_mol_ml is None: # read from metadata
+                    try:
+                        total_e_slab_mol = db.metadata.get('total_e_slab_mol')
+                    except KeyError as exc:
+                        raise RuntimeError('No total_e_slab_mol metadata found in '\
+                                           f'{calc_type} database') from exc
+                else: # use the provided value, and update the metadata
+                    total_e_slab_mol = total_e_slab_mol_ml
+                    db.metadata['total_e_slab_mol'] = total_e_slab_mol
+            else:
+                if total_e_slab_mol_dft is None: # read from metadata
+                    try:
+                        total_e_slab_mol = db.metadata.get('total_e_slab_mol')
+                    except KeyError as exc:
+                        raise RuntimeError('No total_e_slab_mol metadata found in '\
+                                           f'{calc_type} database') from exc
+                else: # use the provided value, and update the metadata
+                    total_e_slab_mol = total_e_slab_mol_dft
+                    db.metadata['total_e_slab_mol'] = total_e_slab_mol
+            ### end of reading metadata ###
+
+
+            systems = [AdsorptionCalculation.fromdict(row.data.AdsorptionCalculation) \
+                       for row in rows]
+
+            #Add the results to the systems
+            xsorb.calculations.results.update_calculations_results(
                     systems=systems,
                     program=program,
                     mult=mult,
                     total_e_slab_mol=total_e_slab_mol,
                     verbose=verbose)
 
-            for row_id, result in zip(row_ids, results):
-                if result is not None:
-                    #remove constraints to be able to write into the database
-                    for i, _ in enumerate(result.trajectory):
-                        result.trajectory[i].set_constraint()
-                    db.update(id=row_id,
-                              atoms=result.atoms,
-                              status=result.status,
-                              scf_nonconverged=result.scf_nonconverged,
-                              adsorption_energy=result.adsorption_energy,
-                              bonds=result.bonds,
-                              final_dz=result.final_dz,
-                              job_status=result.job_status,
-                              data={'trajectory': result.trajectory,
-                                    'adsorption_energy_evolution': result.adsorption_energy_evol})
-                else:
-                    pass
-                    #this is probably already printed somewhere else. Check
-                    #print(f'Warning: Calculation {row.calc_id} cannot be updated.')
-
         if verbose:
             print(f'{calc_type} database updated.')
 
         if write_csv:
             Database.write_csvfile(txt=txt, verbose=verbose)
+
+
+    @staticmethod
+    def update_all_calc_dbs(*,refresh : bool = False,
+                            total_e_slab_mol_dft : float | None = None,
+                            total_e_slab_mol_ml : float | None = None,
+                            mult : float | None = None,
+                            write_csv : bool = True,
+                            txt : bool = False,
+                            verbose: bool=False) -> None:
+        '''
+        Update all the calculation databases
+
+        Args:
+        - refresh: bool to force the update of the database
+        - total_e_slab_mol_dft: float with the dft total energy of the isolated molecule and slab.
+        - total_e_slab_mol_ml: float with total energy of the isolated molecule and slab (for ML)
+        - mult: float with the multiplicative factor for the covalent radii to
+            determine bonding. Needs to be passed when refreshing the database
+            if the value was changed from the settings
+        - write_csv: bool to write the results to a csv file
+        - txt: bool to write a txt file instead of a csv file
+        - verbose: bool to print messages
+        '''
+
+
+        if verbose and refresh:
+            print('Re-reading the output files, updating e_slab_mol, '\
+                   'the radii mult factor, and recalculating the bonding status...')
+
+
+        for calc_type in CALC_DB_NAMES:
+            Database.update_calc_db(calc_type=calc_type,
+                                    refresh=refresh,
+                                    total_e_slab_mol_dft=total_e_slab_mol_dft,
+                                    total_e_slab_mol_ml=total_e_slab_mol_ml,
+                                    mult=mult,
+                                    write_csv=False,
+                                    txt=txt,
+                                    verbose=verbose)
+
+        if write_csv:
+            Database.write_csvfile(txt=txt, verbose=verbose)
+
 
     @staticmethod
     def get_structures(calc_ids : list[int] | int | None = None) -> list:
@@ -278,7 +299,7 @@ class Database:
         Returns:
         - list of rows
         '''
-        with ase.db.connect(DB_NAMES['structures']) as db:
+        with ase.db.connect(STRUCTURES_DB_NAME) as db:
             rows = list(db.select())
             for row in rows:
                 row.__dict__.update({'calc_id': row.id})
@@ -291,7 +312,7 @@ class Database:
 
     #@db_getter
     @staticmethod
-    def get_calculations(calc_type : str,
+    def get_calculations(*,calc_type : str,
                          selection : str | None = None,
                          calc_ids : list[int] | int | None = None,
                          exclude_ids : list[int] | None = None,
@@ -318,14 +339,14 @@ class Database:
         if selection is not None and calc_ids is not None:
             raise ValueError('Cannot use both selection and calc_ids')
 
-        if not Path(DB_NAMES[calc_type]).exists():
+        if not Path(CALC_DB_NAMES[calc_type]).exists():
             print(f'Warning: No {calc_type} calculations present in the database.')
             return []
 
         #Make sure that the database is up to date
-        Database.update_calculations(calc_type, verbose=False)
+        Database.update_calc_db(calc_type, verbose=False)
 
-        with ase.db.connect(DB_NAMES[calc_type]) as db:
+        with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
             rows = list(db.select(selection=selection,
                              columns=columns,
                              sort=sort_key,
@@ -349,7 +370,7 @@ class Database:
         - calc_ids: list of integers with the ids of the calculations to be removed
         - calc_type: string with the type of calculation (screening, relax, or mlopt)
         '''
-        with ase.db.connect(DB_NAMES[calc_type]) as db:
+        with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
             for calc_id in calc_ids:
                 try:
                     row_id = db.get(f'calc_id={calc_id}', include_data=False).id
@@ -360,7 +381,7 @@ class Database:
 
 
     @staticmethod
-    def add_job_ids(calc_type : str, calc_ids : list[str], job_ids : list[str]) -> None:
+    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[str]) -> None:
         '''
         Add the job ids to the corresponding database
 
@@ -369,7 +390,7 @@ class Database:
         - calc_ids: list of integers with the calculation ids
         - job_ids: list of integers with the job ids
         '''
-        with ase.db.connect(DB_NAMES[calc_type]) as db:
+        with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
             for calc_id, job_id in zip(calc_ids, job_ids):
                 row_id = db.get(f'calc_id={calc_id}', include_data=False).id
                 db.update(id=row_id, job_id=job_id)
@@ -385,16 +406,17 @@ class Database:
         '''
 
         job_ids : list[int] = []
-        for calc_type in DB_NAMES.values():
+        for calc_type in CALC_DB_NAMES.values():
             if Path(calc_type).exists():
                 with ase.db.connect(calc_type) as db:
                     for row in db.select(include_data=False):
-                        if row.status=='incomplete' and row.get('job_id') is not None:
+                        if row.status!='completed' and row.get('job_id') is not None:
                             job_ids.append(row.job_id)
 
         return job_ids
 
 
+    # TODO: think if it's better to do this or use the adsites.json file
     # @staticmethod
     # def get_adsorption_sites(calc_type : str) -> list:
     #     '''
@@ -403,11 +425,6 @@ class Database:
     #     Args:
     #     - calc_type: string with the type of calculation
 
-    #     Returns:
-    #     - list of strings with the adsorption sites
-    #     '''
-    #     with ase.db.connect(DB_NAMES[calc_type]) as db:
-    #         return list(set(row.get('site') for row in db.select(include_data=False)))
 
     #@db_getter
     @staticmethod
@@ -422,14 +439,14 @@ class Database:
         - bool: True if all the calculations are completed, False otherwise
         '''
 
-        if not Path(DB_NAMES[calc_type]).exists():
+        if not Path(CALC_DB_NAMES[calc_type]).exists():
             return False
 
         #Make sure that the database is up to date
-        Database.update_calculations(calc_type, verbose=False)
+        Database.update_calc_db(calc_type, verbose=False)
 
-        with ase.db.connect(DB_NAMES[calc_type]) as db:
-            return len(list(db.select('status=incomplete', include_data=False))) == 0
+        with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
+            return len(list(db.select('status!=completed', include_data=False))) == 0
 
 
     @staticmethod
@@ -437,13 +454,13 @@ class Database:
                       txt : bool = False,
                       verbose: bool = False) -> None:
         '''
-        Reads the structures.db database and writes the info to a csv file.
+        Reads the structures database and writes the info to a csv file.
         Is not meant to be called from the CLI, since it is executed
         automatically when adding new structures or updating the calculations.
 
         It can be called explicitly from the CLI with the command xsorb write_csv
         in case it was accidentally deleted and no calculations are present yet,
-        to write the entries of the structures.db.
+        to write the entries of the structures database.
         When results are present, simply call xsorb update to write it again.
 
         Args:
@@ -452,70 +469,71 @@ class Database:
         - verbose: bool to print messages
         '''
 
-        if verbose: print('Writing results file...')
+        if verbose: print('Writing results file...') #pylint: disable=multiple-statements
 
-        if not Path('structures.db').exists():
-            raise RuntimeError('Missing structures.db database. Cannot write csv file.')
+        if not Path(STRUCTURES_DB_NAME).exists():
+            raise RuntimeError('Missing structures database. Cannot write csv file.')
 
-        # Get the data from the database
-        info_dicts : list[dict] = []
-        with ase.db.connect('structures.db') as db:
+        # Get the data from the structures database
+        info_dicts : dict[int,dict] = {}
+        with ase.db.connect(STRUCTURES_DB_NAME) as db:
             for row in db.select(include_data=False):
-                info_dict = {'calc_id': row.id}
-                for key in DATAFRAME_COLUMNS_NAMES:
-                    info_dict.update({key: row.get(key)})
-                info_dicts.append(info_dict)
+                local_dict = {}
+                for key in AdsorptionStructure.dataframe_column_names():
+                    local_dict.update({key: row.get(key)})
+                info_dicts[row.id] = local_dict
 
         last_calc_e_column_name = None
         if include_results:
             energies_column_names = []
-            for calc_type, db_name in DB_NAMES.items():
+
+            for calc_type, db_name in CALC_DB_NAMES.items():
                 #order is mlopt, screening, relax
                 atleast_one_calc = False
+                eads_column_name = f'Eads_{calc_type[:3]}(eV)'
+
                 if Path(db_name).exists():
                     with ase.db.connect(db_name) as db:
-                        for i, info_dict in enumerate(info_dicts):
+                        for calc_id in info_dicts: #pylint: disable=consider-using-dict-items
                             try:
-                                row = db.get(f'calc_id={info_dict["calc_id"]}', include_data=False)
+                                row = db.get(f'calc_id={calc_id}', include_data=False)
                             except KeyError:
                                 continue
+
 
                             eads = row.get('adsorption_energy') #can be a float or None
                             if eads is not None:
                                 eads = f'{eads:.3f}'
-                                if row.get('scf_nonconverged'):
+                                if row.get('status') == 'scf_nonconverged':
                                     eads += '**'
-                                    if verbose: print(f'Warning! {calc_type} {info_dict["calc_id"]} '\
+                                    if verbose:
+                                        print(f'Warning! {calc_type} {calc_id} '\
                                           'failed to reach SCF convergence in the last step. '\
                                             'The energy will be marked with **')
-                                elif row.get('status') != 'completed':
+                                elif row.get('status') == 'incomplete':
                                     eads += '*'
-                                    if verbose: print(f'Warning! {calc_type} {info_dict["calc_id"]} '\
+                                    if verbose:
+                                        print(f'Warning! {calc_type} {calc_id} '\
                                           'has not reached final configuration. '\
                                             'The energy will be marked with a *')
-                            info_dicts[i].update({f'Eads_{calc_type[:3]}(eV)': eads})
+                            info_dicts[calc_id].update({eads_column_name: eads})
+
                             if row.get('bonds'):
-                                info_dicts[i].update({'bonds': row.get('bonds')})
+                                info_dicts[calc_id].update({'bonds': row.get('bonds')})
+
                             if row.get('final_dz'):
-                                info_dicts[i].update({'final_dz': row.get('final_dz')})
+                                info_dicts[calc_id].update({'final_dz': row.get('final_dz')})
+
                             atleast_one_calc = True
 
                     if atleast_one_calc:
-                        last_calc_e_column_name = f'Eads_{calc_type[:3]}(eV)'
-                        energies_column_names.append(last_calc_e_column_name)
+                        last_calc_e_column_name = eads_column_name
+                        energies_column_names.append(eads_column_name)
 
         # Write csv file
-        df_column_names = ['calc_id'] + list(DATAFRAME_COLUMNS_NAMES)
-        if include_results:
-            df_column_names += energies_column_names
-            df_column_names.append('bonds')
-            df_column_names.append('final_dz')
-        df = pd.DataFrame(columns=df_column_names)
-        for i, info_dict in enumerate(info_dicts):
-            df_line = pd.Series(info_dict)
-            df.loc[i] = df_line
+        df = pd.DataFrame.from_dict(info_dicts, orient='index')
 
-        if include_results and txt: #sort by energy column
+        if last_calc_e_column_name and include_results and txt: #sort by energy column
             df.sort_values(by=last_calc_e_column_name)
 
         if txt:
@@ -523,7 +541,7 @@ class Database:
         else:
             df.to_csv('results.csv', index=False)
 
-        if verbose: print('Results file written.')
+        if verbose: print('Results file written.') #pylint: disable=multiple-statements
 
 
 def manual_update_calculations(calc_type : str,
@@ -541,7 +559,7 @@ def manual_update_calculations(calc_type : str,
     '''
 
     if refresh:
-        from xsorb.io.settings import Settings
+        from xsorb.settings import Settings # pylint: disable=import-outside-toplevel
         settings = Settings(read_energies=True)
         total_e_slab_mol = settings.total_e_slab_mol
         total_e_slab_mol_ml = settings.total_e_slab_mol_ml
@@ -552,10 +570,10 @@ def manual_update_calculations(calc_type : str,
         total_e_slab_mol_ml = None
 
 
-    Database.update_calculations(
-        calc_type,
-        refresh,
-        total_e_slab_mol=total_e_slab_mol,
+    Database.update_calc_db(
+        calc_type=calc_type,
+        refresh=refresh,
+        total_e_slab_mol_dft=total_e_slab_mol,
         total_e_slab_mol_ml=total_e_slab_mol_ml,
         mult=mult,
         txt=txt,
