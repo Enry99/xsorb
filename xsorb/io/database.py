@@ -43,14 +43,16 @@ CalculationResults data:
 
 --- data (dict) from ase, used to store more complex data structures ---
 - data contains a dictionary with xsorb.adsorptiondata.AdsorptionCalculation,
-    which can be converted back to an object using
+    which can be converted back to an object
 
 
-Each database also has the following metadata:
+Each calculation database also has the following metadata:
 - program (str): name of the program used for the calculations
 - mult (float): multiplicative factor for the covalent radii to determine bonding
     The mult factor is updated from settings only when refreshing the database
 - total_e_slab_mol (float): total energy of the isolated molecule and slab. May be None
+while the structure database contains:
+- adsorption_sites (list): list of AdsorptionSiteCrystal or AdsorptionSiteAmorphous objects
 
 '''
 from __future__ import annotations
@@ -60,10 +62,9 @@ import pandas as pd
 import ase.db
 
 import xsorb.calculations.results
-import xsorb.io.inputs
-
 from xsorb.io.filenames import STRUCTURES_DB_NAME, CALC_DB_NAMES
 from xsorb.ase_custom.atoms import AtomsCustom
+from xsorb.adsorptiondata.adsorptionstructure import AdsorptionSiteCrystal, AdsorptionSiteAmorphous
 from xsorb.adsorptiondata import AdsorptionCalculation
 from xsorb.adsorptiondata import AdsorptionStructure
 
@@ -95,6 +96,7 @@ class Database:
         # excluding those that are already present
         calc_ids : list[int] = []
         with ase.db.connect(STRUCTURES_DB_NAME) as db:
+            adsorption_sites = Database.get_adsorption_sites() # get existing sites
             for ads_struct in adsorption_structures:
                 already_present = False
                 for row in db.select(include_data=False):
@@ -107,6 +109,13 @@ class Database:
                                        data={'AdsorptionStructure': ads_struct},
                                        **ads_struct.db_keys())
                     calc_ids.append(calc_id)
+
+                # add the adsorption sites if not already present
+                if ads_struct.adsite not in adsorption_sites:
+                    adsorption_sites.append(ads_struct.adsite)
+
+            # Update the metadata with the adsorption sites
+            db.metadata['adsorption_sites'] = [site for site in adsorption_sites]
 
         if write_csv:
             Database.write_csvfile(include_results=False)
@@ -416,14 +425,37 @@ class Database:
         return job_ids
 
 
-    # TODO: think if it's better to do this or use the adsites.json file
-    # @staticmethod
-    # def get_adsorption_sites(calc_type : str) -> list:
-    #     '''
-    #     Get the unique adsorption sites from the database
+    @staticmethod
+    def get_adsorption_sites(cls_type=None) -> list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous]:
+        '''
+        Get the unique adsorption sites from the structures database
 
-    #     Args:
-    #     - calc_type: string with the type of calculation
+        Args:
+        - cls_type: class type of the adsorption site to be returned,
+            either AdsorptionSiteCrystal or AdsorptionSiteAmorphous
+
+        Returns:
+        - list of AdsorptionSiteCrystal or AdsorptionSiteAmorphous objects
+        '''
+
+        with ase.db.connect(STRUCTURES_DB_NAME) as db:
+            sites = db.metadata.get('adsorption_sites', [])
+
+        converted_sites = []
+        for site in sites:
+            if site['__xsorb_objtype__'] == 'AdsorptionSiteCrystal':
+                site = AdsorptionSiteCrystal.fromdict(site)
+            elif site['__xsorb_objtype__'] == 'AdsorptionSiteAmorphous':
+                site = AdsorptionSiteAmorphous.fromdict(site)
+            else:
+                raise ValueError(f"Unknown site type: {site['__xsorb_objtype__']}")
+
+            if cls_type is None or isinstance(site, cls_type):
+                converted_sites.append(site)
+            else:
+                raise TypeError(f"Expected site of type {cls_type}, got {type(site)}")
+
+        return converted_sites
 
 
     #@db_getter

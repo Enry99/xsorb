@@ -27,7 +27,7 @@ from ase.neighborlist import NeighborList, natural_cutoffs
 from ase.geometry.geometry import get_layers
 
 from xsorb.ase_custom.atoms import AtomsCustom
-from xsorb.structures import ADSITES_FILENAME
+from xsorb.io.database import Database
 from xsorb.visualize.plot import plot_adsites_image
 from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, AdsorptionSiteCrystal,
     AdsorptionSiteAmorphous, SurroundingSite)
@@ -141,44 +141,6 @@ class Slab:
         return modes[mode](**kwargs)
 
 
-    @staticmethod
-    def read_sites() -> list[AdsorptionSiteCrystal | AdsorptionSiteAmorphous]:
-        """
-        Read already existing sites from previous calculations, stored in a json file
-
-        Returns:
-        - list of AdsorptionSite objects
-        """
-
-        if Path(ADSITES_FILENAME).is_file(): # pylint: disable=no-else-return
-            sites = json.load(open(ADSITES_FILENAME, 'r')) #pylint: disable=consider-using-with,unspecified-encoding
-            converted_sites = []
-            for site in sites:
-                if site['__xsorb_objtype__'] == 'AdsorptionSiteCrystal':
-                    site = AdsorptionSiteCrystal.fromdict(site)
-                elif site['__xsorb_objtype__'] == 'AdsorptionSiteAmorphous':
-                    site = AdsorptionSiteAmorphous.fromdict(site)
-                else:
-                    raise ValueError(f"Unknown site type: {site['__xsorb_objtype__']}")
-                converted_sites.append(site)
-            return converted_sites
-        else:
-            return []
-
-    @staticmethod
-    def write_sites(sites : list[AdsorptionSite]) -> None:
-        """
-        Write the sites to a json file, to be used in the future.
-
-        Args:
-        - sites: list of AdsorptionSite objects
-        """
-
-        json.dump([site.todict() for site in sites],
-                  open(ADSITES_FILENAME, 'w'), #pylint: disable=consider-using-with,unspecified-encoding
-                  indent=4)
-
-
     def _get_symmetrically_equivalent_sets(self, coords_set : list, threshold : float =1e-6):
         """Classifies the adsorption sites into sets of symmetrically equivalent sites.
 
@@ -243,8 +205,9 @@ class Slab:
         #create a list with all the sites, with info for each one
         all_adsites : list[AdsorptionSiteCrystal] = []
 
+
         #handle the case of existing sites
-        existing_sites = self.read_sites()
+        existing_sites = Database.get_adsorption_sites(type(AdsorptionSiteCrystal))
         all_adsites.extend(existing_sites)
 
         i_site = len(all_adsites)
@@ -530,7 +493,7 @@ class Slab:
         all_adsites : list[AdsorptionSite] = []
 
         #handle the case of existing sites
-        existing_sites = self.read_sites()
+        existing_sites = Database.get_adsorption_sites(type(AdsorptionSiteAmorphous))
         all_adsites.extend(existing_sites)
 
 
@@ -538,7 +501,6 @@ class Slab:
         for coords, cn, idx in zip(surf_coords, cn_list, surf_sites_indices):
 
             #here unique id is the atom index in the slab, since we are considering atoms as sites
-            unique_id = idx
             atom_species = self.asf.slab[idx].species_string
 
             # skip the site if it is already in the list of existing sites

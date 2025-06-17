@@ -6,8 +6,8 @@ import os
 import shutil
 
 from xsorb.io.filenames import (
-    ALL_DB_NAMES, ADSITES_FILENAME, JOBS_FILENAME,
-    outdirs, all_files_and_dirs)
+    ALL_DB_NAMES, JOBS_FILENAME,
+    ALL_OUTDIRS, ALL_FILES_AND_DIRS)
 
 def cleanup_xsorb_run(calc_only: bool = False):
     '''
@@ -23,7 +23,7 @@ def cleanup_xsorb_run(calc_only: bool = False):
     if calc_only:
         print("Cleaning up only calculation files...")
 
-        for directory in outdirs:
+        for directory in ALL_OUTDIRS:
             if os.path.exists(directory):
                 shutil.rmtree(directory, ignore_errors=True)
                 print(f"Removed directory: {directory}")
@@ -32,15 +32,10 @@ def cleanup_xsorb_run(calc_only: bool = False):
         return
 
     # Remove all database files
-    for db_name in ALL_DB_NAMES.values():
+    for db_name in ALL_DB_NAMES:
         if os.path.exists(db_name):
             os.remove(db_name)
             print(f"Removed database file: {db_name}")
-
-    # Remove the adsites file
-    if os.path.exists(ADSITES_FILENAME):
-        os.remove(ADSITES_FILENAME)
-        print(f"Removed adsites file: {ADSITES_FILENAME}")
 
     # Remove the jobs file
     if os.path.exists(JOBS_FILENAME):
@@ -55,7 +50,7 @@ def fresh_start():
     and ask the user if they want to continue or clean up.
     '''
 
-    if any(os.path.exists(file_or_dir) for file_or_dir in all_files_and_dirs):
+    if any(os.path.exists(file_or_dir) for file_or_dir in ALL_FILES_AND_DIRS):
         clean = input('Warning: some files from a previous run exist. '
               'Do you want to delete all of them and start a fresh run? (y/n): ')
         if clean.lower() == 'y':
