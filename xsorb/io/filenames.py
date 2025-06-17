@@ -22,3 +22,6 @@ MOL_OUTDIR                 = 'mol_outdirs'
 
 # for convenience in cleanup
 outdirs = [SCREENING_OUTDIR, RELAX_OUTDIR, ML_OPT_OUTDIR, SLAB_OUTDIR, MOL_OUTDIR]
+
+# for convenience in check:
+all_files_and_dirs = list(DB_NAMES.values()) + [ADSITES_FILENAME] + outdirs

@@ -13,6 +13,7 @@ Main functions to launch the various types of calculations.
 
 from __future__ import annotations
 import sys
+import os
 
 import numpy as np
 
@@ -21,6 +22,7 @@ from xsorb.settings import Settings
 from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.io.inputs import write_inputs, write_slab_mol_inputs
 from xsorb.io.jobs import launch_jobs
+from xsorb.io.cleanup import fresh_start
 from xsorb.io.database import Database
 from xsorb.io.utils import continue_even_if_not_all_completed_question
 from xsorb.calculations.selection import obtain_calc_indices, get_adsorption_structures
@@ -36,6 +38,8 @@ def generate(save_image : bool = False):
     - save_image: save an image of the adsorption sites
     and of the molecular rotations after writing the files.
     '''
+
+    fresh_start()  # ask the user if they want to start a fresh run
 
     settings=Settings()
 
@@ -61,6 +65,9 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     - save_image: save an image of the adsorption sites
     and of the molecular rotations when generating the configurations
     '''
+
+    if not from_ml_opt:
+        fresh_start()
 
     settings=Settings(read_energies=True) #need the energies to store them into the db metadata
 
@@ -99,6 +106,8 @@ def launch_ml_opt(save_image : bool = False,):
     - save_image: save an image of the adsorption sites
     and of the molecular rotations when generating the configurations
     '''
+
+    fresh_start()  # ask the user if they want to start a fresh run
 
     settings=Settings()
 

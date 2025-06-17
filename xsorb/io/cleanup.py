@@ -5,7 +5,9 @@ Moudule to clean all files for an Xsorb run.
 import os
 import shutil
 
-from xsorb.io.filenames import DB_NAMES, ADSITES_FILENAME, JOBS_FILENAME, outdirs
+from xsorb.io.filenames import (
+    DB_NAMES, ADSITES_FILENAME, JOBS_FILENAME,
+    outdirs, all_files_and_dirs)
 
 def cleanup_xsorb_run(calc_only: bool = False):
     '''
@@ -45,3 +47,16 @@ def cleanup_xsorb_run(calc_only: bool = False):
         os.remove(JOBS_FILENAME)
 
     print("All Xsorb run files cleaned up.")
+
+
+def fresh_start():
+    '''
+    Check if any of the files from a previous run exists,
+    and ask the user if they want to continue or clean up.
+    '''
+
+    if any(os.path.exists(file_or_dir) for file_or_dir in all_files_and_dirs):
+        clean = input('Warning: some files from a previous run exist. '
+              'Do you want to delete all of them and start a fresh run? (y/n): ')
+        if clean.lower() == 'y':
+            cleanup_xsorb_run()
