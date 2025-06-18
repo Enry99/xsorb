@@ -4,7 +4,7 @@ CLI parser for command: render
 
 import argparse
 
-from xsorb.cli.command import CLICommandBase, positive_int, positive_float
+from xsorb.cli.command import CLICommandBase, _positive_int, _positive_float
 
 
 class CLICommand(CLICommandBase):
@@ -17,38 +17,35 @@ Example:
 
     @staticmethod
     def add_arguments(parser : argparse.ArgumentParser):
+
+        # calculation options
         parser.add_argument('calc_type',
                         type=str,
                         choices=['screening', 'relax', 'mlopt', 'initial'],
                         help='''type of calculation to render''')
         parser.add_argument('calc_id',
                         nargs='?',
-                        type=positive_int,
+                        type=_positive_int,
                         help='''ID of the calculation to render''')
-        parser.add_argument('-pov','--povray',
-                        action='store_true',
-                        default=False,
-                        help='Use povray for rendering (much better quality).')
+
+        # structure options
+        parser.add_argument('-r','--rotations',
+                            type=str,
+                            default='',
+                            help="List of rotations for the visualization, e.g. 10z,-90x. "\
+                                "Default = top view. "\
+                                "Presets for front view: front (= -90x), front2 (90z,-90x). "\
+                                "If the first rotation has a negative angle, preceed it "
+                                "with a dummy rotation, e.g. 0z,-90x. ")
         parser.add_argument('-s','--supercell',
                         nargs = 3,
-                        type=positive_int,
+                        type=_positive_int,
                         metavar=('nx', 'ny', 'nz'),
                         help="Replicate the cell nx ny nz times along the three cell vectors.")
         parser.add_argument('-wr', '--wrap',
-                        action='store_true',
-                        default=False,
-                        help='Wrap atoms according to pbc.')
-        parser.add_argument('-cm', '--center-mol',
-                        action='store_true',
-                        help='translate the structure so that the molecule is centered in the image')
-        parser.add_argument('-r', '--rotation',
-                        type=str,
-                        help='Rotation for saving images, in ASE format, e.g. 10z,5x')
-        parser.add_argument('-dc','--depth-cueing',
-                        nargs='?',
-                        type=positive_float,
-                        const=1.0,
-                        help='Enable depth cueing. Optional parameter: intensity (>0, default=1).')
+                            action='store_true',
+                            default=False,
+                            help='Wrap atoms according to pbc.')
         parser.add_argument('-rc','--range-cut',
                         nargs=2,
                         type=float,
@@ -57,6 +54,18 @@ Example:
         parser.add_argument('-cv','--cut-vacuum',
                         action='store_true',
                         help='Cut vacuum above and below the slab (avoid white empty region).')
+        parser.add_argument('-b','--bonds',
+                            type=str,
+                            choices=['none', 'single', 'multiple'],
+                            default='single',
+                            help='Draw bonds between atoms. Options: none, single (default), multiple.')
+
+        # color and style options
+        parser.add_argument('-dc','--depth-cueing',
+                        nargs='?',
+                        type=_positive_float,
+                        const=1.0,
+                        help='Enable depth cueing. Optional parameter: intensity (>0, default=1).')
         parser.add_argument('-cc', '--colorcode',
                         type=str,
                         choices=['forces', 'magmoms', 'coordnum'],
@@ -72,20 +81,25 @@ Example:
                         choices=['forces', 'magmoms'],
                         help='''Draw arrows representing the vectors,
                         with lenghth proportional to the magnitude.''')
-        parser.add_argument('-nobd','--nobonds',
-                        action='store_true',
-                        default=False, help='Do not show bonds' )
+
+        # rendering options
         parser.add_argument('-w', '--width-res',
-                        type=positive_int,
+                        type=_positive_int,
                         default=700,
                         help='Horizontal resolution in pixels.')
+        parser.add_argument('-pov','--povray',
+                        action='store_true',
+                        default=True,
+                        help='Use povray for rendering (much better quality).')
+
+        # movie options
         parser.add_argument('-m','--movie',
                         action='store_true',
                         default=False,
                         help='Create movie from the frames.')
         parser.add_argument('-f', '--framerate',
-                        type=positive_int,
-                        default=10,
+                        type=float,
+                        default=10.0,
                         help='Framerate of the movie (frames per second). Default = 10.')
 
     @staticmethod

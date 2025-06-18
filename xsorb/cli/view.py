@@ -4,7 +4,7 @@ CLI parser for command: view
 
 import argparse
 
-from xsorb.cli.command import CLICommandBase, positive_int
+from xsorb.cli.command import CLICommandBase, _positive_int
 
 
 class CLICommand(CLICommandBase):
@@ -22,7 +22,7 @@ Example:
                         help='''type of calculation to plot''')
         parser.add_argument('calc_id',
                         nargs='?',
-                        type=positive_int,
+                        type=_positive_int,
                         help='''ID of the calculation to plot''')
 
     @staticmethod

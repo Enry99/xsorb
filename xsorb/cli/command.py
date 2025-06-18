@@ -38,19 +38,13 @@ class CLICommandBase(ABC):
         This method should be implemented by all subclasses.
         '''
 
-def positive_int(value):
-    '''
-    Check if a value is a positive integer.
-    '''
+def _positive_int(value):
     ivalue = int(value)
     if ivalue <= 0:
         raise argparse.ArgumentTypeError(f"{value} is not positive")
     return ivalue
 
-def positive_float(value):
-    '''
-    Check if a value is a positive float.
-    '''
+def _positive_float(value):
     fvalue = float(value)
     if fvalue < 1e-10:
         raise argparse.ArgumentTypeError(f"{value} is not positive")
