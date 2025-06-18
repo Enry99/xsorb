@@ -423,7 +423,7 @@ def parse_pwo_start_custom(lines, index=0):
 
 
 @reader
-def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_single_trajectory=False):
+def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_single_trajectory=True):
     """
     Custom version of ase.io.espresso.read_espresso_out to:
     - handle custom labels
