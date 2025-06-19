@@ -11,7 +11,6 @@ Mod to ase.io.vasp.read_vasp to add resorting for poscar if ase-sort.dat is pres
 
 from pathlib import Path
 import re
-import sys
 
 import numpy as np
 import ase.io.vasp

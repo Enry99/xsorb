@@ -12,12 +12,9 @@ import os
 import sys
 
 import numpy as np
-import ase.io.utils
 import ase.io.pov
 from ase import Atoms
 from ase.constraints import FixAtoms
-from ase.data.colors import jmol_colors as default_colors
-from ase.data import covalent_radii
 from ase.io.pov import pa, pc
 
 
@@ -105,102 +102,6 @@ def POVRAYInit(self, cell, cell_vertices, positions, diameters, colors,
             # self.constrainatoms.extend(c.index) # is this list-like?
             for n, i in enumerate(c.index):
                 self.constrainatoms += [i]
-
-
-@classmethod
-def from_PlottingVariables(cls, pvars, **kwargs):
-    '''
-    Custom method to ase.io.pov.POVRAY.from_PlottingVariables
-    to handle arrows
-
-    '''
-    cell = pvars.cell
-    cell_vertices = pvars.cell_vertices
-    if 'colors' in kwargs:
-        colors = kwargs.pop('colors')
-    else:
-        colors = pvars.colors
-    diameters = pvars.d
-    image_height = pvars.h
-    image_width = pvars.w
-    positions = pvars.positions
-    constraints = pvars.constraints
-    arrows=pvars.arrows
-    return cls(cell=cell, cell_vertices=cell_vertices, colors=colors, #pylint: disable=not-callable
-            constraints=constraints, diameters=diameters,
-            image_height=image_height, image_width=image_width,
-            positions=positions, arrows=arrows, **kwargs) #### CUSTOM (arrows)
-
-
-def PlottingVariablesInit(self, atoms, rotation='', show_unit_cell=2,
-                 radii=None, bbox=None, colors=None, scale=20,
-                 maxwidth=500, extra_offset=(0., 0.),
-                 auto_bbox_size=1.05,
-                 auto_image_plane_z='front_all',
-                arrows_type=None):
-    '''
-    Custom init to ase.io.utils.PlottingVariables
-    to handle arrows
-
-    '''
-    assert show_unit_cell in (0, 1, 2, 3)
-
-    self.show_unit_cell = show_unit_cell
-    self.numbers = atoms.get_atomic_numbers()
-    self.maxwidth = maxwidth
-    self.atoms = atoms
-    # not used in PlottingVariables, keeping for legacy
-    self.natoms = len(atoms)
-
-    self.auto_bbox_size = auto_bbox_size
-    self.auto_image_plane_z = auto_image_plane_z
-    self.offset = np.zeros(3)
-    self.extra_offset = np.array(extra_offset)
-
-    self.constraints = atoms.constraints
-    # extension for partial occupancies
-    self.frac_occ = False
-    self.tags = None
-    self.occs = None
-
-    if 'occupancy' in atoms.info:
-        self.occs = atoms.info['occupancy']
-        self.tags = atoms.get_tags()
-        self.frac_occ = True
-
-    # colors
-    self.colors = colors
-    if colors is None:
-        ncolors = len(default_colors)
-        self.colors = default_colors[self.numbers.clip(max=ncolors - 1)]
-
-    # radius
-    if radii is None:
-        radii = covalent_radii[self.numbers]
-    elif isinstance(radii, float):
-        radii = covalent_radii[self.numbers] * radii
-    else:
-        radii = np.array(radii)
-
-    self.radii = radii  # radius in Angstroms
-    self.scale = scale  # Angstroms per cm
-
-    self.set_rotation(rotation)
-    self.update_image_plane_offset_and_size_from_structure(bbox=bbox)
-
-    #### CUSTOM PART ####
-    if arrows_type is not None:
-        if arrows_type == 'forces':
-            arrows = atoms.get_forces()
-        elif arrows_type == 'magmoms':
-            arrows = np.array([[0,0, magmom] for magmom in atoms.get_magnetic_moments()])
-        else:
-            raise ValueError(f'Unknown arrows type: {arrows_type}')
-        arrows = np.dot(arrows, self.rotation)
-        self.arrows = arrows
-    else:
-        self.arrows = None
-    #### END CUSTOM PART ####
 
 
 def write_ini(self, path):
@@ -460,18 +361,17 @@ adaptive 1 jitter}}"""
     # Draw arrows
     arrows = ''
     if self.arrows is not None:
-        maxlength = max([np.linalg.norm(arrow) for arrow in self.arrows])
+        maxlength = np.max([np.linalg.norm(arrow) for arrow in self.arrows])
         for pos, arrow, diam in zip(self.positions, self.arrows, self.diameters):
             modulus = np.linalg.norm(arrow)
-            normalized_arrow = arrow / maxlength
-            if modulus/maxlength > 0.1: # avoid degenerate primitives
-                cylinder_pos_dw = pos - 0.8*normalized_arrow
-                cylinder_pos_up = pos + 0.7*normalized_arrow
+            if modulus/maxlength > 0.1: # skip degenerate primitives
+                cylinder_pos_dw = pos # - 0.8*normalized_arrow
+                cylinder_pos_up = pos + 0.7*arrow
                 arrows += f'cylinder {{{pa(cylinder_pos_dw)}, '+\
                                         f'{pa(cylinder_pos_up)}, 0.1 texture{{pigment '+\
                                         f'{{color {pc([1,0,0])} '+\
                                         f'transmit 0.0}} finish{{ase3}}}}}}\n'
-                cone_pos = pos + 0.7*normalized_arrow
+                cone_pos = pos + 0.7*arrow
                 arrows += f'cone {{{pa(cone_pos)}, 0.2'+\
                                         f'{pa(cone_pos + 0.3*arrow/modulus)}, 0.0 texture{{pigment '+\
                                         f'{{color {pc([1,0,0])} '+\
@@ -529,5 +429,3 @@ else:
 
 ase.io.pov.POVRAY.__init__ = POVRAYInit
 ase.io.pov.POVRAY.write_pov = write_pov
-ase.io.pov.POVRAY.from_PlottingVariables = from_PlottingVariables
-ase.io.utils.PlottingVariables.__init__ = PlottingVariablesInit

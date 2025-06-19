@@ -11,6 +11,9 @@ Need to be monkey patched at runtime by importin this module.
 #              write_pov method of POVRAY class.
 #-11 Jun 2025: update to ase 3.25.0, added read_single_trajectory to pwo, some reordering.
 #              explictly marked the custom parts with #### CUSTOM ...
+# -19 Jun 2025: improved arrows in povray, removed monkey patching of
+#               PlottingVariables, now using directly POVRAY class.
+#               NOW ALIGNED with xplot (atomsplot) v 1.0
 
 # Runtime patch for read/write
 import xsorb.ase_custom.espresso
