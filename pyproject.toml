@@ -1,0 +1,49 @@
+[build-system]
+requires = ['setuptools >= 61.0.0']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'xsorb'
+description='A lightweight, flexible and user-friendly tool to generate structures and run adsorption calculations of molecules on crystalline or amorphous surfaces.'
+dynamic = ['version']
+authors = [
+    { name = 'Enrico Pedretti', email = 'enrico.pedretti2@unibo.it' },
+    { name = 'Paolo Restuccia', email = 'paolo.restuccia@unibo.it' },
+    { name = 'Maria Clelia Righi', email = 'clelia.righi@unibo.it' },
+]
+maintainers = [ { name = 'Enrico Pedretti', email = 'enrico.pedretti2@unibo.it' } ]
+requires-python = '>=3.9'
+dependencies = [
+'ase==3.25.0',
+'numpy>=1.19.5',
+'matplotlib>=3.9.0',
+'pymatgen',
+]
+readme = 'README.md'
+license = 'CC-BY-4.0'
+license-files = ['LICENSE']
+
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Operating System :: OS Independent',
+    'Intended Audience :: Science/Research',
+    'Topic :: Scientific/Engineering :: Physics',
+]
+
+[project.urls]
+Repository = 'https://github.com/Enry99/xsorb'
+Issues = 'https://github.com/Enry99/xsorb/issues'
+
+
+[project.scripts]
+xsorb = 'xsorb.cli.main:main'
+
+
+[tool.setuptools.dynamic]
+version = {attr = 'xsorb.__version__'}
+
