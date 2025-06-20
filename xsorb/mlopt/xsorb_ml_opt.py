@@ -7,9 +7,6 @@
 Script to optimize a structure using a ML calculator.
 '''
 
-#TODO: when creating the package, make sure that this script
-# is available as xsorb-ml-opt
-
 import sys
 import os
 
@@ -34,7 +31,7 @@ def main():
 
     try:
         sys.path.append(os.path.abspath(main_dir))
-        from ml_calculator_loader import NNloader
+        from ml_calculator_loader import NNloader #runtime import
     except ImportError as exc:
         raise ImportError("ml_calculator_loader.py not found.") from exc
 
@@ -61,7 +58,3 @@ def main():
 
     with open(log_file, "a", encoding=sys.getfilesystemencoding()) as f:
         f.write(f"\nOptimization {'converged' if converged else 'NOT converged'}.\n")
-
-
-if __name__ == '__main__':
-    main()

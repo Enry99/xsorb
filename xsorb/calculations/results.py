@@ -10,7 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-import xsorb.io.jobs
 from xsorb.structures.utils import slab_mol_bonds
 from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.dft_codes.definitions import (
