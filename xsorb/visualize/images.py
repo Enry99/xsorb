@@ -12,19 +12,32 @@ are called from the command line.
 from __future__ import annotations
 from pathlib import Path
 import os
+import subprocess
+import logging
 from dataclasses import asdict
-
-from ase.visualize import view
 
 import xsorb.structures.slab
 from xsorb.ase_custom.atoms import AtomsCustom
-from xsorb.io.settings import Settings
+from xsorb.settings import Settings
 from xsorb.io.database import Database
 from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.visualize.render import render_image
 from xsorb.visualize.plot import plot_overview_grid
-from xsorb.visualize.utils import get_centered_mol_and_slab, read_custom_colors
+from xsorb.visualize.utils import get_centered_mol_and_slab
 from xsorb.io.utils import progressbar
+from xsorb.adsorptiondata.adsorptioncalculation import ALLOWED_STATUSES
+from xsorb.adsorptiondata import AdsorptionStructure, AdsorptionCalculation
+from xsorb.visualize.settings import CustomSettings
+
+
+stars_map = {"completed": "",
+             "incomplete": "*",
+             "scf_nonconverged": "**"}
+symbols_map = {"completed": {"symbol": ".", "color": "white"}, # not to be used
+               "incomplete": {"symbol": "x", "color": "black"},
+               "scf_nonconverged": {"symbol": "^", "color": "red"}}
+assert stars_map.keys() == symbols_map.keys() and set(stars_map.keys()) == set(ALLOWED_STATUSES) \
+    , "stars_map and symbols_map must have the same keys as ALLOWED_STATUSES"
 
 
 def plot_adsorption_sites(all_sites : bool = False):
@@ -71,6 +84,7 @@ def plot_adsorption_sites(all_sites : bool = False):
 def plot_images(calc_type : str,
                 calc_id : int | None = None,
                 movie: bool = False,
+                framerate : int = 10,
                 **kwargs):
     '''
     Plot images of the configurations
@@ -79,17 +93,17 @@ def plot_images(calc_type : str,
     - calc_type: 'initial','screening','relax','mlopt'
     - calc_id: index of the calculation to plot. If None, plot all
     - movie: if True, generate a movie from the images
+    - framerate: framerate for the movie, Default is 10.
 
-    kwargs are those for xsorb.visualize.render_image
+    kwargs are those for xsorb.visualize.render.render_image
     '''
 
     kwargs.pop('traceback', None)
     kwargs.pop('command', None)
     kwargs.pop('func', None)
-    kwargs.pop('arrows_type', None)
     framerate = kwargs.pop('framerate', None)
     rotations = kwargs.pop('rotation', None)
-    center_mol = kwargs.pop('center_mol', None)
+    center_mol = kwargs.pop('center_molecule', None)
 
     if calc_type not in ('initial','screening', 'relax', 'mlopt'):
         raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'mlopt'")
@@ -103,9 +117,7 @@ def plot_images(calc_type : str,
         print("No images to be generated.")
         return
 
-    custom_colors = read_custom_colors()
-    if custom_colors and custom_colors.get('povray_old_style'):
-        os.environ['POVRAY_OLD_STYLE'] = '1'
+    custom_settings = CustomSettings()
 
     #get it here, so that we can decide to apply it or not
     #depending on the rotation.
@@ -123,7 +135,7 @@ def plot_images(calc_type : str,
     for row in progressbar(rows, 'Rendering:'):
 
         atoms = AtomsCustom(row.toatoms())
-        mol_indices = row.data.adsorption_structure.mol_indices
+        mol_indices = row.data.AdsorptionStructure.mol_indices
 
         if center_mol:
             #use the same translation for all frames in the trajectory, to avoid jumps
@@ -156,38 +168,55 @@ def plot_images(calc_type : str,
 
                 os.makedirs(f'rendered_frames_{row.calc_id}', exist_ok=True)
                 os.chdir(f'rendered_frames_{row.calc_id}')
-                for i, frame in enumerate(progressbar(row.data.trajectory,
-                                                        'Rendering:')):
+
+                adscalc = AdsorptionCalculation.fromdict(row.data["AdsorptionCalculation"])
+                traj = adscalc.calc_results.trajectory
+                for i, frame in enumerate(progressbar(traj, 'Rendering:')):
                     render_image(atoms=frame,
                                 outfile=f'{file_label}_{i:05d}.png',
                                 rotations=rot,
                                 transl_vector=transl_vector,
-                                custom_settings=custom_colors,
                                 depth_cueing=dc,
                                 mol_indices=mol_indices,
+                                custom_settings=custom_settings,
                                 **kwargs)
                 os.chdir(figures_dir)
 
                 print('Frames generated. Generating movie...')
 
-                success = os.system(f'ffmpeg -framerate {framerate} '\
-                            f'-i rendered_frames/{file_label}_%05d.png  '\
-                            '-vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" '\
-                            f'-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '\
-                            f'{file_label}.mp4')
+                success = False
+                # first, try to use ffmpeg:
+                ffmpeg_cmd = f'ffmpeg -y -framerate {framerate} '\
+                    f'-i rendered_frames/{file_label}_%05d.png '\
+                    '-vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" '\
+                    f'-c:v libx264 -profile:v high -crf 20 -pix_fmt yuv420p '\
+                    f'{file_label}.mp4'
+                try:
+                    ret = subprocess.run([ffmpeg_cmd], check=True, capture_output=True, shell=True)
+                    success = ret.returncode == 0
+                except (subprocess.CalledProcessError, FileNotFoundError) as ffmpeg_error:
+                    logging.error('ffmpeg failed: %s. trying to use imagemagick...', ffmpeg_error)
+                    # if ffmpeg fails, try imagemagick:
+                    try:
+                        convert_cmd = f'convert -delay {1000 // framerate} '\
+                            f'-loop 0 rendered_frames/{file_label}_*.png {file_label}.gif'
+                        ret = subprocess.run([convert_cmd], check=True, capture_output=True, shell=True)
+                        success = ret.returncode == 0
+                    except (subprocess.CalledProcessError, FileNotFoundError) as imagemagick_error:
+                        logging.error('Imagemagick also failed: %s', imagemagick_error)
 
                 if success:
-                    print('Movie generated.')
+                    logging.info('Movie generated.')
                 else:
-                    print('Error generating movie, '\
-                          'however the frames are still present in the  rendered_frames folder.')
+                    logging.error('Error generating movie, '
+                            'however the frames are still present in the rendered_frames folder.')
 
             else: #single image
                 render_image(atoms=atoms,
                          outfile=f'{file_label}.png',
                          rotations=rot,
                          transl_vector=transl_vector,
-                         custom_settings=custom_colors,
+                         custom_settings=custom_settings,
                          depth_cueing=dc,
                          mol_indices=mol_indices,
                          **kwargs)
@@ -211,7 +240,6 @@ def plot_images(calc_type : str,
     print(f'All images saved in {figures_dir}.')
 
 
-#TODO: make it read trajectory
 def view_config(calc_type : str, calc_id : int):
     '''
     View the selected config with ASE GUI
@@ -221,20 +249,28 @@ def view_config(calc_type : str, calc_id : int):
     - calc_id: index of the calculation to plot.
     '''
 
+    from ase.visualize import view # pylint: disable=import-outside-toplevel
+
     if calc_type not in ('initial','screening', 'relax', 'mlopt'):
-        raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'mlopt'")
+        raise RuntimeError(f"Wrong '{calc_type}', expected '"\
+                           "'screening', 'relax', 'mlopt' or 'initial'")
 
     if calc_type == 'initial':
-        atoms = Database.get_structure(calc_id)[0].to_atoms()
+        row = Database.get_structures(calc_ids=calc_id)[0]
+        ads_structure = AdsorptionStructure.fromdict(row.data["AdsorptionStructure"])
+        atoms_or_traj = ads_structure.atoms
     else:
-        atoms = Database.get_calculation(calc_type, calc_id)[0].to_atoms()
+        row = Database.get_calculations(calc_type=calc_type, calc_ids=calc_id)[0]
+        calc_results = AdsorptionCalculation.fromdict(row.data["AdsorptionCalculation"])
+        atoms_or_traj = calc_results.calc_results.trajectory
 
-    view(atoms)
+    view(atoms_or_traj)
 
 
 def plot_energy_evolution(calc_type : str):
     '''
     Plot the energy evolution during optimization for all the configurations
+    that have at least one step.
 
     Args:
     - calc_type: 'screening','relax','mlopt'
@@ -247,21 +283,18 @@ def plot_energy_evolution(calc_type : str):
 
     for row in rows:
 
-        stars = '**' if row.get('scf_nonconverged') else \
-            '*' if row.get('status') != 'completed' else ''
+        label = f'{row.calc_id}: {row.adsorption_energy:.2f}{stars_map[row.status]} eV'
 
-        label = f'{row.calc_id}: {row.get("adsorption_energy"):.2f}{stars} eV'
-
-        energy_array = row.data.adsorption_energy_evolution
+        energy_array = row.data.AdsorptionCalculation.calc_results.adsorption_energy_evol
         plt.plot(energy_array, '-', label=label)
 
-        if '*' in stars:
-            symbol = 'x' if stars == '*' else '^'
-            color = 'black' if stars == '*' else 'red'
-            plt.plot(len(energy_array)-1, energy_array[-1], symbol, color=color)
+        if row.status != 'completed':
+            plt.plot(len(energy_array)-1, energy_array[-1],
+                     symbols_map[row.status]["sym"],
+                     color=symbols_map[row.status]["color"])
 
 
-    plt.title('Energy evolution during optimization')
+    plt.title(f'Energy evolution during {calc_type}')
     plt.xlabel('step')
     plt.ylabel('energy (eV)')
     plt.grid(linestyle='dotted')

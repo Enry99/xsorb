@@ -42,6 +42,10 @@ Example:
                         type=_positive_int,
                         metavar=('nx', 'ny', 'nz'),
                         help="Replicate the cell nx ny nz times along the three cell vectors.")
+        parser.add_argument('-cmol', '--center-molecule',
+                            action='store_true',
+                            default=False,
+                            help='Center the molecule in the middle of the slab.')
         parser.add_argument('-wr', '--wrap',
                             action='store_true',
                             default=False,
@@ -59,6 +63,10 @@ Example:
                             choices=['none', 'single', 'multiple'],
                             default='single',
                             help='Draw bonds between atoms. Options: none, single (default), multiple.')
+        parser.add_argument('-hc', '--hide-cell',
+                        action='store_true',
+                        default=False,
+                        help='Hide the cell box.')
 
         # color and style options
         parser.add_argument('-dc','--depth-cueing',
@@ -81,6 +89,11 @@ Example:
                         choices=['forces', 'magmoms'],
                         help='''Draw arrows representing the vectors,
                         with lenghth proportional to the magnitude.''')
+        parser.add_argument('-as', '--arrows-scale',
+                        type=_positive_float,
+                        default=1.0,
+                        help='''Scale factor for the arrows.
+                        Default = 1.0 (no scaling).''')
 
         # rendering options
         parser.add_argument('-w', '--width-res',

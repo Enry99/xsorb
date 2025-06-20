@@ -118,6 +118,12 @@ vesta_colors = np.array([
     [0.30000, 0.30000, 0.30000]
 ])
 
+colorschemes = {
+    "vesta": vesta_colors,
+    "cpk": cpk_colors,
+    "jmol": jmol_colors
+}
+
 
 @dataclass
 class CustomSettings:
@@ -149,18 +155,16 @@ class CustomSettings:
             if custom_settings.pop("povray_old_style", None):
                 os.environ['POVRAY_OLD_STYLE'] = '1'
 
-            color_scheme = custom_settings.pop("color_scheme", "jmol").lower()
-            if color_scheme == "vesta":
-                self.color_scheme = vesta_colors.copy()
-                logger.info("Using VESTA colors for elements.")
-            elif color_scheme == "cpk":
-                self.color_scheme = cpk_colors.copy()
-                logger.info("Using CPK colors for elements.")
-            elif color_scheme == "jmol":
-                self.color_scheme = jmol_colors.copy()
-                logger.info("Using Jmol colors for elements.")
-            else:
-                logger.warning("Unknown color scheme '%s'. Using Jmol colors by default.", color_scheme)
+            color_scheme_name = custom_settings.pop("color_scheme", None)
+            if color_scheme_name is not None:
+                color_scheme_name = color_scheme_name.lower()
+
+                if color_scheme_name in colorschemes:
+                    self.color_scheme = colorschemes[color_scheme_name].copy()
+                    logger.info("Using %s colors for elements.", color_scheme_name)
+                else:
+                    logger.warning("Unknown color scheme '%s'. '\
+                                   'Using Jmol colors by default.", color_scheme_name)
 
             for key, value in custom_settings.items():
                 if hasattr(self, key):

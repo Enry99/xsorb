@@ -17,13 +17,11 @@ xsorb/calculations:             OK
 xsorb/structures:               OK
 
 xsorb/io:                       OK
+
+xsorb/visualize:                OK
 -----------
 
-xsorb/visualize/*:
-
-
 FINALLY: xfrag.
-
 
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
 TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs

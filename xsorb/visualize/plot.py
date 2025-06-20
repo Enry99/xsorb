@@ -15,6 +15,7 @@ or by other "launcher" functions that are directly called by the cli commands.
 '''
 
 from __future__ import annotations
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -25,12 +26,12 @@ from matplotlib import colormaps
 from matplotlib import cm
 from matplotlib.colors import Normalize
 from pymatgen.core import Structure
-from pymatgen.analysis.adsorption import plot_slab, get_rot
+from pymatgen.analysis.adsorption import plot_slab, get_rot, color_dict
 from ase.visualize.plot import plot_atoms
 
 
 if TYPE_CHECKING:
-    from xsorb.structures.slab import AdsorptionSite
+    from xsorb.structures.slab import AdsorptionSiteCrystal, AdsorptionSiteAmorphous
     from xsorb.structures.molecule import MoleculeRotation
 
 
@@ -66,15 +67,19 @@ def plot_rotations_images(mol_rotations_ase : list[MoleculeRotation],
 
 
 def plot_adsites_image(mode : str,
-                       adsites : list[AdsorptionSite],
+                       adsites : list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous],
                        slab_pymat : Structure,
                        figname : str = 'adsorption_sites.png',
                        verbose : bool = False):
     '''
     Internal helper function to save an image of the adsorption sites with their numeric label
     Args:
+    - mode: 'high_symmetry', 'coord_number', 'coord_number_surrounding'
+        - high_symmetry: plot the sites with colors based on their type (ontop, bridge, hollow)
+        - coord_number: plot the sites with colors based on their coordination number
+        - coord_number_surrounding: plot the sites with lines connecting to surrounding sites
+            and color based on their coordination number
     - adsites: list of cartesian coordinates of the sites
-    - adsite_labels: list of the adsites labels (used to color code the sites)
     - slab_pymat: Pymatgen Structure of the slab
     - figname: filename of the image
     '''
@@ -83,8 +88,20 @@ def plot_adsites_image(mode : str,
     if mode not in allowed_modes:
         raise ValueError(f"The mode to plot adsorption sites must be one of {allowed_modes}")
 
+    if len(adsites) == 0:
+        logging.warning("No adsorption sites to plot.")
+        return
+
     if verbose: print(f"Saving image to {figname}...") #pylint: disable=multiple-statements
 
+    # try to read custom colors from image_settings.json
+    from xsorb.visualize.settings import CustomSettings
+    from ase.data import chemical_symbols
+    custom_settings = CustomSettings()
+    color_scheme_dict_by_element = {
+        el: rgb for el, rgb in zip(chemical_symbols, custom_settings.color_scheme)
+    }
+    color_dict = color_scheme_dict_by_element # monkey patch pymatgen's color_dict #pylint: disable=unused-variable
 
     # preparation to plot the sites ####################################################
     fig = plt.figure(figsize=(4,3))
@@ -119,7 +136,7 @@ def plot_adsites_image(mode : str,
         ax.set_title('Adsites based on C.N.')
         coord_nums = [adsite.coordination_number for adsite in adsites]
         cmap_coord_numb = colormaps.get_cmap('viridis_r')
-        norm = Normalize(vmin=min(coord_nums), vmax=max(coord_nums))
+        norm = Normalize(vmin=np.min(coord_nums), vmax=np.max(coord_nums))
         fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap_coord_numb), ax=ax, label='C.N.')
 
 
@@ -130,7 +147,7 @@ def plot_adsites_image(mode : str,
         if mode == "coord_number_surrounding":
             for surrounding_site in main_site.surrounding_sites:
                 site_xy = sop.operate(surrounding_site.coords)[:2]
-                label = str(surrounding_site.label)
+                label = surrounding_site.label
                 if surrounding_site.duplicate_main:
                     label += '^'
                 if surrounding_site.duplicate_surrounding:

@@ -8,26 +8,9 @@
 '''
 
 from __future__ import annotations
-from pathlib import Path
-import json
-import sys
 
 import numpy as np
 from ase import Atoms
-
-def read_custom_colors():
-    '''
-    Read the custom colors from the file custom_colors.json and return a dictionary.
-    If the file does not exist, return None.
-    '''
-
-    if Path("custom_colors.json").exists():
-        with open("custom_colors.json", "r", encoding=sys.getfilesystemencoding()) as f:
-            custom_colors = json.load(f)
-            print("Custom colors read from file.")
-        return custom_colors
-
-    return None
 
 
 def get_centered_mol_and_slab(atoms : Atoms, mol_indices : list[int]):
@@ -44,8 +27,9 @@ def get_centered_mol_and_slab(atoms : Atoms, mol_indices : list[int]):
     transl_vector (np.array): The translation vector to center the molecule
     """
 
-    from ase import neighborlist
-    from scipy import sparse
+    # import here to not impact import time if not used
+    from ase import neighborlist # pylint: disable=import-outside-toplevel
+    from scipy import sparse # pylint: disable=import-outside-toplevel
 
     #avoid modifying the original structure
     atoms = atoms.copy()
