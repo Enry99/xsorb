@@ -47,7 +47,7 @@ def plot_rotations_images(mol_rotations_ase : list[MoleculeRotation],
     - labels: list of strings containing the info on each rotation
     '''
 
-    if verbose: print(f"Saving image to {figname}...") #pylint: disable=multiple-statements
+    if verbose: logging.info(f"Saving image to {figname}...") #pylint: disable=multiple-statements
 
     rows_fig = max(int(np.ceil(len(mol_rotations_ase)/5)), 1)
     cols_fig = max(int(np.ceil(len(mol_rotations_ase)/rows_fig)), 1)
@@ -63,7 +63,7 @@ def plot_rotations_images(mol_rotations_ase : list[MoleculeRotation],
     fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
     fig.savefig(figname, dpi=800, bbox_inches='tight')
 
-    if verbose: print("Image saved.") #pylint: disable=multiple-statements
+    if verbose: logging.info("Image saved.") #pylint: disable=multiple-statements
 
 
 def plot_adsites_image(mode : str,
@@ -92,7 +92,7 @@ def plot_adsites_image(mode : str,
         logging.warning("No adsorption sites to plot.")
         return
 
-    if verbose: print(f"Saving image to {figname}...") #pylint: disable=multiple-statements
+    if verbose: logging.info(f"Saving image to {figname}...") #pylint: disable=multiple-statements
 
     # try to read custom colors from image_settings.json
     from xsorb.visualize.settings import CustomSettings
@@ -201,7 +201,7 @@ def plot_adsites_image(mode : str,
 
     fig.savefig(figname, dpi=800, bbox_inches='tight')
 
-    if verbose: print("Image saved.") #pylint: disable=multiple-statements
+    if verbose: logging.info("Image saved.") #pylint: disable=multiple-statements
 
 
 def plot_overview_grid(calc_type : str,

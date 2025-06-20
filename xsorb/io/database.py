@@ -57,6 +57,7 @@ while the structure database contains:
 '''
 from __future__ import annotations
 from pathlib import Path
+import logging
 
 import pandas as pd
 import ase.db
@@ -246,7 +247,7 @@ class Database:
                     verbose=verbose)
 
         if verbose:
-            print(f'{calc_type} database updated.')
+            logging.info(f'{calc_type} database updated.')
 
         if write_csv:
             Database.write_csvfile(txt=txt, verbose=verbose)
@@ -277,7 +278,7 @@ class Database:
 
 
         if verbose and refresh:
-            print('Re-reading the output files, updating e_slab_mol, '\
+            logging.info('Re-reading the output files, updating e_slab_mol, '\
                    'the radii mult factor, and recalculating the bonding status...')
 
 
@@ -349,7 +350,7 @@ class Database:
             raise ValueError('Cannot use both selection and calc_ids')
 
         if not Path(CALC_DB_NAMES[calc_type]).exists():
-            print(f'Warning: No {calc_type} calculations present in the database.')
+            logging.warning(f'Warning: No {calc_type} calculations present in the database.')
             return []
 
         #Make sure that the database is up to date
@@ -501,7 +502,7 @@ class Database:
         - verbose: bool to print messages
         '''
 
-        if verbose: print('Writing results file...') #pylint: disable=multiple-statements
+        if verbose: logging.info('Writing results file...') #pylint: disable=multiple-statements
 
         if not Path(STRUCTURES_DB_NAME).exists():
             raise RuntimeError('Missing structures database. Cannot write csv file.')
@@ -539,13 +540,13 @@ class Database:
                                 if row.get('status') == 'scf_nonconverged':
                                     eads += '**'
                                     if verbose:
-                                        print(f'Warning! {calc_type} {calc_id} '\
+                                        logging.warning(f'Warning! {calc_type} {calc_id} '\
                                           'failed to reach SCF convergence in the last step. '\
                                             'The energy will be marked with **')
                                 elif row.get('status') == 'incomplete':
                                     eads += '*'
                                     if verbose:
-                                        print(f'Warning! {calc_type} {calc_id} '\
+                                        logging.warning(f'Warning! {calc_type} {calc_id} '\
                                           'has not reached final configuration. '\
                                             'The energy will be marked with a *')
                             info_dicts[calc_id].update({eads_column_name: eads})
@@ -573,7 +574,7 @@ class Database:
         else:
             df.to_csv('results.csv', index=False)
 
-        if verbose: print('Results file written.') #pylint: disable=multiple-statements
+        if verbose: logging.info('Results file written.') #pylint: disable=multiple-statements
 
 
 def manual_update_calculations(calc_type : str,

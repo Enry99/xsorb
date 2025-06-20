@@ -9,6 +9,7 @@ used to generate the adsorption structures
 '''
 
 from __future__ import annotations
+import logging
 from dataclasses import asdict
 
 import numpy as np
@@ -63,7 +64,7 @@ class AdsorptionStructuresGenerator:
 
         #Slab import from file
         if verbose:
-            print('Loading slab...')
+            logging.info('Loading slab...')
         self.slab = Slab(slab=slab,
                     surface_thickness=settings.structure.adsorption_sites.surface_thickness,
                     layers_threshold=settings.structure.constraints.layers_height,
@@ -73,12 +74,12 @@ class AdsorptionStructuresGenerator:
                     sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,
                     translate_slab_from_below_cell_bottom=settings.structure.misc.translate_slab)
         if verbose:
-            print('Slab loaded.')
+            logging.info('Slab loaded.')
 
 
         #Molecule import from file
         if verbose:
-            print('Loading molecule...')
+            logging.info('Loading molecule...')
 
         self.mol = Molecule(mol=mol,
                     atom_indexes=settings.structure.molecule.selected_atom_indexes,
@@ -87,7 +88,7 @@ class AdsorptionStructuresGenerator:
                     fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
                     fix_mol_xyz=settings.structure.constraints.fix_mol_xyz)
         if verbose:
-            print('Molecule loaded.')
+            logging.info('Molecule loaded.')
 
 
 
@@ -352,7 +353,7 @@ class AdsorptionStructuresGenerator:
 
         #Adsorption of molecule on all adsorption sites for all molecule orientations
         if verbose:
-            print('Generating adsorption structures...')
+            logging.info('Generating adsorption structures...')
 
         if self.settings.structure.molecule.z_rot_angles == 'surrounding':
             rot_mode = 'surrounding'
@@ -361,7 +362,7 @@ class AdsorptionStructuresGenerator:
 
         adsorption_structures : list[AdsorptionStructure] = []
         for mol_ref_index in self.mol.reference_atom_indices:
-            print(f"Molecule atom {mol_ref_index}:")
+            logging.info(f"Molecule atom {mol_ref_index}:")
             for adsite in progressbar(adsites, "Generating structures for each site:"):
                 molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
                                                                     which_index=mol_ref_index,
@@ -391,6 +392,6 @@ class AdsorptionStructuresGenerator:
             adsorption_structures = filtered_adsorption_structures
 
         if verbose:
-            print('Adsorption structures generated.')
+            logging.info('Adsorption structures generated.')
 
         return adsorption_structures

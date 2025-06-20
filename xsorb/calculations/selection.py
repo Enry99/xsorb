@@ -9,6 +9,7 @@ Module with the functions to select the configurations for subsequent calculatio
 '''
 
 from __future__ import annotations
+import logging
 
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.io.database import Database
@@ -79,9 +80,9 @@ def obtain_calc_indices(*,
         raise ValueError('Only one between n_configs and threshold can be specified.')
 
     if verbose:
-        print(f'Collecting results from {calc_type}...')
+        logging.info(f'Collecting results from {calc_type}...')
         if excluded_calc_ids is not None:
-            print(f'Configurations {excluded_calc_ids} will be excluded, as requested.')
+            logging.info(f'Configurations {excluded_calc_ids} will be excluded, as requested.')
 
 
     #### start collecting the results from the database ####
@@ -162,7 +163,7 @@ def obtain_calc_indices(*,
         raise ValueError('Duplicate calculation IDs found in the selected configurations.')
 
 
-    if verbose: print(f'{calc_type} results collected.') #pylint: disable=multiple-statements
+    if verbose: logging.info(f'{calc_type} results collected.') #pylint: disable=multiple-statements
 
     return selected_calc_ids
 

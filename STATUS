@@ -27,5 +27,4 @@ TODO: add check for scf not converged in vasp, and reaching max steps in qe, at 
 TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
 TODO: mettere plot istogrammi, sia per xsorb, con le varie eads, sia in xfrag, con tutte le combinazioni.
 TODO: add conformers from PubChem
-TODO: sostituire print con logging, salvando tutto su file, e solo le info principali su console
 TODO: add CITATION.cff file

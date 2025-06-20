@@ -4,6 +4,7 @@ Moudule to clean all files for an Xsorb run.
 
 import os
 import shutil
+import logging
 
 from xsorb.io.filenames import (
     ALL_DB_NAMES, JOBS_FILENAME,
@@ -17,17 +18,17 @@ def cleanup_xsorb_run(calc_only: bool = False):
     # ask the user for confirmation
     confirm = input("Do you really want to remove all files for this Xsorb run? (yes/no): ")
     if confirm != 'yes':
-        print("Cleanup aborted.")
+        logging.info("Cleanup aborted.")
         return
 
     if calc_only:
-        print("Cleaning up only calculation files...")
+        logging.info("Cleaning up only calculation files...")
 
         for directory in ALL_OUTDIRS:
             if os.path.exists(directory):
                 shutil.rmtree(directory, ignore_errors=True)
-                print(f"Removed directory: {directory}")
-        print("Calculation files cleaned up.")
+                logging.info(f"Removed directory: {directory}")
+        logging.info("Calculation files cleaned up.")
 
         return
 
@@ -35,13 +36,13 @@ def cleanup_xsorb_run(calc_only: bool = False):
     for db_name in ALL_DB_NAMES:
         if os.path.exists(db_name):
             os.remove(db_name)
-            print(f"Removed database file: {db_name}")
+            logging.info(f"Removed database file: {db_name}")
 
     # Remove the jobs file
     if os.path.exists(JOBS_FILENAME):
         os.remove(JOBS_FILENAME)
 
-    print("All Xsorb run files cleaned up.")
+    logging.info("All Xsorb run files cleaned up.")
 
 
 def fresh_start():

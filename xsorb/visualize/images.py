@@ -114,7 +114,7 @@ def plot_images(calc_type : str,
         rows = Database.get_calculations(calc_type, calc_ids=calc_id)
 
     if not rows:
-        print("No images to be generated.")
+        logging.warning("No images to be generated.")
         return
 
     custom_settings = CustomSettings()
@@ -164,7 +164,7 @@ def plot_images(calc_type : str,
             #render trajectory for each config
             if movie and (rot_label == rotations_labels[1] if not rotations else True):
 
-                print('Generating frames for traj...')
+                logging.info('Generating frames for traj...')
 
                 os.makedirs(f'rendered_frames_{row.calc_id}', exist_ok=True)
                 os.chdir(f'rendered_frames_{row.calc_id}')
@@ -182,7 +182,7 @@ def plot_images(calc_type : str,
                                 **kwargs)
                 os.chdir(figures_dir)
 
-                print('Frames generated. Generating movie...')
+                logging.info('Frames generated. Generating movie...')
 
                 success = False
                 # first, try to use ffmpeg:
@@ -237,7 +237,7 @@ def plot_images(calc_type : str,
 
     os.chdir(main_dir)
 
-    print(f'All images saved in {figures_dir}.')
+    logging.info(f'All images saved in {figures_dir}.')
 
 
 def view_config(calc_type : str, calc_id : int):
@@ -303,4 +303,4 @@ def plot_energy_evolution(calc_type : str):
                prop={'size': 6  if calc_type in ('screening', 'mlopt') else 8})
     energy_plot_filename = f'{calc_type}_energies.png'
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
-    print(f'Plot saved in {energy_plot_filename}')
+    logging.info(f'Plot saved in {energy_plot_filename}')

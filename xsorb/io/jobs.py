@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import logging
 
 import xsorb.io.database
 from xsorb.settings import Settings
@@ -163,12 +164,12 @@ def cancel_jobs():
     job_ids_to_cancel = [job for job in active_jobs if job in submitted_job_ids]
 
     if len(job_ids_to_cancel) == 0:
-        print("No jobs to cancel.")
+        logging.info("No jobs to cancel.")
         return
 
-    print(f"Cancelling jobs {job_ids_to_cancel}.")
+    logging.info(f"Cancelling jobs {job_ids_to_cancel}.")
 
     for job_id in job_ids_to_cancel:
         scheduler.cancel_job(job_id)
 
-    print("All jobs cancelled.")
+    logging.info("All jobs cancelled.")

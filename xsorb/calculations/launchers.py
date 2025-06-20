@@ -13,7 +13,7 @@ Main functions to launch the various types of calculations.
 
 from __future__ import annotations
 import sys
-import os
+import logging
 
 import numpy as np
 
@@ -182,7 +182,7 @@ def launch_final_relax(*,
     #this check also updates the db
     if not Database.all_completed(calc_type=take_from) and \
         not continue_even_if_not_all_completed_question():
-        print('Quitting.')
+        logging.info('Quitting.')
         sys.exit(0)
 
     if not calc_ids:

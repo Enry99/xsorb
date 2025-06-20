@@ -10,6 +10,7 @@ Module for writing input files for the calculations
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import shutil
+import logging
 from pathlib import Path
 
 
@@ -54,7 +55,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
     program = settings.dft.program if calc_type != 'mlopt' else 'ml'
 
-    if verbose: print('Writing input files...') #pylint: disable=multiple-statements
+    if verbose: logging.info('Writing input files...') #pylint: disable=multiple-statements
 
     #Add structures to database, and obtain the calc_ids
     if calc_ids is None:
@@ -119,7 +120,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
                                   total_e_slab_mol=total_e_slab_mol,
                                   calc_type=calc_type)
 
-    if verbose: print('All input files written.') #pylint: disable=multiple-statements
+    if verbose: logging.info('All input files written.') #pylint: disable=multiple-statements
 
     return written_systems
 
@@ -163,7 +164,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
                                              log_file_path=LOG_FILE_PATHS['mol'][program]))
 
 
-    if verbose: print('Writing input files...') #pylint: disable=multiple-statements
+    if verbose: logging.info('Writing input files...') #pylint: disable=multiple-statements
 
     #Write the input files
     answer_all = False #pylint: disable=invalid-name
@@ -195,7 +196,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
             label=file_label,
             directory=file_dir)
 
-    if verbose: print('All input files written.') #pylint: disable=multiple-statements
+    if verbose: logging.info('All input files written.') #pylint: disable=multiple-statements
 
     return written_systems
 
@@ -217,7 +218,7 @@ def saveas(calc_type : str, saveas_format : str):
 
     folder = Path(f"{calc_type}/{saveas_format}")
 
-    print(f"Saving files to {folder}...")
+    logging.info(f"Saving files to {folder}...")
     folder.mkdir(exist_ok=True, parents=True)
 
     if calc_type == 'initial':
@@ -231,4 +232,4 @@ def saveas(calc_type : str, saveas_format : str):
         else:
             write(folder / f'{calc_type}_{row.calc_id}.{saveas_format}', AtomsCustom(row.toatoms()))
 
-    print("All files saved.")
+    logging.info("All files saved.")

@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import sys
+import logging
 
 try:
     import tomllib
@@ -115,7 +116,7 @@ class Settings:
                     self.input.E_slab_mol[0] = read(self.input.slab_filename).get_potential_energy()
                 except Exception as e: # pylint: disable=broad-except
                     if verbose:
-                        print(f"Error reading slab energy: {e}. Setting to 0")
+                        logging.error(f"Error reading slab energy: {e}. Setting to 0")
         if int(self.input.E_slab_mol[1]) == 0:
             try:
                 self.input.E_slab_mol[1] = \
@@ -126,7 +127,7 @@ class Settings:
                     self.input.E_slab_mol[1] = read(self.input.molecule_filename).get_potential_energy()
                 except Exception as e: # pylint: disable=broad-except
                     if verbose:
-                        print(f"Error reading molecule energy: {e}. Setting to 0")
+                        logging.error(f"Error reading molecule energy: {e}. Setting to 0")
 
         return sum(self.input.E_slab_mol)
 
@@ -144,13 +145,13 @@ class Settings:
         except Exception as e: # pylint: disable=broad-except
             eslab_ml = 0.0
             if verbose:
-                print(f"Error reading ML slab energy: {e}. Setting to 0")
+                logging.error(f"Error reading ML slab energy: {e}. Setting to 0")
         try:
             emol_ml = \
                 read(OUT_FILE_PATHS['mol']['ml']).get_potential_energy()
         except Exception as e: # pylint: disable=broad-except
             emol_ml = 0.0
             if verbose:
-                print(f"Error reading molecule energy: {e}. Setting to 0")
+                logging.error(f"Error reading molecule energy: {e}. Setting to 0")
 
         return eslab_ml + emol_ml

@@ -9,6 +9,7 @@ Module to check and update the results of the calculations
 from __future__ import annotations
 from pathlib import Path
 import sys
+import logging
 
 from xsorb.structures.utils import slab_mol_bonds
 from xsorb.ase_custom.io import ase_custom_read as read
@@ -94,12 +95,12 @@ def get_atoms_from_calc(filename : str, return_trajectory : bool = True):
         try:
             trajectory = read(filename, index=':')
         except Exception as exc: #pylint: disable=broad-except
-            print(f'Error reading trajectory from file {filename}: {exc}. '\
+            logging.error(f'Error reading trajectory from file {filename}: {exc}. '\
                 'Attempting to read only the last configuration.')
             try:
                 trajectory = [read(filename)]
             except Exception as exc2: #pylint: disable=broad-except
-                print(f'Error reading file {filename}: {exc2}.')
+                logging.error(f'Error reading file {filename}: {exc2}.')
                 return None
 
         return trajectory
@@ -108,7 +109,7 @@ def get_atoms_from_calc(filename : str, return_trajectory : bool = True):
         try:
             atoms = read(filename)
         except Exception as exc: #pylint: disable=broad-except
-            print(f'Error reading file {filename}: {exc}.')
+            logging.error(f'Error reading file {filename}: {exc}.')
             return None
 
         return atoms
@@ -155,7 +156,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
                     missing_file = system.calc_info.out_file_path
                 else:
                     missing_file = system.calc_info.log_file_path
-                print(f'Warning! File {missing_file} not found. Skipping.')
+                logging.warning(f'Warning! File {missing_file} not found. Skipping.')
             continue
 
         traj = get_atoms_from_calc(system.calc_info.out_file_path)
@@ -204,5 +205,5 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
 
 
         except Exception as e: #pylint: disable=broad-except
-            print(f'No energy in file {system.calc_info.out_file_path}: {e}.' \
+            logging.info(f'No energy in file {system.calc_info.out_file_path}: {e}.' \
                   'possibly the calculation is still running. Skipping.')

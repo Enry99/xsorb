@@ -9,7 +9,7 @@ Module that contains the class Molecule, used to generate the rotations
 """
 
 from __future__ import annotations
-import warnings
+import logging
 
 import numpy as np
 from ase.constraints import FixCartesian
@@ -153,7 +153,7 @@ class Molecule:
         '''
 
         if verbose:
-            print('Generating molecular configurations...')
+            logging.info('Generating molecular configurations...')
 
         if which_index not in self.reference_atom_indices:
             raise ValueError('The index of the reference atom is not valid.')
@@ -210,7 +210,7 @@ class Molecule:
                                                       mol_atom=which_index))
 
         if verbose:
-            print('All molecular configurations generated.')
+            logging.info('All molecular configurations generated.')
 
         if save_image:
             plot_rotations_images(mol_rotations_ase, verbose=True)

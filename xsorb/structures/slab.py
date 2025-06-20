@@ -12,8 +12,7 @@ Module that contains the Slab class, with the methods to find adsorption sites
 from __future__ import annotations
 from typing import Callable
 import warnings
-from pathlib import Path
-import json
+import logging
 
 import numpy as np
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
@@ -291,7 +290,7 @@ class Slab:
         '''
 
         if verbose:
-            print('Finding adsorption sites...')
+            logging.info('Finding adsorption sites...')
 
         site_types = ('ontop', 'hollow', 'bridge')
 
@@ -321,7 +320,7 @@ class Slab:
 
 
         if verbose:
-            print('Adsorption sites found.')
+            logging.info('Adsorption sites found.')
 
         if save_image: #save png to visualize the identified sites
             plot_adsites_image(mode='high_symmetry',
@@ -384,7 +383,7 @@ class Slab:
             #standard coordination number (integer no. of nearest neighbours)
             #with fixed radius. If radius is set to None, the natural_cutoffs are used.
             if verbose:
-                print('Using ase.neighborlist {0} to find coordination numbers.'.format( # pylint: disable=consider-using-f-string
+                logging.info('Using ase.neighborlist {0} to find coordination numbers.'.format( # pylint: disable=consider-using-f-string
                     'with fixed radius for all atoms' if cn_plain_fixed_radius \
                           else 'with ase.neighborlist.natural_cutoffs.'))
 
@@ -400,7 +399,7 @@ class Slab:
 
         elif cn_method == 'minimumdistancenn':
             if verbose:
-                print('Using pymatgen.analysis.local_env.MinimumDistanceNN' \
+                logging.info('Using pymatgen.analysis.local_env.MinimumDistanceNN' \
                         ' to find coordination numbers.')
 
             nn = MinimumDistanceNN(tol=0.2)
@@ -408,7 +407,7 @@ class Slab:
 
         elif cn_method == 'crystalnn':
             if verbose:
-                print('Using pymatgen.analysis.local_env.CrystalNN with weigths' \
+                logging.info('Using pymatgen.analysis.local_env.CrystalNN with weigths' \
                         ' to find coordination numbers.')
 
 
@@ -568,7 +567,7 @@ class Slab:
         '''
 
         if verbose:
-            print('Finding adsorption sites...')
+            logging.info('Finding adsorption sites...')
 
         surf_coords, cn_list, surf_sites_indices = \
             self._coord_number_surface_analysis(cn_method, cn_plain_fixed_radius, verbose)
@@ -587,7 +586,7 @@ class Slab:
             surrounding_sites_deltaz=surrounding_sites_deltaz)
 
         if verbose:
-            print('Adsorption sites found.')
+            logging.info('Adsorption sites found.')
 
 
         if save_image: #save png to visualize the identified sites
