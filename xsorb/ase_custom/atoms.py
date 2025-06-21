@@ -47,6 +47,10 @@ class AtomsCustom(Atoms):
     @custom_labels.setter
     def custom_labels(self, ids=None):
         """Set custom_labels."""
+        if isinstance(ids, list) and all(isinstance(i, str) for i in ids):
+            # if list of strings, extract numbers
+            ids = [extract_number_from_string(s, self.symbols[i]) for i, s in enumerate(ids)]
+            print(ids)
         self.set_tags(ids)
 
 
