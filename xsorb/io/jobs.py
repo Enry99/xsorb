@@ -111,7 +111,7 @@ def restart_jobs(calc_type : str):
     scheduler = JobScheduler(settings.input.scheduler)
     active_jobs = scheduler.get_active_job_ids()
 
-    rows = xsorb.io.database.Database.get_calculations(calc_type,
+    rows = xsorb.io.database.Database.get_calculations(calc_type=calc_type,
                                      selection='status!=completed')
     indices_to_restart = [row.calc_id for row in rows if row.job_id not in active_jobs]
     in_files = [row.in_file_path for row in rows]

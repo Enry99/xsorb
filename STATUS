@@ -24,7 +24,7 @@ xsorb/visualize:                OK
 FINALLY: xfrag.
 
 TODO: add check for scf not converged in vasp, and reaching max steps in qe, at the end of the relax
+TODO: check that restart is done when calculation crashed before first step
 TODO: check that when reading magmoms from input, the order is then changed correctly after resorting the poscar during write_inputs
-TODO: mettere plot istogrammi, sia per xsorb, con le varie eads, sia in xfrag, con tutte le combinazioni.
 TODO: add conformers from PubChem
 TODO: add CITATION.cff file

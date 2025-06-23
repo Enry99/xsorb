@@ -15,6 +15,10 @@ import os
 import subprocess
 import logging
 from dataclasses import asdict
+import numpy as np
+import matplotlib
+from matplotlib import pyplot as plt
+from ase.data import chemical_symbols
 
 import xsorb.structures.slab
 from xsorb.ase_custom.atoms import AtomsCustom
@@ -29,6 +33,7 @@ from xsorb.adsorptiondata.adsorptioncalculation import ALLOWED_STATUSES
 from xsorb.adsorptiondata import AdsorptionStructure, AdsorptionCalculation
 from xsorb.visualize.settings import CustomSettings
 
+matplotlib.use('Agg')
 
 stars_map = {"completed": "",
              "incomplete": "*",
@@ -111,7 +116,7 @@ def plot_images(calc_type : str,
     if calc_type == 'initial':
         rows = Database.get_structures(calc_ids=calc_id)
     else:
-        rows = Database.get_calculations(calc_type, calc_ids=calc_id)
+        rows = Database.get_calculations(calc_type=calc_type, calc_ids=calc_id)
 
     if not rows:
         logging.warning("No images to be generated.")
@@ -135,7 +140,15 @@ def plot_images(calc_type : str,
     for row in progressbar(rows, 'Rendering:'):
 
         atoms = AtomsCustom(row.toatoms())
-        mol_indices = row.data.AdsorptionStructure.mol_indices
+        if row.data.get('AdsorptionStructure'):
+            adstruct = AdsorptionStructure.fromdict(row.data['AdsorptionStructure'])
+        elif row.data.get('AdsorptionCalculation'):
+            adstruct = AdsorptionCalculation.fromdict(
+                row.data['AdsorptionCalculation']).adsorption_structure
+        else:
+            raise RuntimeError(f"Row {row.calc_id} does not contain AdsorptionStructure or "
+                               "AdsorptionCalculation data.")
+        mol_indices = adstruct.mol_indices
 
         if center_mol:
             #use the same translation for all frames in the trajectory, to avoid jumps
@@ -179,6 +192,7 @@ def plot_images(calc_type : str,
                                 depth_cueing=dc,
                                 mol_indices=mol_indices,
                                 custom_settings=custom_settings,
+                                fixed_bounds=True,
                                 **kwargs)
                 os.chdir(figures_dir)
 
@@ -219,6 +233,7 @@ def plot_images(calc_type : str,
                          custom_settings=custom_settings,
                          depth_cueing=dc,
                          mol_indices=mol_indices,
+                         fixed_bounds=True,
                          **kwargs)
                 if rot_label == rotations_labels[0]:
                     outfiles.append(f'{file_label}.png')
@@ -276,22 +291,23 @@ def plot_energy_evolution(calc_type : str):
     - calc_type: 'screening','relax','mlopt'
     '''
 
-    from matplotlib import pyplot as plt
-    import numpy as np
-
-    rows = Database.get_calculations(calc_type, selection='adsorption_energy')
+    rows = Database.get_calculations(calc_type=calc_type, selection='adsorption_energy')
 
     for row in rows:
 
         label = f'{row.calc_id}: {row.adsorption_energy:.2f}{stars_map[row.status]} eV'
 
-        energy_array = row.data.AdsorptionCalculation.calc_results.adsorption_energy_evol
-        plt.plot(energy_array, '-', label=label)
+        adscalc = AdsorptionCalculation.fromdict(row.data.AdsorptionCalculation)
+        if adscalc.calc_results is None:
+            continue
+        energy_array = adscalc.calc_results.adsorption_energy_evol
+        if energy_array:
+            plt.plot(energy_array, '-', label=label)
 
-        if row.status != 'completed':
-            plt.plot(len(energy_array)-1, energy_array[-1],
-                     symbols_map[row.status]["sym"],
-                     color=symbols_map[row.status]["color"])
+            if row.status != 'completed':
+                plt.plot(len(energy_array)-1, energy_array[-1],
+                        symbols_map[row.status]["sym"],
+                        color=symbols_map[row.status]["color"])
 
 
     plt.title(f'Energy evolution during {calc_type}')
@@ -304,3 +320,89 @@ def plot_energy_evolution(calc_type : str):
     energy_plot_filename = f'{calc_type}_energies.png'
     plt.savefig(energy_plot_filename, dpi=300, bbox_inches='tight')
     logging.info(f'Plot saved in {energy_plot_filename}')
+
+
+def plot_histo(calc_type : str):
+    """
+    Plot a histogram of the adsorption energies for the given calculation type.
+
+    Parameters
+    ----------
+    calc_type : str
+        The type of calculation: 'screening', 'relax', 'mlopt'.
+    """
+
+    #### collect data from the database ####
+    rows = Database.get_calculations(calc_type=calc_type, selection='adsorption_energy')
+
+    relax_energies : list[float] = []
+    bond_elements: list[list[str]] = []
+    for row in rows:
+        adscalc = AdsorptionCalculation.fromdict(row.data.AdsorptionCalculation)
+        if adscalc.calc_results is None:
+            continue
+        relax_energies.append(adscalc.calc_results.adsorption_energy)
+        if adscalc.calc_results.bonds is None:
+            bond_elements.append(['X'])  # 'X' for no bonds
+        else:
+            bond_elements.append([bond.mol_atom_species for bond in adscalc.calc_results.bonds])
+    if not relax_energies:
+        logging.warning('No data found for %s. Quitting.', calc_type)
+        return
+    ########################################
+
+
+    matplotlib.rcParams.update({'font.size': 14})
+
+    cs = CustomSettings()
+    # convert array to dict with element symbols as keys
+    colorcode_dict = dict(zip(chemical_symbols, cs.color_scheme))
+    # update with mol_colors
+    if cs.molecule_colors:
+        colorcode_dict.update(cs.molecule_colors)
+    colorcode_dict['X'] = (169/255, 169/255, 169/255)  # gray for no bonds
+
+
+    #### plot histogram with stacked coloring ####
+    counts, bins = np.histogram(relax_energies)
+
+    # Create the base histogram plot
+    _, ax = plt.subplots()
+
+    for i, count in enumerate(counts):
+        if count == 0:
+            continue
+
+        # Get indices of energies that fall into this bin
+        energies_ids = [j for j, energy in enumerate(relax_energies)
+                       if bins[i] <= energy < bins[i+1]]
+
+        # Collect all bond species in this bin
+        bin_bondspecies : list[str] = []
+        for j in energies_ids:
+            bin_bondspecies.extend(bond_elements[j])
+
+        # Count occurrences of each element
+        el_counts : dict[str,int] = {}
+        for el in bin_bondspecies:
+            el_counts[el] = el_counts.get(el, 0) + 1
+
+        # Calculate proportions and create stacked segments
+        total_bonds = sum(el_counts.values())
+        bottom = 0
+
+        for el, el_count in el_counts.items():
+            height = count * (el_count / total_bonds)
+            color = colorcode_dict.get(el, (0,0,0)) # black fallback
+
+            ax.bar(bins[i], height, width=bins[i+1]-bins[i],
+                  bottom=bottom, color=color, edgecolor='white', linewidth=0.5,
+                  align='edge')
+            bottom += height
+
+    plt.title(f'{calc_type} adsorption energy histogram')
+    plt.ylabel('Counts')
+    plt.xlabel('E$_{ads}$(eV)')
+    plt.ylim(ymin=0)
+    plt.savefig(f'histo_{calc_type}.png', dpi=300, bbox_inches='tight')
+    plt.clf()

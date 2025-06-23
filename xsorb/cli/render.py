@@ -102,7 +102,7 @@ Example:
                         help='Horizontal resolution in pixels.')
         parser.add_argument('-pov','--povray',
                         action='store_true',
-                        default=True,
+                        #default=True,
                         help='Use povray for rendering (much better quality).')
 
         # movie options

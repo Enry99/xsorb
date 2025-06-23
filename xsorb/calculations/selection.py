@@ -195,7 +195,7 @@ def get_adsorption_structures(get_structures_from : str,
 
     for row, row_original in zip(rows, rows_original):
         ads_struct = AdsorptionStructure.fromdict(
-            row.data.adsorption_calculation.adsorption_structure)
+            row.data.AdsorptionCalculation.get('adsorption_structure'))
         atoms = AtomsCustom(row.toatoms())
 
         if get_structures_from == 'mlopt':

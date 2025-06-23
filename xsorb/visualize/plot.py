@@ -19,6 +19,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
+import matplotlib
 from matplotlib import pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.patheffects as PathEffects
@@ -26,7 +27,7 @@ from matplotlib import colormaps
 from matplotlib import cm
 from matplotlib.colors import Normalize
 from pymatgen.core import Structure
-from pymatgen.analysis.adsorption import plot_slab, get_rot, color_dict
+from pymatgen.analysis.adsorption import plot_slab, get_rot, color_dict #pylint: disable=unused-import
 from ase.visualize.plot import plot_atoms
 
 
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from xsorb.structures.slab import AdsorptionSiteCrystal, AdsorptionSiteAmorphous
     from xsorb.structures.molecule import MoleculeRotation
 
+matplotlib.use('Agg') # Use Agg backend for matplotlib to avoid GUI issues in headless environments
 
 
 def plot_rotations_images(mol_rotations_ase : list[MoleculeRotation],

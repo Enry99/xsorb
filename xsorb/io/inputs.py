@@ -224,7 +224,7 @@ def saveas(calc_type : str, saveas_format : str):
     if calc_type == 'initial':
         rows = xsorb.io.database.Database.get_structures()
     else:
-        rows = xsorb.io.database.Database.get_calculations(calc_type)
+        rows = xsorb.io.database.Database.get_calculations(calc_type=calc_type)
 
     for row in rows:
         if saveas_format == 'xyz':
