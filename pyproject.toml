@@ -15,9 +15,11 @@ maintainers = [ { name = 'Enrico Pedretti', email = 'enrico.pedretti2@unibo.it' 
 requires-python = '>=3.9'
 dependencies = [
 'ase==3.25.0',
+'pymatgen',
 'numpy>=1.19.5',
 'matplotlib>=3.9.0',
-'pymatgen',
+'pandas>=2.0.0',
+'dacite>=1.8.1'
 ]
 readme = 'README.md'
 license = 'CC-BY-4.0'
