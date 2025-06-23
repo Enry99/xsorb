@@ -41,7 +41,8 @@ def build_xsorb_parser():
         ('view', 'xsorb.cli.view'),
         ('savefiles', 'xsorb.cli.savefiles'),
         ('update', 'xsorb.cli.update'),
-        ('energyplot', 'xsorb.cli.energyplot')
+        ('energyplot', 'xsorb.cli.energyplot'),
+        ('histo', 'xsorb.cli.histo')
     ]
 
     for command, module_name in commands:

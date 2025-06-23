@@ -1,5 +1,5 @@
 '''
-CLI parser for command: energyplot
+CLI parser for command: histo
 '''
 
 import argparse
@@ -8,10 +8,9 @@ from xsorb.cli.command import CLICommandBase
 
 
 class CLICommand(CLICommandBase):
-    """save image with energies evolution for a given calculation type
-
+    """save image with adsorption energy histogram for a given calculation type
 Example:
- $ xsorb energyplot screening
+ $ xsorb histo screening
     """
 
     @staticmethod
@@ -19,13 +18,13 @@ Example:
         parser.add_argument('calc_type',
                         type=str,
                         choices=['screening', 'relax', 'mlopt'],
-                        help='''type of calculation to render''')
+                        help='''type of calculation''')
 
 
     @staticmethod
     def run(args : argparse.Namespace):
-        from xsorb.visualize.images import plot_energy_evolution # pylint: disable=import-outside-toplevel
-        plot_energy_evolution(args.calc_type)
+        from xsorb.visualize.images import plot_histo # pylint: disable=import-outside-toplevel
+        plot_histo(args.calc_type)
 
 
     @staticmethod
