@@ -17,7 +17,7 @@ def build_xsorb_parser():
     # main parser
     parser = argparse.ArgumentParser(
         prog='xsorb',
-        epilog=xsorb.__doc__,
+        description=xsorb.__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         allow_abbrev=False)
     parser.add_argument('-v', '--version',action='version',version=f'%(prog)s-{xsorb.__version__}')

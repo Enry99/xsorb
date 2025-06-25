@@ -31,6 +31,8 @@ Official repository:    https://gitlab.com/triboteam/xsorbed
 Latest updates:         https://github.com/Enry99/xsorb
 Documentation:          https://gitlab.com/triboteam/xsorbed/-/wikis/home
 
+----------------------------------------------------------------------------------
+
 """
 
 __version__ = "3.0beta"
