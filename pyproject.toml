@@ -43,7 +43,7 @@ Issues = 'https://github.com/Enry99/xsorb/issues'
 
 
 [project.scripts]
-xsorb = 'xsorb.cli.main:main'
+xsorb = 'xsorb.cli.xsorb_main:main'
 xsorb-ml-opt = 'xsorb.mlopt.xsorb_ml_opt:main'
 
 
