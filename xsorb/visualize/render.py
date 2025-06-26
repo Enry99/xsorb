@@ -25,8 +25,9 @@ import os
 from pathlib import Path
 
 import numpy as np
+from scipy.ndimage import gaussian_filter1d
 from ase.io.pov import get_bondpairs, set_high_bondorder_pairs
-from ase.data import covalent_radii
+from ase.data.vdw_alvarez import vdw_radii
 
 from ase.io import write
 from ase.io.utils import PlottingVariables
@@ -122,7 +123,22 @@ def _get_arrows(atoms: Atoms, quantity: str, rotation, scaling : float) -> np.nd
     return arrows
 
 
-def _calculate_ground_fog_height(atoms: Atoms, mol_indices: list[float] | None = None) -> float:
+def _plot_histo(distances, bins_heights, threshold, bins_heights_smooth=None):
+
+    import matplotlib.pyplot as plt
+
+    plt.bar(distances, bins_heights, width=0.1, alpha=0.7, label='Original')
+    if bins_heights_smooth is not None:
+        plt.plot(distances, bins_heights_smooth, 'r-', linewidth=2, label='Smoothed')
+    plt.axhline(y=threshold, color='black', linestyle='--', label='Threshold')
+    plt.xlabel('z (Angstrom)')
+    plt.ylabel('Occupied volume (Angstrom^3)')
+    plt.title('Occupied volume per layer')
+    plt.legend()
+    #plt.ylim(ymax=10)
+    plt.savefig('occupied_volume_per_layer.png')
+
+def _calculate_ground_fog_offset(atoms: Atoms, mol_indices: list[float] | None = None) -> float:
     """
     Calculate the height of ground fog for visualization purposes.
     This function determines the fog height by analyzing the structure of a system,
@@ -157,22 +173,30 @@ def _calculate_ground_fog_height(atoms: Atoms, mol_indices: list[float] | None =
 
     if mol_indices is not None:
         mol_zs = atoms.positions[mol_indices][:,2]
-        constant_fog_height = - (mol_zs.max() - mol_zs.min())
+        return mol_zs.max() - mol_zs.min()
     else:
         #this should give much more intense peaks for the slab
         sorted_atoms = sort(atoms, tags=atoms.positions[:,2])
         zmax_mol = sorted_atoms.positions[-1,2]
+
         layer_indicization, distances = get_layers(atoms=sorted_atoms, miller=(0,0,1),
-                                        tolerance=0.3)
+                                        tolerance=0.01)
 
         #use occupied volume rather than number of atoms, to avoid
         #planar molecules such as benzene to be considered as a slab layer
         bins_heights = [0] * len(distances)
         for i, idx in enumerate(layer_indicization):
-            bins_heights[idx] += 4/3*np.pi*(covalent_radii[sorted_atoms[i].number])**3
+            bins_heights[idx] += 4/3*np.pi*(vdw_radii[sorted_atoms[i].number])**3
 
-        # XXX: this method does not work for the example depth_cueing_mols_auto
-        threshold = 0.8 * max(bins_heights)
+        if len(distances) > 50: #amorphous
+            bins_heights_smooth = gaussian_filter1d(bins_heights, sigma=5.0)
+            threshold = np.mean(bins_heights_smooth)
+            bins_heights = bins_heights_smooth
+            logging.debug("Fog threshold from amorphous mode: %s", threshold)
+        else: #crystalline
+            threshold = np.mean(bins_heights)
+            logging.debug("Using original histogram for crystalline system")
+
         zmax_slab = 0
         for i in range(len(distances)-1,-1,-1):
             if bins_heights[i] > threshold:
@@ -183,12 +207,12 @@ def _calculate_ground_fog_height(atoms: Atoms, mol_indices: list[float] | None =
             logging.warning(
                 "Not possible to determine slab height, resorting to default fog "
             )
-            constant_fog_height = -2
+            return 2
         else:
             zmax_slab = min(zmax_mol, zmax_slab) #avoid negative heights
-            constant_fog_height = - (zmax_mol - zmax_slab)
-
-    return constant_fog_height
+            fog_offset = zmax_mol - zmax_slab
+            logging.debug("Constant_fog_height: %.2f A", fog_offset)
+            return fog_offset
 
 
 def _calculate_bondorder_pairs(atoms: Atoms, mol_indices : list[int] | None = None) -> dict:
@@ -231,6 +255,7 @@ def render_image(atoms: 'Atoms | AtomsCustom',
                 bonds: str = 'single',
                 hide_cell: bool = False,
                 depth_cueing: Optional[float] = None,
+                fog_offset: Optional[float] = None,
                 highlight_mol: bool = False,
                 colorcode: Optional[str] = None,
                 ccrange: Optional[list] = None,
@@ -272,6 +297,10 @@ def render_image(atoms: 'Atoms | AtomsCustom',
         If True, hide the cell box. Default is False.
     depth_cueing : float | None, optional
         Intensity of depth cueing effect. If None, no depth cueing is applied. Default is None.
+    fog_offset : float | None, optional
+        Offset for the depth cueing effect, starting from the camera position.
+        If None, the function calculates the offset based on the structure.
+        Default is None.
     highlihgt_mol : bool, optional
         If True, highlight molecular atoms with a different color. Default is False.
     colorcode : str | None, optional
@@ -313,14 +342,13 @@ def render_image(atoms: 'Atoms | AtomsCustom',
         wrap = True
 
     if wrap:
-        atoms.wrap(pretty_translation=True) #wrap the atoms to the unit cell
+        atoms.wrap() #pretty_translation=True) #wrap the atoms to the unit cell
 
     if mol_indices is None and custom_settings.mol_indices is not None:
         mol_indices = custom_settings.mol_indices
 
     if supercell is not None:
         if mol_indices is not None:
-            n_repeats = np.array(supercell) - 1
             # get new mol_indces after supercell expansion
             mol_indices = [i + j * len(atoms) for i in mol_indices for j in range(np.prod(supercell))]
 
@@ -447,11 +475,12 @@ def render_image(atoms: 'Atoms | AtomsCustom',
 
 
         if depth_cueing is not None:
-            constant_fog_height = _calculate_ground_fog_height(atoms) #, mol_indices)
+            if fog_offset is None:
+                fog_offset = _calculate_ground_fog_offset(atoms, mol_indices)
 
             povray_settings['depth_cueing'] = True
             povray_settings['cue_density'] = depth_cueing
-            povray_settings['constant_fog_height'] = constant_fog_height
+            povray_settings['constant_fog_height'] = -fog_offset
 
 
 
