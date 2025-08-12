@@ -22,7 +22,7 @@ from xsorb.dft_codes.calculator import edit_files_for_restart
 from xsorb.io.scheduler import JobScheduler
 from xsorb.io.filenames import JOBS_FILENAME
 if TYPE_CHECKING:
-    from xsorb.adsorptiondata.adsorptioncalculation import CalculationInfo
+    from xsorb.adsorptiondata.adsorptioncalculation import AdsorptionCalculation
 
 
 TEST = False
@@ -32,7 +32,7 @@ def launch_jobs(*,program : str,
                 calc_type : str,
                 jobscript : str,
                 scheduler_name : str,
-                systems : list[CalculationInfo],
+                systems : list[AdsorptionCalculation],
                 jobname_prefix : str = ''):
     '''
     Launch the calculations.
@@ -55,7 +55,7 @@ def launch_jobs(*,program : str,
     submitted_jobs : list[str] = []
     for system in systems:
 
-        j_dir = Path(system.in_file_path).parent
+        j_dir = Path(system.calc_info.in_file_path).parent
         shutil.copyfile(jobscript, f'{j_dir}/jobscript.sh')
 
         os.chdir(j_dir)   ####################
@@ -69,18 +69,18 @@ def launch_jobs(*,program : str,
                         prefix = jobname_prefix[:4]
                         if jobname_prefix != '': prefix += '_' #pylint: disable=multiple-statements
                         if calc_type != 'isolated':
-                            suffix = f'{calc_type[0]}{system.calc_id}'
+                            suffix = f'{calc_type[0]}{system.calc_info.calc_id}'
                         else:
-                            suffix = system.calc_id
+                            suffix = system.calc_info.calc_id
                         lines[i] = f"{line.split('=')[0]}={prefix}{suffix}\n"
                         break
             with open('jobscript.sh', 'w',encoding=sys.getfilesystemencoding()) as f:
                 f.writelines(lines)
 
         postfix = SBATCH_POSTFIX[program].format(
-            in_file=Path(system.in_file_path).name,
-            out_file=Path(system.out_file_path).name,
-            log_file=Path(system.log_file_path).name,
+            in_file=Path(system.calc_info.in_file_path).name,
+            out_file=Path(system.calc_info.out_file_path).name,
+            log_file=Path(system.calc_info.log_file_path).name,
             main_dir=main_dir)
 
         jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
@@ -90,7 +90,7 @@ def launch_jobs(*,program : str,
 
     if calc_type not in ('isolated'): #no database for slab/molecule
         xsorb.io.database.Database.add_job_ids(calc_type,
-                                               [int(system.calc_id) for system in systems],
+                                               [int(system.calc_info.calc_id) for system in systems],
                                                submitted_jobs)
     else:
         with open(JOBS_FILENAME, "a",encoding=sys.getfilesystemencoding()) as f:
