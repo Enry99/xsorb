@@ -148,11 +148,11 @@ class JobScheduler:
         except Exception as e:
             raise JobSchedulerError(f"Unexpected error: {str(e)}") from e
 
-    def _extract_job_id(self, output: str) -> Optional[str]:
+    def _extract_job_id(self, output: str) -> Optional[int]:
         """Extract job ID from scheduler output using regex."""
         regex = self.config["id_regex"]
         match = re.search(regex, output)
-        return match.group(1) if match else None
+        return int(match.group(1)) if match else None
 
     def _validate_job_id(self, job_id: str) -> bool:
         """Validate job ID format for the current scheduler."""
@@ -184,7 +184,7 @@ class JobScheduler:
 
         return cmd
 
-    def submit_job(self, script_path: str, script_args: Optional[List[str]] = None) -> str:
+    def submit_job(self, script_path: str, script_args: Optional[List[str]] = None) -> int:
         """
         Submit a job script and return the job ID.
 
@@ -193,7 +193,7 @@ class JobScheduler:
             script_args: List of arguments to pass to the job script (e.g., ["input.pwi", "output.pwo"])
 
         Returns:
-            Job ID as string
+            Job ID as an integer
 
         Raises:
             JobSchedulerError: If submission fails

@@ -134,8 +134,8 @@ class Database:
         Write new calculations to corresponding database
 
         Args:
-        - systems: list of CalculationInfo objects, each containing
-            'calc_id', 'adsorption_structure', 'in_file_path', 'out_file_path'
+        - systems: list of AdsorptionCalculation objects, each containing
+            adsorption_structure, (calc_info, calc_results)
         - program: string with the name of the program used for the calculations:
             'vasp', 'espresso', 'ml'
         - mult: float with the multiplicative factor for the covalent radii to
@@ -159,7 +159,7 @@ class Database:
                 ads_struct : AdsorptionStructure = system.adsorption_structure
                 db.write(ads_struct.atoms,
                         data={'AdsorptionCalculation': system},
-                        **ads_struct.db_keys())
+                        **system.db_keys())
 
             db.metadata = {'program': program,
                            'mult': mult,
@@ -391,7 +391,7 @@ class Database:
 
 
     @staticmethod
-    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[str]) -> None:
+    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[int]) -> None:
         '''
         Add the job ids to the corresponding database
 

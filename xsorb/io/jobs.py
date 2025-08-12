@@ -96,6 +96,8 @@ def launch_jobs(*,program : str,
         with open(JOBS_FILENAME, "a",encoding=sys.getfilesystemencoding()) as f:
             f.writelines([f'{job}\n' for job in submitted_jobs])
 
+    logging.info("Submitted all %s calculations.", calc_type)
+
 
 def restart_jobs(calc_type : str):
     '''
