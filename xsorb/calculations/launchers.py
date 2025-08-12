@@ -119,7 +119,7 @@ def launch_ml_opt(save_image : bool = False,):
                                    settings=settings,
                                    calc_type='mlopt')
 
-    if settings.input.jobscript_ml_path is None or settings.input.submit_command_ml is None:
+    if settings.input.jobscript_ml_path is None:
         raise ValueError('jobscript_ml_path is not defined in the settings file. '\
                          'Please define it to launch the machine learning optimization.')
 
@@ -260,8 +260,7 @@ def launch_isolated_slab_and_molecule(*,
                                             ml=ml)
 
     if ml:
-        if (settings.input.jobscript_ml_path is None \
-               or settings.input.submit_command_ml is None):
+        if settings.input.jobscript_ml_path is None:
             raise ValueError('jobscript_ml_path is not defined in the settings file. '\
                 'Please define it to launch the machine learning optimization.')
         program = 'ml'
