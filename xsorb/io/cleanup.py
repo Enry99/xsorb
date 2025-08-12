@@ -21,15 +21,14 @@ def cleanup_xsorb_run(calc_only: bool = False):
         logging.info("Cleanup aborted.")
         return
 
+
+    logging.info("Cleaning up calculation files...")
+    for directory in ALL_OUTDIRS:
+        if os.path.exists(directory):
+            shutil.rmtree(directory, ignore_errors=True)
+            logging.info(f"Removed directory: {directory}")
+    logging.info("Calculation files cleaned up.")
     if calc_only:
-        logging.info("Cleaning up only calculation files...")
-
-        for directory in ALL_OUTDIRS:
-            if os.path.exists(directory):
-                shutil.rmtree(directory, ignore_errors=True)
-                logging.info(f"Removed directory: {directory}")
-        logging.info("Calculation files cleaned up.")
-
         return
 
     # Remove all database files
