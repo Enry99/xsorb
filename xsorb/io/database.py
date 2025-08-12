@@ -147,10 +147,6 @@ class Database:
         # Write the adsorption structures to the corresponding database
         with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
 
-            db.metadata = {'program': program,
-                           'mult': mult,
-                           'total_e_slab_mol': total_e_slab_mol}
-
             for system in systems:
                 try:
                     #if the calculation is already present in the database, remove it
@@ -164,6 +160,10 @@ class Database:
                 db.write(ads_struct.atoms,
                         data={'AdsorptionCalculation': system},
                         **ads_struct.db_keys())
+
+            db.metadata = {'program': program,
+                           'mult': mult,
+                           'total_e_slab_mol': total_e_slab_mol}
 
 
     @staticmethod
@@ -438,6 +438,10 @@ class Database:
         Returns:
         - list of AdsorptionSiteCrystal or AdsorptionSiteAmorphous objects
         '''
+
+        if not Path(STRUCTURES_DB_NAME).exists():
+            logging.debug('Warning: No structures database found. Returning empty list.')
+            return []
 
         with ase.db.connect(STRUCTURES_DB_NAME) as db:
             sites = db.metadata.get('adsorption_sites', [])
