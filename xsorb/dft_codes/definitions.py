@@ -41,7 +41,7 @@ IN_FILE_PATHS = {
     },
 
     'mlopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/ml_opt_{0}.pwi'
+        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.pwi'
     },
 
     'slab': {
@@ -70,7 +70,7 @@ OUT_FILE_PATHS = {
     },
 
     'mlopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/ml_opt_{0}.traj'
+        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.traj'
     },
 
     'slab': {
@@ -98,7 +98,7 @@ LOG_FILE_PATHS = {
     },
 
     'mlopt': {
-        'ml' : ML_OPT_OUTDIR+'/{0}/ml_opt_{0}.log'
+        'ml' : ML_OPT_OUTDIR+'/{0}/mlopt_{0}.log'
     },
 
     'slab': {
