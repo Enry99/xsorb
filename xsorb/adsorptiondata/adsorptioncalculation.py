@@ -147,9 +147,9 @@ class CalculationResults(JsonableBase):
         Used by xsorb to reconstruct objects after reading from JSON or database.
         """
         # Convert nested objects
-        dct['atoms'] = AtomsCustom.fromdict(dct['atoms'])
+        dct['atoms'] = AtomsCustom(dct['atoms'])
         if 'trajectory' in dct:
-            dct['trajectory'] = [AtomsCustom.fromdict(atoms) for atoms in dct['trajectory']]
+            dct['trajectory'] = [AtomsCustom(atoms) for atoms in dct['trajectory']]
         if 'bonds' in dct:
             dct['bonds'] = [BondInfo.fromdict(bond) for bond in dct['bonds']]
         return cls(**dct)

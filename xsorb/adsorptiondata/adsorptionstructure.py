@@ -52,10 +52,13 @@ class MoleculeRotation(JsonableBase):
         """
         Returns a dictionary with the keys to be explicitly stored in the database.
         """
+        xrot = self.xrot if not self.xrot.isdigit() else float(self.xrot)
+        yrot = self.yrot if not self.yrot.isdigit() else float(self.yrot)
+        zrot = self.zrot if not self.zrot.isdigit() else float(self.zrot)
         return {
-            'xrot': self.xrot,
-            'yrot': self.yrot,
-            'zrot': self.zrot,
+            'xrot': xrot,
+            'yrot': yrot,
+            'zrot': zrot,
             'mol_atom': self.mol_atom
         }
 
@@ -81,7 +84,7 @@ class MoleculeRotation(JsonableBase):
         '''
         Creates a MoleculeRotation object from a dictionary
         '''
-        dct['atoms'] = AtomsCustom.fromdict(dct['atoms'])
+        dct['atoms'] = AtomsCustom(dct['atoms'])
         return cls(**dct)
 
 
@@ -113,7 +116,7 @@ class AdsorptionSite(JsonableBase):
         Returns a dictionary with the keys to be explicitly stored in the database.
         """
         return {
-            'site': self.label,
+            'site': self.label if not self.label.isdigit() else int(self.label),
             'coords': self.unique_id,
             'site_info': self.info
         }
@@ -352,7 +355,7 @@ class AdsorptionStructure(JsonableBase):
         Creates an AdsorptionStructure object from a dictionary
         '''
 
-        dct['atoms'] = AtomsCustom.fromdict(dct['atoms'])
+        dct['atoms'] = AtomsCustom(dct['atoms'])
         dct['mol_rot'] = MoleculeRotation.fromdict(dct['mol_rot'])
 
         #handle different types of AdsorptionSite
