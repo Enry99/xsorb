@@ -205,5 +205,5 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
 
 
         except Exception as e: #pylint: disable=broad-except
-            logging.info(f'No energy in file {system.calc_info.out_file_path}: {e}.' \
-                  'possibly the calculation is still running. Skipping.')
+            logging.info(f'Unable to read energy in  file {system.calc_info.out_file_path},'\
+                        f' error: {e}. The calculation may be still running. Skipping.')

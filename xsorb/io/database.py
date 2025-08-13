@@ -50,8 +50,7 @@ Each calculation database also has the following metadata:
 - program (str): name of the program used for the calculations
 - mult (float): multiplicative factor for the covalent radii to determine bonding
     The mult factor is updated from settings only when refreshing the database
-- total_e_slab_mol (float): total energy of the isolated molecule and slab. May be None
-while the structure database contains:
+- total_e_slab_mol (float): total energy of the isolated molecule and slab if available
 - adsorption_sites (list): list of AdsorptionSiteCrystal or AdsorptionSiteAmorphous objects
 
 '''
@@ -197,9 +196,16 @@ class Database:
             selection = 'status!=completed' if not refresh else None
             rows = list(db.select(selection, include_data=True))
 
+            if not rows:
+                if verbose:
+                    logging.info(
+                        'All %s calculations weare already completed. '
+                        'db is already up to date.', calc_type)
+                return
+
             ### read stuff from the database metadata ###
             try:
-                program = db.metadata.get('program')
+                program = db.metadata['program']
             except KeyError as exc:
                 raise RuntimeError(f'No program metadata found in {calc_type} database') from exc
 
@@ -207,34 +213,39 @@ class Database:
             if mult is not None:
                 db.metadata['mult'] = mult
             else:
-                try:
-                    mult = db.metadata.get('mult')
-                except KeyError as exc:
-                    raise RuntimeError(f'No mult metadata found in {calc_type} database') from exc
+                mult = db.metadata['mult']
 
             if calc_type == 'mlopt':
                 if total_e_slab_mol_ml is None: # read from metadata
-                    try:
-                        total_e_slab_mol = db.metadata.get('total_e_slab_mol')
-                    except KeyError as exc:
-                        raise RuntimeError('No total_e_slab_mol metadata found in '\
-                                           f'{calc_type} database') from exc
+                    if not db.metadata.get('total_e_slab_mol_ml'):
+                        logging.warning('No total_e_slab_mol available in %s database. '
+                                        'If you calculated slab and mol energies, try to '
+                                        'refresh the database with "xsorb update -refresh". '
+                                        'Total energies will be used instead of adsorption energies.', calc_type)
+                        total_e_slab_mol = 0
+                    else:
+                        total_e_slab_mol = db.metadata['total_e_slab_mol']
+
                 else: # use the provided value, and update the metadata
                     total_e_slab_mol = total_e_slab_mol_ml
                     db.metadata['total_e_slab_mol'] = total_e_slab_mol
             else:
                 if total_e_slab_mol_dft is None: # read from metadata
-                    try:
-                        total_e_slab_mol = db.metadata.get('total_e_slab_mol')
-                    except KeyError as exc:
-                        raise RuntimeError('No total_e_slab_mol metadata found in '\
-                                           f'{calc_type} database') from exc
+                    if not db.metadata.get('total_e_slab_mol'):
+                        logging.warning('No total_e_slab_mol available in %s database. '
+                                        'If you calculated slab and mol energies, try to '
+                                        'refresh the database with "xsorb update -refresh". '
+                                        'Total energies will be used instead of adsorption energies.', calc_type)
+                        total_e_slab_mol = 0
+                    else:
+                        total_e_slab_mol = db.metadata['total_e_slab_mol']
                 else: # use the provided value, and update the metadata
                     total_e_slab_mol = total_e_slab_mol_dft
                     db.metadata['total_e_slab_mol'] = total_e_slab_mol
             ### end of reading metadata ###
 
 
+            ### read results and update the calculations ###
             systems = [AdsorptionCalculation.fromdict(row.data.AdsorptionCalculation) \
                        for row in rows]
 
@@ -245,9 +256,21 @@ class Database:
                     mult=mult,
                     total_e_slab_mol=total_e_slab_mol,
                     verbose=verbose)
+            ################################################
+
+            # Update the database with the new results
+            metadata = db.metadata.copy() # workaround for ase.db bug
+            for row, system in zip(rows, systems):
+                logging.debug('Updating calculation %s (row %s)', system.calc_info.calc_id, row.id)
+                if system.calc_results is not None:
+                    db.update(id=row.id,
+                            atoms=system.calc_results.atoms,
+                            data={'AdsorptionCalculation': system},
+                            **system.db_keys())
+            db.metadata = metadata
 
         if verbose:
-            logging.info(f'{calc_type} database updated.')
+            logging.info('%s database updated.', calc_type)
 
         if write_csv:
             Database.write_csvfile(txt=txt, verbose=verbose)
@@ -278,7 +301,7 @@ class Database:
 
 
         if verbose and refresh:
-            logging.info('Re-reading the output files, updating e_slab_mol, '\
+            logging.info('Re-reading the output files, updating e_slab_mol, '
                    'the radii mult factor, and recalculating the bonding status...')
 
 
@@ -350,7 +373,7 @@ class Database:
             raise ValueError('Cannot use both selection and calc_ids')
 
         if not Path(CALC_DB_NAMES[calc_type]).exists():
-            logging.warning(f'Warning: No {calc_type} calculations present in the database.')
+            logging.warning('Warning: No %s calculations present in the database.', calc_type)
             return []
 
         #Make sure that the database is up to date
@@ -401,9 +424,11 @@ class Database:
         - job_ids: list of integers with the job ids
         '''
         with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
+            metadata = db.metadata.copy() # workaround for ase.db bug
             for calc_id, job_id in zip(calc_ids, job_ids):
                 row_id = db.get(f'calc_id={calc_id}', include_data=False).id
                 db.update(id=row_id, job_id=job_id)
+            db.metadata = metadata
 
 
     @staticmethod
@@ -527,7 +552,7 @@ class Database:
             for calc_type, db_name in CALC_DB_NAMES.items():
                 #order is mlopt, screening, relax
                 atleast_one_calc = False
-                eads_column_name = f'Eads_{calc_type[:3]}(eV)'
+                eads_column_name = f'Eads_{calc_type}(eV)'
 
                 if Path(db_name).exists():
                     with ase.db.connect(db_name) as db:
@@ -544,15 +569,15 @@ class Database:
                                 if row.get('status') == 'scf_nonconverged':
                                     eads += '**'
                                     if verbose:
-                                        logging.warning(f'Warning! {calc_type} {calc_id} '\
-                                          'failed to reach SCF convergence in the last step. '\
-                                            'The energy will be marked with **')
+                                        logging.warning('Warning! %s %s '
+                                          'failed to reach SCF convergence in the last step. '
+                                            'The energy will be marked with **', calc_type, calc_id)
                                 elif row.get('status') == 'incomplete':
                                     eads += '*'
                                     if verbose:
-                                        logging.warning(f'Warning! {calc_type} {calc_id} '\
-                                          'has not reached final configuration. '\
-                                            'The energy will be marked with a *')
+                                        logging.warning('Warning! %s %s '
+                                          'has not reached final configuration. '
+                                            'The energy will be marked with a *', calc_type, calc_id)
                             info_dicts[calc_id].update({eads_column_name: eads})
 
                             if row.get('bonds'):
@@ -607,12 +632,15 @@ def manual_update_calculations(calc_type : str,
         total_e_slab_mol_ml = None
 
 
-    Database.update_calc_db(
-        calc_type=calc_type,
-        refresh=refresh,
-        total_e_slab_mol_dft=total_e_slab_mol,
-        total_e_slab_mol_ml=total_e_slab_mol_ml,
-        mult=mult,
-        txt=txt,
-        verbose=True
-    )
+    dbs_to_update = [calc_type] if calc_type != 'all' else CALC_DB_NAMES.keys()
+    for calc_type in dbs_to_update:
+        if Path(CALC_DB_NAMES[calc_type]).exists():
+            Database.update_calc_db(
+                calc_type=calc_type,
+                refresh=refresh,
+                total_e_slab_mol_dft=total_e_slab_mol,
+                total_e_slab_mol_ml=total_e_slab_mol_ml,
+                mult=mult,
+                txt=txt,
+                verbose=True
+            )
