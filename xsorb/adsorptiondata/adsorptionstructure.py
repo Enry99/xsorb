@@ -45,7 +45,7 @@ class MoleculeRotation(JsonableBase):
     zrot: str
     mol_atom: int
 
-    __xsorb_objtype__ = "MoleculeRotation"
+    __xsorb_objtype__ : str = "MoleculeRotation"
 
 
     def db_keys(self) -> dict:
@@ -107,8 +107,6 @@ class AdsorptionSite(JsonableBase):
     label: str
     coords: list[float]
     info: str
-
-    __xsorb_objtype__ = "AdsorptionSite"
 
 
     def db_keys(self) -> dict:
@@ -172,7 +170,7 @@ class AdsorptionSiteCrystal(AdsorptionSite):
 
     type: str #type of the site, e.g. ontop, bridge, hollow, etc.
 
-    __xsorb_objtype__ = "AdsorptionSiteCrystal"
+    __xsorb_objtype__ : str = "AdsorptionSiteCrystal"
 
     def todict(self):
         return self.__dict__
@@ -207,7 +205,7 @@ class AdsorptionSiteAmorphous(AdsorptionSite):
     coordination_number: float | None = None
     surrounding_sites: list['SurroundingSite'] | None = None
 
-    __xsorb_objtype__ = "AdsorptionSiteAmorphous"
+    __xsorb_objtype__ : str = "AdsorptionSiteAmorphous"
 
     def todict(self):
         #remove None values from the dictionary to write into ase db
@@ -250,7 +248,7 @@ class SurroundingSite(AdsorptionSite):
     duplicate_main: bool
     vector: list[float]   #vector from the main site to the surrounding site
 
-    __xsorb_objtype__ = "SurroundingSite"
+    __xsorb_objtype__ : str = "SurroundingSite"
 
     def __str__(self) -> str:
         return self.label
@@ -288,7 +286,7 @@ class AdsorptionStructure(JsonableBase):
     distance : float
     mol_indices: list[int]
 
-    __xsorb_objtype__ = "AdsorptionStructure"
+    __xsorb_objtype__ : str = "AdsorptionStructure"
 
 
     def db_keys(self) -> dict:

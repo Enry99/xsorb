@@ -25,7 +25,7 @@ class CalculationInfo(JsonableBase):
     _status: str = 'incomplete' # 'completed', 'incomplete', 'scf_nonconverged'
 
 
-    __xsorb_objtype__ = 'CalculationFilesInfo'
+    __xsorb_objtype__ : str = 'CalculationFilesInfo'
 
     def __post_init__(self) -> None:
         """
@@ -84,7 +84,7 @@ class BondInfo(JsonableBase):
     slab_atom_species: str
     length: float
 
-    __xsorb_objtype__ = 'BondInfo'
+    __xsorb_objtype__ : str = 'BondInfo'
 
     def __str__(self) -> str:
         return f"{self.mol_atom_species}{self.mol_atom_id}-"\
@@ -117,7 +117,7 @@ class CalculationResults(JsonableBase):
     trajectory : list[AtomsCustom] | None
 
 
-    __xsorb_objtype__ = 'CalculationResults'
+    __xsorb_objtype__ : str = 'CalculationResults'
 
 
     def db_keys(self) -> dict:
@@ -170,7 +170,7 @@ class AdsorptionCalculation(JsonableBase):
     calc_info: Optional[CalculationInfo] = None
     calc_results: Optional[CalculationResults] = None
 
-    __xsorb_objtype__ = 'AdsorptionCalculation'
+    __xsorb_objtype__ : str = 'AdsorptionCalculation'
 
 
     def db_keys(self) -> dict:
@@ -201,8 +201,8 @@ class AdsorptionCalculation(JsonableBase):
         """
         # Convert nested objects
         dct['adsorption_structure'] = AdsorptionStructure.fromdict(dct['adsorption_structure'])
-        if dct['calc_info'] is not None:
+        if dct.get('calc_info'):
             dct['calc_info'] = CalculationInfo.fromdict(dct['calc_info'])
-        if dct['calc_results'] is not None:
+        if dct.get('calc_results'):
             dct['calc_results'] = CalculationResults.fromdict(dct['calc_results'])
         return cls(**dct)
