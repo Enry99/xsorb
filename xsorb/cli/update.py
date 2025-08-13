@@ -22,6 +22,8 @@ class CLICommand(CLICommandBase):
     def add_arguments(parser : argparse.ArgumentParser):
         parser.add_argument('calc_type',
                         type=str,
+                        nargs='?',
+                        default='all',
                         choices=['screening', 'relax', 'mlopt', 'all'],
                         help='''type of calculation to plot''')
         parser.add_argument('-refresh',
