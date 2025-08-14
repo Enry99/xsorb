@@ -54,8 +54,8 @@ Each calculation database also has the following metadata:
 - adsorption_sites (list): list of AdsorptionSiteCrystal or AdsorptionSiteAmorphous objects
 
 '''
+
 from __future__ import annotations
-from os import write
 from pathlib import Path
 import logging
 
@@ -97,6 +97,10 @@ class Database:
         # excluding those that are already present
         calc_ids : list[int] = []
         with ase.db.connect(STRUCTURES_DB_NAME) as db:
+            try:
+                metadata = db.metadata.copy() # workaround for ase.db bug
+            except:
+                metadata = {}
             adsorption_sites = Database.get_adsorption_sites() # get existing sites
             for ads_struct in adsorption_structures:
                 already_present = False
@@ -116,7 +120,9 @@ class Database:
                     adsorption_sites.append(ads_struct.adsite)
 
             # Update the metadata with the adsorption sites
-            db.metadata['adsorption_sites'] = [site for site in adsorption_sites]
+            metadata['adsorption_sites'] = [site for site in adsorption_sites]
+
+            db.metadata = metadata # workaround for ase.db bug
 
         if write_csv:
             Database.write_csvfile(include_results=False)
@@ -272,7 +278,7 @@ class Database:
                             atoms=system.calc_results.atoms,
                             data={'AdsorptionCalculation': system},
                             **system.db_keys())
-            db.metadata = metadata
+            db.metadata = metadata # workaround for ase.db bug
 
         if verbose:
             logging.info('%s database updated.', calc_type)
@@ -433,7 +439,7 @@ class Database:
             for calc_id, job_id in zip(calc_ids, job_ids):
                 row_id = db.get(f'calc_id={calc_id}', include_data=False).id
                 db.update(id=row_id, job_id=job_id)
-            db.metadata = metadata
+            db.metadata = metadata # workaround for ase.db bug
 
 
     @staticmethod
@@ -457,7 +463,9 @@ class Database:
 
 
     @staticmethod
-    def get_adsorption_sites(cls_type=None) -> list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous]:
+    def get_adsorption_sites(
+            cls_type: AdsorptionSiteCrystal|AdsorptionSiteAmorphous|None=None
+            ) -> list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous]:
         '''
         Get the unique adsorption sites from the structures database
 

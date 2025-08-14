@@ -182,6 +182,11 @@ class AdsorptionSiteCrystal(AdsorptionSite):
         '''
         return cls(**dct)
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, AdsorptionSiteCrystal):
+            return NotImplemented
+        return super().__eq__(other)
+
 
 @dataclass
 class AdsorptionSiteAmorphous(AdsorptionSite):
@@ -222,6 +227,11 @@ class AdsorptionSiteAmorphous(AdsorptionSite):
             dct['surrounding_sites'] = [SurroundingSite.fromdict(ss) \
                     for ss in dct['surrounding_sites']]
         return cls(**dct)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, AdsorptionSiteAmorphous):
+            return NotImplemented
+        return super().__eq__(other)
 
 
 @dataclass
