@@ -137,7 +137,7 @@ def _read_xyz_frame_custom(lines, natoms, properties_parser=key_val_str_to_dict,
                   cell=cell,
                   pbc=pbc,
                   info=info,
-                  tags=tags)
+                  tags=arrays.pop('tags', None))
     ##### END CUSTOM PART #####
 
     # Read and set constraints
@@ -265,8 +265,8 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
                     masks = np.ones((natoms, 3), dtype=bool)
                     for i in range(len(cnstr)):
                         idx = cnstr[i].index
-                        masks[idx] = cnstr[i].mask
-                    cnstr = ~masks  # cnstr: coordinates that can be moved
+                        masks[idx] = ~cnstr[i].mask  # FIX TO ASE BUG
+                    cnstr = masks  # cnstr: coordinates that can be moved
             else:
                 fr_cols.remove('move_mask')
 
@@ -286,7 +286,7 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
 
         ##### CUSTOM PART #####
         if custom_labels_as_symbols:
-            arrays['symbols'] = atoms.custom_labels
+            np.array(atoms.custom_labels)
         ##### END CUSTOM PART #####
 
         comm, ncols, dtype, fmt = output_column_format(atoms,
