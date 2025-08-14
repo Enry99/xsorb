@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 import sys
+from copy import deepcopy
 
 from ase.io.espresso import read_fortran_namelist
 
@@ -135,7 +136,7 @@ class EspressoParams:
             self.settings_dict_screening['control'].update({'outdir': 'OUT'})
             if 'ions' not in self.settings_dict_screening: self.settings_dict['ions'] = {}
         else:
-            self.settings_dict_screening = self.settings_dict.copy()
+            self.settings_dict_screening = deepcopy(self.settings_dict)
         #update screening settings_dict with etot_conv_thr and forc_conv_thr
         self.settings_dict_screening['control'].update({'etot_conv_thr': self.etot_conv_thr_screening})
         self.settings_dict_screening['control'].update({'forc_conv_thr': self.forc_conv_thr_screening})
