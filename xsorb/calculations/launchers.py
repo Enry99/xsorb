@@ -68,7 +68,7 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     if not from_ml_opt:
         fresh_start()
 
-    settings=Settings(read_energy_dft=True) #need the energies to store them into the db metadata
+    settings=Settings(read_energies_dft=True) #need the energies to store them into the db metadata
 
     if from_ml_opt:
         calc_ids = obtain_calc_indices(calc_type='mlopt')
