@@ -51,7 +51,8 @@ class Settings:
     dft: DFTParams
 
     def __init__(self,
-                 read_energies: bool = False,
+                 read_energies_dft: bool = False,
+                 read_energies_ml: bool = False,
                  verbose: bool = True):
 
         #Read the settings file
@@ -89,11 +90,13 @@ class Settings:
         #or a list of two floats, if specified. One can be 0, e.g. [13.6, 0.0] if only the
         #slab energy or molecule energy is known. We need to fill in the missing energies if
         #available if read_energies is True.
-        if read_energies:
+        if read_energies_dft:
             self.total_e_slab_mol = self.read_E_slab_mol(verbose)
-            self.total_e_slab_mol_ml = self.read_E_slab_mol_ml(verbose)
         else:
             self.total_e_slab_mol = None
+        if read_energies_ml:
+            self.total_e_slab_mol_ml = self.read_E_slab_mol_ml(verbose)
+        else:
             self.total_e_slab_mol_ml = None
 
 
@@ -152,6 +155,6 @@ class Settings:
         except Exception as e: # pylint: disable=broad-except
             emol_ml = 0.0
             if verbose:
-                logging.error(f"Error reading molecule energy: {e}. Setting to 0")
+                logging.error(f"Error reading ML molecule energy: {e}. Setting to 0")
 
         return eslab_ml + emol_ml

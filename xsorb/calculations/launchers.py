@@ -68,7 +68,7 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     if not from_ml_opt:
         fresh_start()
 
-    settings=Settings(read_energies=True) #need the energies to store them into the db metadata
+    settings=Settings(read_energy_dft=True) #need the energies to store them into the db metadata
 
     if from_ml_opt:
         calc_ids = obtain_calc_indices(calc_type='mlopt')
@@ -107,7 +107,7 @@ def launch_ml_opt(save_image : bool = False,):
 
     fresh_start()  # ask the user if they want to start a fresh run
 
-    settings=Settings()
+    settings=Settings(read_energies_ml=True) #need the energies to store them into the db metadata
 
     slab = read(settings.input.slab_filename)
     mol = read(settings.input.molecule_filename)
@@ -177,7 +177,7 @@ def launch_final_relax(*,
 
 
     #Retrieve the structures
-    settings=Settings(read_energies=True) #need the energies to store them into the db metadata
+    settings=Settings(read_energies_dft=True) #need the energies to store them into the db metadata
 
     #this check also updates the db
     if not Database.all_completed(calc_type=take_from) and \
