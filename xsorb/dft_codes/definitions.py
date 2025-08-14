@@ -41,19 +41,19 @@ IN_FILE_PATHS = {
     },
 
     'mlopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.pwi'
+        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.xyz'
     },
 
     'slab': {
         'vasp': SLAB_OUTDIR+'/DFT/POSCAR',
         'espresso': SLAB_OUTDIR+'/DFT/slab.pwi',
-        'ml': SLAB_OUTDIR+'/ML/slab.pwi'
+        'ml': SLAB_OUTDIR+'/ML/slab.xyz'
     },
 
     'mol': {
         'vasp': MOL_OUTDIR+'/DFT/POSCAR',
         'espresso': MOL_OUTDIR+'/DFT/mol.pwi',
-        'ml': MOL_OUTDIR+'/ML/mol.pwi'
+        'ml': MOL_OUTDIR+'/ML/mol.xyz'
     },
 
 }
@@ -145,7 +145,7 @@ SBATCH_POSTFIX = {
 FRAGMENTS_IN_FILE_PATHS = {
     'vasp': 'fragments/{0}/POSCAR',
     'espresso': 'fragments/{0}/{0}.pwi',
-    'ml': 'fragments/{0}/{0}_ml.pwi'
+    'ml': 'fragments/{0}/{0}_ml.xyz'
 }
 
 FRAGMENTS_OUT_FILE_PATHS = {

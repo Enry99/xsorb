@@ -25,7 +25,7 @@ from ase import Atoms
 from ase.constraints import FixScaled
 from ase.calculators.vasp import Vasp
 
-from xsorb.ase_custom import vasp
+from xsorb.ase_custom import vasp, write_xyz_custom
 from xsorb.ase_custom.espresso import write_espresso_in_custom
 
 
@@ -50,11 +50,7 @@ class MLFakeCalculator():
         creating the directory if it does not exist
         '''
         self.directory.mkdir(exist_ok=True, parents=True)
-        fake_pseudo = {el: f'{el}.UPF' for el in atoms.get_chemical_symbols()}
-        write_espresso_in_custom(self.directory / f'{self.label}.pwi',
-                                  atoms=atoms,
-                                  input_data=None,
-                                  pseudopotentials=fake_pseudo)
+        write_xyz_custom(self.directory / f'{self.label}.xyz', atoms)
 
 
 class EspressoFakeCalculator():
@@ -77,7 +73,7 @@ class EspressoFakeCalculator():
         # Remove pseudopotential from input_data if present
         if input_data is not None:
             self.input_data = input_data.copy()
-            self.input_data.pop('pseudopotentials', None)    
+            self.input_data.pop('pseudopotentials', None)
 
         self.label = label
         self.directory = Path(directory)
@@ -101,7 +97,7 @@ class EspressoFakeCalculator():
                                   kpts=self.kpts,
                                   koffset=self.koffset,
                                   additional_cards=self.additional_cards)
-        
+
 
 def setup_ML_calculator(**kwargs) -> MLFakeCalculator:
     '''
