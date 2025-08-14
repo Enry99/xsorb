@@ -154,10 +154,10 @@ class JobScheduler:
         match = re.search(regex, output)
         return int(match.group(1)) if match else None
 
-    def _validate_job_id(self, job_id: str) -> bool:
+    def _validate_job_id(self, job_id: int) -> bool:
         """Validate job ID format for the current scheduler."""
         pattern = self.config["id_format"]
-        return bool(re.match(pattern, job_id))
+        return bool(re.match(pattern, str(job_id)))
 
     def _build_command(self,
                        operation: str,
@@ -244,12 +244,12 @@ class JobScheduler:
             )
 
         log_msg = f"Submitted job {job_id}"
-        if script_args:
+        if script_args and logging.getLogger().isEnabledFor(logging.DEBUG):
             log_msg += f" with arguments: {' '.join(script_args)}"
         self.logger.info(log_msg)
         return job_id
 
-    def cancel_job(self, job_id: str) -> bool:
+    def cancel_job(self, job_id: int) -> bool:
         """
         Cancel a running job.
 
@@ -268,7 +268,7 @@ class JobScheduler:
         if not self._validate_job_id(job_id):
             raise JobSchedulerError(f"Invalid job ID format: {job_id}")
 
-        cmd = self._build_command("cancel", job_id)
+        cmd = self._build_command("cancel", str(job_id))
 
         try:
             self._run_command(cmd)
@@ -278,13 +278,13 @@ class JobScheduler:
             self.logger.error(f"Failed to cancel job {job_id}: {str(e)}")
             return False
 
-    def get_active_job_ids(self) -> List[str]:
+    def get_active_job_ids(self) -> List[int]:
         """
         Get all active job IDs for the current user (running + queued/pending).
         These are jobs that can be cancelled.
 
         Returns:
-            List of job IDs (strings) for jobs that are running or queued
+            List of job IDs (integers) for jobs that are running or queued
 
         Raises:
             JobSchedulerError: If command execution fails
@@ -312,7 +312,7 @@ class JobScheduler:
             self.logger.error(f"Failed to get active jobs: {str(e)}")
             raise
 
-    def _extract_active_job_ids(self, output: str) -> List[str]:
+    def _extract_active_job_ids(self, output: str) -> List[int]:
         """
         Extract active job IDs from scheduler output (running + queued).
 
@@ -334,22 +334,33 @@ class JobScheduler:
                 continue
 
             # First field is usually the job ID for most schedulers
-            job_id = fields[0]
+            job_id_str = fields[0]
 
-            # Validate job ID format
-            if self._validate_job_id(job_id):
-                # For schedulers that include completed jobs, filter only active ones
-                if self.scheduler_name in ["pbs", "torque"]:
-                    # Check status column (typically field 5) - include R (running) and Q (queued)
-                    if len(fields) >= 6 and fields[5] in ["R", "Q", "H", "T", "W", "S"]:
+            # Validate job ID format and convert to int
+            try:
+                # For PBS/Torque, extract numeric part from job.server format
+                if self.scheduler_name in ["pbs", "torque"] and "." in job_id_str:
+                    job_id_str = job_id_str.split(".")[0]
+
+                job_id = int(job_id_str)
+
+                # Validate job ID format
+                if self._validate_job_id(job_id):
+                    # For schedulers that include completed jobs, filter only active ones
+                    if self.scheduler_name in ["pbs", "torque"]:
+                        # Check status column (typically field 5) - include R (running) and Q (queued)
+                        if len(fields) >= 6 and fields[5] in ["R", "Q", "H", "T", "W", "S"]:
+                            job_ids.append(job_id)
+                    elif self.scheduler_name == "lsf":
+                        # Check status column (typically field 2) - include RUN and PEND states
+                        if len(fields) >= 3 and fields[2] in ["RUN", "PEND", "PSUSP", "USUSP", "SSUSP"]:
+                            job_ids.append(job_id)
+                    else:
+                        # For SLURM, SGE, HTCondor - command already filters active jobs
                         job_ids.append(job_id)
-                elif self.scheduler_name == "lsf":
-                    # Check status column (typically field 2) - include RUN and PEND states
-                    if len(fields) >= 3 and fields[2] in ["RUN", "PEND", "PSUSP", "USUSP", "SSUSP"]:
-                        job_ids.append(job_id)
-                else:
-                    # For SLURM, SGE, HTCondor - command already filters active jobs
-                    job_ids.append(job_id)
+            except ValueError:
+                # Skip non-numeric job IDs
+                continue
 
         return job_ids
 
