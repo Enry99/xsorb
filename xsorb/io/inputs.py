@@ -66,7 +66,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     calc_type_for_writing = calc_type if calc_type is not None else 'screening'
 
     written_systems : list[AdsorptionCalculation] = []
-    answer_all = False #pylint: disable=invalid-name
+    ovewrite_answer = 'y' #pylint: disable=invalid-name
     for i, ads_structure in zip(calc_ids, adsorption_structures):
 
         #possibly apply constraints to slab in case of mlopt
@@ -79,12 +79,13 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
         log_file_path = LOG_FILE_PATHS[calc_type_for_writing][program].format(i)
         file_dir = Path(in_file_path).parent.as_posix()
 
-        if ask_before_overwrite and (Path(in_file_path).exists() or Path(out_file_path).exists()) \
-            and not answer_all:
-            answer = overwrite_question(f'{in_file_path} or {out_file_path}')
-            if answer == 'yall': answer_all = True #pylint: disable=multiple-statements,invalid-name
-            elif answer == 'nall': break #pylint: disable=multiple-statements
-            elif answer == 'n': continue #pylint: disable=multiple-statements
+        if ask_before_overwrite and (Path(in_file_path).exists() or Path(out_file_path).exists()):
+            if 'all' not in ovewrite_answer:
+                # first time is 'y' as set above, so the question will be asked if
+                # ask_before_overwrite is True
+                ovewrite_answer = overwrite_question(f'{in_file_path} or {out_file_path}')
+            if 'n' in ovewrite_answer:
+                continue # skip only if file exists. Not break!
 
         if Path(file_dir).exists():
             #remove the directory and all its content
