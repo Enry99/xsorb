@@ -86,6 +86,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             elif answer == 'nall': break #pylint: disable=multiple-statements
             elif answer == 'n': continue #pylint: disable=multiple-statements
 
+        if Path(file_dir).exists():
             #remove the directory and all its content
             shutil.rmtree(file_dir)
 
