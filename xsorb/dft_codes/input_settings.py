@@ -130,12 +130,15 @@ class EspressoParams:
         #if screening pwi file is provided, build screening settings_dict
         if self.pwi_path_screening is not None:
             self.settings_dict_screening = self.build_settings_dict(self.pwi_path_screening)
-            self.settings_dict_screening['control'].update({'etot_conv_thr': self.etot_conv_thr_screening})
-            self.settings_dict_screening['control'].update({'forc_conv_thr': self.forc_conv_thr_screening})
-            self.settings_dict_screening['control'].update({'outdir': 'OUT'})
             self.settings_dict_screening['control'].update({'calculation': 'relax' })
             self.settings_dict_screening['control'].update({'restart_mode': 'from_scratch'})
+            self.settings_dict_screening['control'].update({'outdir': 'OUT'})
             if 'ions' not in self.settings_dict_screening: self.settings_dict['ions'] = {}
+        else:
+            self.settings_dict_screening = self.settings_dict.copy()
+        #update screening settings_dict with etot_conv_thr and forc_conv_thr
+        self.settings_dict_screening['control'].update({'etot_conv_thr': self.etot_conv_thr_screening})
+        self.settings_dict_screening['control'].update({'forc_conv_thr': self.forc_conv_thr_screening})
 
 
 @dataclass
@@ -157,7 +160,7 @@ class VaspParams:
     settings_dict = None
     settings_dict_screening = None
 
-    def build_settings_dict(self, incar_path: str | None, kpoints_path: str | None): 
+    def build_settings_dict(self, incar_path: str | None, kpoints_path: str | None):
         '''
         Build the settings dictionary from the input files.
         '''
@@ -167,13 +170,13 @@ class VaspParams:
             with open(incar_path, 'r',encoding=sys.getfilesystemencoding()) as f:
                incar_string = f.read()
                _settings_dict['incar_string'] = incar_string
-               
+
         if kpoints_path is not None:
             with open(kpoints_path, 'r',encoding=sys.getfilesystemencoding()) as f:
                 kpoints_string = f.read()
                 _settings_dict['kpoints_string'] = kpoints_string
 
-        #add vasp_pp_path, vasp_pseudo_setups and pymatgen_set and vasp_xc_functional 
+        #add vasp_pp_path, vasp_pseudo_setups and pymatgen_set and vasp_xc_functional
         # to the settings dictionary
         _settings_dict['vasp_pp_path'] = self.vasp_pp_path
         _settings_dict['vasp_pseudo_setups'] = self.vasp_pseudo_setups
@@ -192,12 +195,12 @@ class VaspParams:
 
         if self.pymatgen_set is not None:
             self.pymatgen_set = self.pymatgen_set.lower()
-            
+
             if self.pymatgen_set not in [
-                'mprelaxset', 
-                'mpmetalrelaxset', 
-                'mpscanrelaxset', 
-                'mphserelaxset', 
+                'mprelaxset',
+                'mpmetalrelaxset',
+                'mpscanrelaxset',
+                'mphserelaxset',
                 'mitrelaxset']:
                 raise ValueError(f'Invalid pymatgen_set: {self.pymatgen_set}. '
                                 'Valid options are: MPRelaxSet, MPMetalRelaxSet, '
@@ -207,7 +210,7 @@ class VaspParams:
         #read incar and kpoints files if provided
         if self.incar_path is not None or self.kpoints_path is not None:
             self.settings_dict = self.build_settings_dict(self.incar_path, self.kpoints_path)
-            
+
             #fix if user forgot to put the correct IBRION for relax
             if 'incar_string' in self.settings_dict and self.pymatgen_set is None:
                 s = self.settings_dict['incar_string'].split('\n')
@@ -218,12 +221,12 @@ class VaspParams:
                 if missing_ibrion: s.append('IBRION = 2')
 
                 self.settings_dict['incar_string'] = '\n'.join(s)
-        
+
 
         if self.incar_path_screening is not None or self.kpoints_path_screening is not None:
             self.settings_dict_screening = self.build_settings_dict(
                 self.incar_path_screening, self.kpoints_path_screening)
-            
+
             #fix if user forgot to put the correct IBRION for relax, and add EDIFFG for screening.
             #EDIFFG is put here so that in any case this will be the final value, even if the user had
             #specified a different value explicitly in the INCAR instead of using one of the RelaxSets
@@ -269,7 +272,7 @@ class DFTParams:
         self.program = self.program.lower()
         if self.program not in ['espresso', 'vasp', 'ml']:
             raise ValueError(f'DFT program must be one of ["espresso", "vasp", "ml"].')
-        
+
         if self.program == 'espresso':
             if self.espresso is None:
                 raise ValueError('espresso settings are missing.')
