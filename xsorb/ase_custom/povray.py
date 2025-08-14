@@ -78,7 +78,8 @@ def POVRAYInit(self, cell, cell_vertices, positions, diameters, colors,
     if canvas_width is None:
         if canvas_height is None:
             self.canvas_width = min(self.image_width * 15, 640)
-            self.canvas_height = min(self.image_height * 15, 640)
+            # a guess should respect the aspect ratio
+            self.canvas_height = self.canvas_width / ratio
         else:
             self.canvas_width = canvas_height * ratio
             self.canvas_height = canvas_height

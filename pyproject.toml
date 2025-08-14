@@ -14,7 +14,7 @@ authors = [
 maintainers = [ { name = 'Enrico Pedretti', email = 'enrico.pedretti2@unibo.it' } ]
 requires-python = '>=3.9'
 dependencies = [
-'ase==3.25.0',
+'ase==3.26.0',
 'pymatgen',
 'numpy>=1.19.5',
 'matplotlib>=3.9.0',

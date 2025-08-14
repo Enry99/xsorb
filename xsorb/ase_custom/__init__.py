@@ -14,6 +14,7 @@ Need to be monkey patched at runtime by importin this module.
 # -19 Jun 2025: improved arrows in povray, removed monkey patching of
 #               PlottingVariables, now using directly POVRAY class.
 #               NOW ALIGNED with xplot (atomsplot) v 1.0
+# -14 Aug 2025: updated to ase 3.26.0
 
 # Runtime patch for read/write
 import xsorb.ase_custom.espresso

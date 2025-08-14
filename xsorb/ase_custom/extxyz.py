@@ -199,7 +199,7 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
                     voigt_6_to_full_3x3_stress(atoms.info['stress'])
 
         if columns is None:
-            fr_cols = (['symbols', 'positions']
+            fr_cols = (['symbols', 'positions', 'move_mask']
                        + [key for key in atoms.arrays if
                           key not in ['symbols', 'positions', 'numbers',
                                       'species', 'pos']])
@@ -254,7 +254,7 @@ def write_xyz_custom(fileobj, images, comment='', columns=None,
 
         # Move mask
         if 'move_mask' in fr_cols:
-            cnstr = images[0]._get_constraints()
+            cnstr = images[0].constraints
             if len(cnstr) > 0:
                 c0 = cnstr[0]
                 if isinstance(c0, FixAtoms):
