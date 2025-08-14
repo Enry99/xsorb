@@ -55,6 +55,7 @@ Each calculation database also has the following metadata:
 
 '''
 from __future__ import annotations
+from os import write
 from pathlib import Path
 import logging
 
@@ -192,6 +193,10 @@ class Database:
         '''
 
         with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
+
+            if verbose:
+                logging.info('Updating %s database...', calc_type)
+
             #Get the ids and calc_ids of the (incomplete) calculations to be updated
             selection = 'status!=completed' if not refresh else None
             rows = list(db.select(selection, include_data=True))
@@ -199,7 +204,7 @@ class Database:
             if not rows:
                 if verbose:
                     logging.info(
-                        'All %s calculations weare already completed. '
+                        'All %s calculations weare already completed. ' \
                         'db is already up to date.', calc_type)
                 return
 
@@ -557,14 +562,11 @@ class Database:
                 if Path(db_name).exists():
                     with ase.db.connect(db_name) as db:
                         for calc_id in info_dicts: #pylint: disable=consider-using-dict-items
-                            try:
-                                row = db.get(f'calc_id={calc_id}', include_data=False)
-                            except KeyError:
-                                continue
-
+                            row = db.get(f'calc_id={calc_id}', include_data=False)
 
                             eads = row.get('adsorption_energy') #can be a float or None
                             if eads is not None:
+                                atleast_one_calc = True
                                 eads = f'{eads:.3f}'
                                 if row.get('status') == 'scf_nonconverged':
                                     eads += '**'
@@ -578,15 +580,15 @@ class Database:
                                         logging.warning('Warning! %s %s '
                                           'has not reached final configuration. '
                                             'The energy will be marked with a *', calc_type, calc_id)
+
                             info_dicts[calc_id].update({eads_column_name: eads})
 
                             if row.get('bonds'):
-                                info_dicts[calc_id].update({'bonds': row.get('bonds')})
+                                info_dicts[calc_id].update({f'bonds_{calc_type}': row.get('bonds')})
 
                             if row.get('final_dz'):
-                                info_dicts[calc_id].update({'final_dz': row.get('final_dz')})
+                                info_dicts[calc_id].update({f'final_dz_{calc_type}': row.get("final_dz")})
 
-                            atleast_one_calc = True
 
                     if atleast_one_calc:
                         last_calc_e_column_name = eads_column_name
@@ -595,13 +597,17 @@ class Database:
         # Write csv file
         df = pd.DataFrame.from_dict(info_dicts, orient='index')
 
+        # change index to calc_id
+        df.index.name = 'calc_id'
+        df.reset_index(inplace=True)
+
         if last_calc_e_column_name and include_results and txt: #sort by energy column
             df.sort_values(by=last_calc_e_column_name)
 
         if txt:
-            df.to_csv('results.txt', sep='\t', index=False)
+            df.to_csv('results.txt', sep='\t', index=False, float_format='%.3f')
         else:
-            df.to_csv('results.csv', index=False)
+            df.to_csv('results.csv', index=False, float_format='%.3f')
 
         if verbose: logging.info('Results file written.') #pylint: disable=multiple-statements
 
@@ -610,8 +616,8 @@ def manual_update_calculations(calc_type : str,
                                refresh : bool = False,
                                txt : bool = False) -> None:
     '''
-    Manually update the calculations in the database.
-    This function is meant to be called from the CLI, to update the database
+    Manually update the calculations in the database and write the results file.
+    This function is meant to be called from the CLI
 
     Args:
     - calc_type: string with the type of calculation to update
@@ -621,8 +627,11 @@ def manual_update_calculations(calc_type : str,
     '''
 
     if refresh:
+        logging.info('Re-reading the output files, updating e_slab_mol, '
+                'the radii mult factor, and recalculating the bonding status...')
         from xsorb.settings import Settings # pylint: disable=import-outside-toplevel
-        settings = Settings(read_energies=True)
+        settings = Settings(read_energies_dft= (calc_type != 'mlopt'),
+                            read_energies_ml= (calc_type == 'mlopt' or calc_type == 'all'))
         total_e_slab_mol = settings.total_e_slab_mol
         total_e_slab_mol_ml = settings.total_e_slab_mol_ml
         mult=settings.structure.molecule.radius_scale_factor
@@ -641,6 +650,8 @@ def manual_update_calculations(calc_type : str,
                 total_e_slab_mol_dft=total_e_slab_mol,
                 total_e_slab_mol_ml=total_e_slab_mol_ml,
                 mult=mult,
-                txt=txt,
-                verbose=True
+                write_csv=False
             )
+
+    # Write the results file only once at the end
+    Database.write_csvfile(txt=txt, verbose=True)
