@@ -25,7 +25,7 @@ class CalculationInfo(JsonableBase):
     _status: str = 'incomplete' # 'completed', 'incomplete', 'scf_nonconverged'
 
 
-    __xsorb_objtype__ : str = 'CalculationFilesInfo'
+    __xsorb_objtype__ : str = 'CalculationInfo'
 
     def __post_init__(self) -> None:
         """
@@ -113,8 +113,8 @@ class CalculationResults(JsonableBase):
     adsorption_energy_evol: list[float]
     final_dz: float
 
-    bonds : list[BondInfo] | None
-    trajectory : list[AtomsCustom] | None
+    bonds : list[BondInfo] | None = None
+    trajectory : list[AtomsCustom] | None = None
 
 
     __xsorb_objtype__ : str = 'CalculationResults'
