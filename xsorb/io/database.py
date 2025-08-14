@@ -288,49 +288,6 @@ class Database:
 
 
     @staticmethod
-    def update_all_calc_dbs(*,refresh : bool = False,
-                            total_e_slab_mol_dft : float | None = None,
-                            total_e_slab_mol_ml : float | None = None,
-                            mult : float | None = None,
-                            write_csv : bool = True,
-                            txt : bool = False,
-                            verbose: bool=False) -> None:
-        '''
-        Update all the calculation databases
-
-        Args:
-        - refresh: bool to force the update of the database
-        - total_e_slab_mol_dft: float with the dft total energy of the isolated molecule and slab.
-        - total_e_slab_mol_ml: float with total energy of the isolated molecule and slab (for ML)
-        - mult: float with the multiplicative factor for the covalent radii to
-            determine bonding. Needs to be passed when refreshing the database
-            if the value was changed from the settings
-        - write_csv: bool to write the results to a csv file
-        - txt: bool to write a txt file instead of a csv file
-        - verbose: bool to print messages
-        '''
-
-
-        if verbose and refresh:
-            logging.info('Re-reading the output files, updating e_slab_mol, '
-                   'the radii mult factor, and recalculating the bonding status...')
-
-
-        for calc_type in CALC_DB_NAMES:
-            Database.update_calc_db(calc_type=calc_type,
-                                    refresh=refresh,
-                                    total_e_slab_mol_dft=total_e_slab_mol_dft,
-                                    total_e_slab_mol_ml=total_e_slab_mol_ml,
-                                    mult=mult,
-                                    write_csv=False,
-                                    txt=txt,
-                                    verbose=verbose)
-
-        if write_csv:
-            Database.write_csvfile(txt=txt, verbose=verbose)
-
-
-    @staticmethod
     def get_structures(calc_ids : list[int] | int | None = None) -> list:
         '''
         Get the rows from the structures database

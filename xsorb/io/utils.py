@@ -28,7 +28,25 @@ def overwrite_question(file_path : str) -> str:
         answer = input(f'{file_path} already exists. Overwrite? '\
                        '("y" = yes to this one, "yall" = yes to all,'\
                          ' "n" = no to this one, "nall" = no to all): ')
-        if answer.lower() in ['y', 'n', 'yall', 'nall']:
+        answer = answer.strip().lower()
+        if answer in ['y', 'n', 'yall', 'nall']:
+            return answer
+        else:
+            print('Value not recognized. Try again.')
+
+
+def cleanup_question() -> str:
+    '''
+    Asks the user if they want to remove all files for the Xsorb run.
+
+    Returns:
+    - answer: str, 'yes' if the user wants to remove all files, 'no' otherwise
+
+    '''
+    while True:
+        answer = input("Do you really want to remove all files for this Xsorb run? (yes/no): ")
+        answer = answer.strip().lower()
+        if answer in ['yes', 'no']:
             return answer
         else:
             print('Value not recognized. Try again.')

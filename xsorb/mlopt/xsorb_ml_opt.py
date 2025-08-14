@@ -47,9 +47,9 @@ def main():
 
     # Optimize the structure
 
-    #First, try with BFGSLinesearch for 150 steps
+    #First, try with BFGSLinesearch for 300 steps
     opt = BFGSLineSearch(atoms, trajectory=out_file, logfile=log_file, maxstep=0.1)
-    converged = opt.run(fmax=0.01, steps=150)
+    converged = opt.run(fmax=0.01, steps=300)
 
     #If not converged, try with regular BFGS
     if not converged:
