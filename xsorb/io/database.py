@@ -548,11 +548,9 @@ class Database:
 
                             info_dicts[calc_id].update({eads_column_name: eads})
 
-                            if row.get('bonds'):
-                                info_dicts[calc_id].update({f'bonds_{calc_type}': row.get('bonds')})
+                            info_dicts[calc_id].update({f'bonds_{calc_type}': row.get('bonds')})
 
-                            if row.get('final_dz'):
-                                info_dicts[calc_id].update({f'final_dz_{calc_type}': row.get("final_dz")})
+                            info_dicts[calc_id].update({f'final_dz_{calc_type}': row.get("final_dz")})
 
 
                     if atleast_one_calc:
@@ -567,10 +565,12 @@ class Database:
         df.reset_index(inplace=True)
 
         if last_calc_e_column_name and include_results and txt: #sort by energy column
-            df.sort_values(by=last_calc_e_column_name)
+            print(f'Sorting results by {last_calc_e_column_name}')
+            df.sort_values(by=last_calc_e_column_name, inplace=True, ascending=False)
 
         if txt:
-            df.to_csv('results.txt', sep='\t', index=False, float_format='%.3f')
+            with open('results.txt', 'w') as f:
+                f.write(df.to_string(index=False, float_format='%.2f', na_rep='-', col_space=2))
         else:
             df.to_csv('results.csv', index=False, float_format='%.3f')
 
