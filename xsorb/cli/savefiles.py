@@ -19,7 +19,7 @@ Example:
         parser.add_argument('calc_type',
                         type=str,
                         choices=['screening', 'relax', 'mlopt', 'initial'],
-                        help='''type of calculation to render''')
+                        help='''type of calculation to take structures from''')
         parser.add_argument('format',
                         type=str,
                         help='''format to save the files''')

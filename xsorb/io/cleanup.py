@@ -26,7 +26,12 @@ def cleanup_xsorb_run(calc_only: bool = False):
     for directory in ALL_OUTDIRS:
         if os.path.exists(directory):
             shutil.rmtree(directory, ignore_errors=True)
-            logging.info(f"Removed directory: {directory}")
+            logging.info("Removed directory: %s", directory)
+
+    # Remove the jobs file
+    if os.path.exists(JOBS_FILENAME):
+        os.remove(JOBS_FILENAME)
+
     logging.info("Calculation files cleaned up.")
     if calc_only:
         return
@@ -35,11 +40,7 @@ def cleanup_xsorb_run(calc_only: bool = False):
     for db_name in ALL_DB_NAMES:
         if os.path.exists(db_name):
             os.remove(db_name)
-            logging.info(f"Removed database file: {db_name}")
-
-    # Remove the jobs file
-    if os.path.exists(JOBS_FILENAME):
-        os.remove(JOBS_FILENAME)
+            logging.info("Removed database file: %s", db_name)
 
     logging.info("All Xsorb run files cleaned up.")
 
