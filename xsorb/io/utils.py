@@ -35,36 +35,19 @@ def overwrite_question(file_path : str) -> str:
             print('Value not recognized. Try again.')
 
 
-def cleanup_question() -> str:
+def yes_no_question(question : str) -> bool:
     '''
     Asks the user if they want to remove all files for the Xsorb run.
 
     Returns:
-    - answer: str, 'yes' if the user wants to remove all files, 'no' otherwise
+    - bool, True if the user wants to proceed, False otherwise
 
     '''
     while True:
-        answer = input("Do you really want to remove all files for this Xsorb run? (yes/no): ")
+        answer = input(f"{question} (yes/no): ")
         answer = answer.strip().lower()
         if answer in ['yes', 'no']:
-            return answer
-        else:
-            print('Value not recognized. Try again.')
-
-
-def continue_even_if_not_all_completed_question() -> bool:
-    '''
-    Asks the user if they want to continue even if not all calculations are completed.
-
-    Returns:
-    - bool, True if the user wants to continue, False otherwise
-    '''
-
-    while True:
-        answer = input('Not all calculations are completed. '\
-                       'Continue anyway with those that are present? (y/n): ')
-        if answer.lower() in ['y', 'n']:
-            return answer.lower() == 'y'
+            return answer == 'yes'
         else:
             print('Value not recognized. Try again.')
 

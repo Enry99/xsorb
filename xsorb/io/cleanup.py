@@ -9,7 +9,7 @@ import logging
 from xsorb.io.filenames import (
     ALL_DB_NAMES, JOBS_FILENAME,
     ALL_OUTDIRS, ALL_FILES_AND_DIRS)
-from xsorb.io.utils import cleanup_question
+from xsorb.io.utils import yes_no_question
 
 def cleanup_xsorb_run(calc_only: bool = False):
     '''
@@ -17,8 +17,7 @@ def cleanup_xsorb_run(calc_only: bool = False):
     '''
 
     # ask the user for confirmation
-    confirm = cleanup_question()
-    if confirm != 'yes':
+    if not yes_no_question("Do you really want to remove all files for this Xsorb run?"):
         logging.info("Cleanup aborted.")
         return
 
@@ -52,6 +51,6 @@ def fresh_start():
     '''
 
     if any(os.path.exists(file_or_dir) for file_or_dir in ALL_FILES_AND_DIRS):
-        confirm = cleanup_question()
-        if confirm == 'yes':
+        if yes_no_question('''Warning: some files from a previous run exist.
+              Do you want to delete all of them and start a fresh run?'''):
             cleanup_xsorb_run()

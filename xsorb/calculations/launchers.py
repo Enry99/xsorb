@@ -24,7 +24,7 @@ from xsorb.io.inputs import write_inputs, write_slab_mol_inputs
 from xsorb.io.jobs import launch_jobs
 from xsorb.io.cleanup import fresh_start
 from xsorb.io.database import Database
-from xsorb.io.utils import continue_even_if_not_all_completed_question
+from xsorb.io.utils import yes_no_question
 from xsorb.calculations.selection import obtain_calc_indices, get_adsorption_structures
 
 
@@ -181,7 +181,8 @@ def launch_final_relax(*,
 
     #this check also updates the db
     if not Database.all_completed(calc_type=take_from) and \
-        not continue_even_if_not_all_completed_question():
+        not yes_no_question('''Not all calculations are completed.
+                            Continue anyway with those that are present?'''):
         logging.info('Quitting.')
         sys.exit(0)
 
