@@ -39,6 +39,14 @@ Examples:
                                 type=_positive_int,
                                 help='''Manually select the configurations for the final relaxation
                                 by their IDs (starting from 1).''')
+        parser.add_argument('-from',
+                        type=str,
+                        choices=['screening', 'mlopt'],
+                        default='screening',
+                        dest='take_from',
+                        help='''Choose the results on which perform the selection, whose
+                        optimized structures will be used as starting point for the final relaxations,
+                        unless --regenerate is specified''')
         parser.add_argument('--exclude',
                         nargs='+',
                         type=_positive_int,
@@ -62,16 +70,6 @@ Examples:
                         The distinction is made based on a check based on covalent radii.
                         The multiplicative factor can be modified via the radius_scale_factor
                         key in the settings file. The default value is 1.1x''')
-        parser.add_argument('--from',
-                        type=str,
-                        choices=['screening', 'mlopt'],
-                        default='screening',
-                        dest='take_from',
-                        help='''Choose the results on which perform the selection, whose
-                        optimized structures will be used for the final relaxations, unless
-                        --regenerate is specified. In that case, the structures will be re-generated
-                        from scratch, and the -from argument will be used just to choose
-                        which IDs should be included the''')
         parser.add_argument('--regenerate',
                         action='store_true',
                         help='''Re-generate the structures for the final relaxations

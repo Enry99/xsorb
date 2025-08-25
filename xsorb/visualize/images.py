@@ -306,7 +306,7 @@ def plot_energy_evolution(calc_type : str):
 
             if row.status != 'completed':
                 plt.plot(len(energy_array)-1, energy_array[-1],
-                        symbols_map[row.status]["sym"],
+                        symbols_map[row.status]["symbol"],
                         color=symbols_map[row.status]["color"])
 
 
