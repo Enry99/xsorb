@@ -219,7 +219,7 @@ def saveas(calc_type : str, saveas_format : str):
     if calc_type not in ('initial','screening', 'relax', 'mlopt'):
         raise RuntimeError(f"Wrong '{calc_type}', expected 'screening', 'relax' or 'mlopt'")
 
-    folder = Path(f"{calc_type}/{saveas_format}")
+    folder = Path(f"exports/{calc_type}/{saveas_format}")
 
     logging.info(f"Saving files to {folder}...")
     folder.mkdir(exist_ok=True, parents=True)
