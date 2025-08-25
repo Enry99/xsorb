@@ -46,7 +46,7 @@ def build_xsorb_parser():
     ]
 
     for command, module_name in commands:
-        cmd : CLICommandBase = import_module(module_name).CLICommand
+        cmd : CLICommandBase = import_module(module_name).CLICommand()
 
         subparser = subparsers.add_parser(
                     command,
