@@ -107,7 +107,7 @@ def plot_images(calc_type : str,
     kwargs.pop('command', None)
     kwargs.pop('func', None)
     framerate = kwargs.pop('framerate', None)
-    rotations = kwargs.pop('rotation', None)
+    rotations = kwargs.pop('rotations', None)
     center_mol = kwargs.pop('center_molecule', None)
 
     if calc_type not in ('initial','screening', 'relax', 'mlopt'):
@@ -241,7 +241,10 @@ def plot_images(calc_type : str,
                     stars.append('**' if row.get('scf_nonconverged') else \
                              '*' if row.get('status') != 'completed' else '')
 
+    logging.info('All structures rendered.')
+
     if calc_id is None and not movie:   #plot grid
+        logging.info('Saving overview image...')
         plot_overview_grid(calc_type=calc_type,
                            outfiles=outfiles,
                            rot_label=rotations_labels[0],
