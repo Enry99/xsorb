@@ -52,6 +52,6 @@ def fresh_start():
     '''
 
     if any(os.path.exists(file_or_dir) for file_or_dir in ALL_FILES_AND_DIRS):
-        if yes_no_question('''Warning: some files from a previous run exist.
-              Do you want to delete all of them and start a fresh run?'''):
+        if yes_no_question('Warning: some files from a previous run exist. '\
+                'Do you want to delete all of them and start a fresh run?'):
             cleanup_xsorb_run()

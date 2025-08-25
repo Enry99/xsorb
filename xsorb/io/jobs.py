@@ -18,14 +18,11 @@ import logging
 import xsorb.io.database
 from xsorb.settings import Settings
 from xsorb.dft_codes.definitions import SBATCH_POSTFIX
-from xsorb.dft_codes.calculator import edit_files_for_restart
+from xsorb.dft_codes.calculator import edit_file_for_restart
 from xsorb.io.scheduler import JobScheduler
 from xsorb.io.filenames import JOBS_FILENAME
 if TYPE_CHECKING:
     from xsorb.adsorptiondata.adsorptioncalculation import AdsorptionCalculation
-
-
-TEST = False
 
 
 def launch_jobs(*,program : str,
@@ -52,7 +49,6 @@ def launch_jobs(*,program : str,
 
     main_dir = os.getcwd()
 
-    submitted_jobs : list[str] = []
     for system in systems:
 
         j_dir = Path(system.calc_info.in_file_path).parent
@@ -84,17 +80,16 @@ def launch_jobs(*,program : str,
             main_dir=main_dir)
 
         jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
-        submitted_jobs.append(jobid)
+        os.chdir(main_dir)
 
-        os.chdir(main_dir) ####################
+        if calc_type not in ('isolated'): #no database for slab/molecule
+            xsorb.io.database.Database.add_job_id(calc_type,
+                                                int(system.calc_info.calc_id),
+                                                jobid)
+        else:
+            with open(JOBS_FILENAME, "a",encoding=sys.getfilesystemencoding()) as f:
+                f.write(f'{jobid}\n')
 
-    if calc_type not in ('isolated'): #no database for slab/molecule
-        xsorb.io.database.Database.add_job_ids(calc_type,
-                                               [int(system.calc_info.calc_id) for system in systems],
-                                               submitted_jobs)
-    else:
-        with open(JOBS_FILENAME, "a",encoding=sys.getfilesystemencoding()) as f:
-            f.writelines([f'{job}\n' for job in submitted_jobs])
 
     logging.info("Submitted all %s calculations.", calc_type)
 
@@ -115,33 +110,29 @@ def restart_jobs(calc_type : str):
 
     rows = xsorb.io.database.Database.get_calculations(calc_type=calc_type,
                                      selection='status!=completed')
-    indices_to_restart = [row.calc_id for row in rows if row.job_id not in active_jobs]
-    in_files = [row.in_file_path for row in rows]
-    out_files = [row.out_file_path for row in rows]
-    log_files = [row.log_file_path for row in rows]
 
-    #edit input files
-    edit_files_for_restart(settings.dft.program, in_files)
-
-    #launch the calculations
     main_dir = os.getcwd()
-    submitted_jobs : list[str] = []
-    for in_file, out_file, log_file in zip(in_files, out_files, log_files):
+    for row in rows:
+        if row.job_id in active_jobs:
+            logging.info(f"Job {row.job_id} for Calculation {row.calc_id}" \
+                         " is still active, not restarting it.")
+        else:
+            in_file = row.in_file_path
 
-        j_dir = Path(in_file).parent
-        os.chdir(j_dir)
+            #edit input file
+            edit_file_for_restart(settings.dft.program, in_file)
 
-        postfix = SBATCH_POSTFIX[settings.dft.program].format(in_file=Path(in_file).name,
-                                                 out_file=Path(out_file).name,
-                                                 log_file=Path(log_file).name,
-                                                 main_dir=main_dir)
+            #launch the calculation
+            j_dir = Path(in_file).parent
+            os.chdir(j_dir)
+            postfix = SBATCH_POSTFIX[settings.dft.program].format(in_file=Path(in_file).name,
+                                                    out_file=Path(row.out_file_path).name,
+                                                    log_file='',
+                                                    main_dir=main_dir)
+            jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
 
-        jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
-        submitted_jobs.append(jobid)
-
-        os.chdir(main_dir) ####################
-
-    xsorb.io.database.Database.add_job_ids(calc_type, indices_to_restart, submitted_jobs)
+            os.chdir(main_dir)
+            xsorb.io.database.Database.add_job_id(calc_type, row.calc_id, jobid)
 
 
 def cancel_jobs():

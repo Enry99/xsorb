@@ -233,57 +233,56 @@ def adjust_constraints(atoms : Atoms, program : str):
         atoms.set_constraint(c)
 
 
-def edit_files_for_restart(program : str, paths : list[str]):
+def edit_file_for_restart(program : str, path : str):
     '''
-    Edit the input files, setting the correct flags for restart.
+    Edit the input file, setting the correct flags for restart.
 
     Args:
     - program: DFT program. Possible values: 'espresso' or 'vasp'
-    - paths: list of paths of the input files to be edited
+    - paths:  path of the input files to be edited
     '''
 
-    for path in paths:
-        if program == 'espresso':
-            with open(path, 'r',encoding=sys.getfilesystemencoding()) as f:
-                lines = f.readlines()
-                for i, line in enumerate(lines):
-                    if 'from_scratch' in line:
-                        lines[i] = lines[i].replace('from_scratch','restart')
-                        break
-            with open(path, 'w',encoding=sys.getfilesystemencoding()) as f:
-                f.writelines(lines)
+    if program == 'espresso':
+        with open(path, 'r',encoding=sys.getfilesystemencoding()) as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                if 'from_scratch' in line:
+                    lines[i] = lines[i].replace('from_scratch','restart')
+                    break
+        with open(path, 'w',encoding=sys.getfilesystemencoding()) as f:
+            f.writelines(lines)
 
-        elif program == 'vasp':
-            parentpath = Path(path).parent.as_posix()
-            poscar = path
-            contcar = parentpath + '/CONTCAR'
-            incar = parentpath + '/INCAR'
-            outcar = parentpath + '/OUTCAR'
-            vasprun = parentpath + '/vasprun.xml'
-            oszicar = parentpath + '/OSZICAR'
+    elif program == 'vasp':
+        parentpath = Path(path).parent.as_posix()
+        poscar = path
+        contcar = parentpath + '/CONTCAR'
+        incar = parentpath + '/INCAR'
+        outcar = parentpath + '/OUTCAR'
+        vasprun = parentpath + '/vasprun.xml'
+        oszicar = parentpath + '/OSZICAR'
 
-            with open(incar, 'r',encoding=sys.getfilesystemencoding()) as f:
-                lines = f.readlines()
-                istart_found = False
-                for i, line in enumerate(lines):
-                    if 'ISTART' in line:
-                        lines[i] = 'ISTART = 1\n'
-                        istart_found = True
-                        break
-                if not istart_found: lines.append('ISTART = 1\n')
+        with open(incar, 'r',encoding=sys.getfilesystemencoding()) as f:
+            lines = f.readlines()
+            istart_found = False
+            for i, line in enumerate(lines):
+                if 'ISTART' in line:
+                    lines[i] = 'ISTART = 1\n'
+                    istart_found = True
+                    break
+            if not istart_found: lines.append('ISTART = 1\n')
 
-            with open(incar, 'w',encoding=sys.getfilesystemencoding()) as f:
-                f.writelines(lines)
+        with open(incar, 'w',encoding=sys.getfilesystemencoding()) as f:
+            f.writelines(lines)
 
-            #copy files for the first part of the relaxation, to avoid overwriting
-            last_i = len( glob.glob( outcar.replace('OUTCAR', 'OUTCAR_') ) )
-            shutil.copyfile(outcar, outcar.replace('OUTCAR', f'OUTCAR_{last_i}'))
-            shutil.copyfile(vasprun, vasprun.replace('vasprun.xml', f'vasprun_{last_i}.xml'))
-            shutil.copyfile(poscar, poscar.replace('POSCAR', f'POSCAR_{last_i}'))
-            shutil.copyfile(oszicar, oszicar.replace('OSZICAR', f'OSZICAR_{last_i}'))
+        #copy files for the first part of the relaxation, to avoid overwriting
+        last_i = len( glob.glob( outcar.replace('OUTCAR', 'OUTCAR_') ) )
+        shutil.copyfile(outcar, outcar.replace('OUTCAR', f'OUTCAR_{last_i}'))
+        shutil.copyfile(vasprun, vasprun.replace('vasprun.xml', f'vasprun_{last_i}.xml'))
+        shutil.copyfile(poscar, poscar.replace('POSCAR', f'POSCAR_{last_i}'))
+        shutil.copyfile(oszicar, oszicar.replace('OSZICAR', f'OSZICAR_{last_i}'))
 
-            #copy contcar to poscar to restart
-            shutil.copyfile(contcar, poscar)
+        #copy contcar to poscar to restart
+        shutil.copyfile(contcar, poscar)
 
-        else:
-            raise ValueError(f"Program {program} not recognized")
+    else:
+        raise ValueError(f"Program {program} not recognized")

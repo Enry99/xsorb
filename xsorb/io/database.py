@@ -382,20 +382,23 @@ class Database:
 
 
     @staticmethod
-    def add_job_ids(calc_type : str, calc_ids : list[int], job_ids : list[int]) -> None:
+    def add_job_id(calc_type : str, calc_id : int, job_id : int) -> None:
         '''
-        Add the job ids to the corresponding database
+        Add the job id to the corresponding database
 
         Args:
         - calc_type: string with the type of calculation
-        - calc_ids: list of integers with the calculation ids
-        - job_ids: list of integers with the job ids
+        - calc_id: int with the calculation id
+        - job_id: int with the job id
         '''
+        # we need to do it for each calculation separately,
+        # so that if the code crashes or is interrupted,
+        # the already submitted jobs are recorded in the database
+
         with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
             metadata = db.metadata.copy() # workaround for ase.db bug
-            for calc_id, job_id in zip(calc_ids, job_ids):
-                row_id = db.get(f'calc_id={calc_id}', include_data=False).id
-                db.update(id=row_id, job_id=job_id)
+            row_id = db.get(f'calc_id={calc_id}', include_data=False).id
+            db.update(id=row_id, job_id=job_id)
             db.metadata = metadata # workaround for ase.db bug
 
 
