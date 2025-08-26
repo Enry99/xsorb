@@ -78,5 +78,3 @@
         #etot_conv_thr_screening        = 5e-3                  # convergence threshold for energy (Ry, QE units)
         #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces (Ry/bohr, QE units)
 
-    #[Calculation_parameters.ml]
-        #force_conv_thr                 = 0.01                  # force threshold (in eV/A) for the machine learning potential optimization

@@ -254,7 +254,7 @@ class MLParams:
     '''
     Dataclass to store machine learning settings.
     '''
-    force_conv_thr: float = 0.01
+    force_conv_thr: float = 0.01 # force threshold (in eV/A). NOT IMPLEMENTED YET!
 
 
 @dataclass
@@ -310,7 +310,8 @@ class DFTParams:
             return settings_dict
 
         elif self.program == 'ml':
-            return {'force_conv_thr': self.ml.force_conv_thr}
+            return {}
+            #return {'force_conv_thr': self.ml.force_conv_thr}
 
         else:
             raise ValueError(f'Program {self.program} not recognized.')

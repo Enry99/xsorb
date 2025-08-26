@@ -181,8 +181,8 @@ def launch_final_relax(*,
 
     #this check also updates the db
     if not Database.all_completed(calc_type=take_from) and \
-        not yes_no_question('''Not all calculations are completed.
-                            Continue anyway with those that are present?'''):
+        not yes_no_question('Not all calculations are completed. '\
+                            'Continue anyway with those that are present?'):
         logging.info('Quitting.')
         sys.exit(0)
 
@@ -199,6 +199,10 @@ def launch_final_relax(*,
         #use the user-specified indices, exclude unwanted calculations
         if excluded_calc_ids:
             calc_ids = [calc_id for calc_id in calc_ids if calc_id not in excluded_calc_ids]
+
+    if len(calc_ids) == 0:
+        logging.info('No configurations to be relaxed. Quitting.')
+        sys.exit(0)
 
     get_structures_from = 'structures' if relax_from_initial else take_from
     adsorption_structures = get_adsorption_structures(get_structures_from, calc_ids)
