@@ -35,7 +35,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
                  calc_type : str | None = None,
                  calc_ids : list[int] | None = None,
                  ask_before_overwrite : bool = True,
-                 verbose : bool = True) -> list[AdsorptionCalculation]:
+                 verbose : bool = True) -> list[CalculationInfo]:
     '''
     Writes the input files for all the adsorption configurations,
     updating the corresponding database(s).
@@ -50,7 +50,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     - interactive: interactive mode: ask before overwriting files that are already present
 
     Returns:
-    - written_systems: list[AdsorptionCalculation]
+    - written_systems: list[CalculationInfo]
     '''
 
     program = settings.dft.program if calc_type != 'mlopt' else 'ml'
@@ -66,7 +66,8 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     calc_type_for_writing = calc_type if calc_type is not None else 'screening'
 
     written_systems : list[AdsorptionCalculation] = []
-    ovewrite_answer = 'y' #pylint: disable=invalid-name
+    written_systems_calcinfos : list[CalculationInfo] = []
+    ovewrite_answer = 'y'
     for i, ads_structure in zip(calc_ids, adsorption_structures):
 
         #possibly apply constraints to slab in case of mlopt
@@ -79,6 +80,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
         log_file_path = LOG_FILE_PATHS[calc_type_for_writing][program].format(i)
         file_dir = Path(in_file_path).parent.as_posix()
 
+        # overwrite check block ##############
         if ask_before_overwrite and (Path(in_file_path).exists() or Path(out_file_path).exists()):
             if 'all' not in ovewrite_answer:
                 # first time is 'y' as set above, so the question will be asked if
@@ -86,10 +88,10 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
                 ovewrite_answer = overwrite_question(f'{in_file_path} or {out_file_path}')
             if 'n' in ovewrite_answer:
                 continue # skip only if file exists. Not break!
-
         if Path(file_dir).exists():
             #remove the directory and all its content
             shutil.rmtree(file_dir)
+        ######################################
 
         #initialize the Calculator and write input files
         write_file_with_calculator(
@@ -100,17 +102,20 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             directory=file_dir
         )
 
-        adsorptioncalc = AdsorptionCalculation(
-            adsorption_structure=ads_structure,
-            calc_info=CalculationInfo(
+        calc_info = CalculationInfo(
                 calc_id=str(i),
                 in_file_path=in_file_path,
                 out_file_path=out_file_path,
                 log_file_path=log_file_path
             )
+
+        adsorptioncalc = AdsorptionCalculation(
+            adsorption_structure=ads_structure,
+            calc_info=calc_info
         )
 
         written_systems.append(adsorptioncalc)
+        written_systems_calcinfos.append(calc_info)
 
 
     #if we are not in generation mode, update the databases.
@@ -125,7 +130,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
     if verbose: logging.info('All input files written.') #pylint: disable=multiple-statements
 
-    return written_systems
+    return written_systems_calcinfos
 
 
 def write_slab_mol_inputs(*,slab : Atoms | None,
@@ -145,63 +150,72 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
     - ask_before_overwrite: interactive mode: ask before overwriting files that are already present
 
     Returns:
-    - written_systems: list of WrittenSystem objects, containing the calc_id,
-        the Atoms object, the path to the input, output and log files.
+    - written_systems: list[CalculationInfo]
     '''
 
     program = 'ml' if ml else settings.dft.program
 
-    structures, written_systems = [], []
+    structures : list[Atoms] = []
+    names: list[str] = []
     if slab is not None:
         structures.append(slab)
-        written_systems.append(CalculationInfo(calc_id='slab',
-                                             in_file_path=IN_FILE_PATHS['slab'][program],
-                                             out_file_path=OUT_FILE_PATHS['slab'][program],
-                                             log_file_path=LOG_FILE_PATHS['slab'][program]))
+        names.append('slab')
 
     if molecule is not None:
         structures.append(molecule)
-        written_systems.append(CalculationInfo(calc_id='mol',
-                                             in_file_path=IN_FILE_PATHS['mol'][program],
-                                             out_file_path=OUT_FILE_PATHS['mol'][program],
-                                             log_file_path=LOG_FILE_PATHS['mol'][program]))
+        names.append('mol')
 
 
     if verbose: logging.info('Writing input files...') #pylint: disable=multiple-statements
 
-    #Write the input files
-    answer_all = False #pylint: disable=invalid-name
-    for atoms, system in zip(structures, written_systems):
+    written_systems_calcinfos : list[CalculationInfo] = []
+    ovewrite_answer = 'y'
+    for atoms, name in zip(structures, names):
 
         #possibly apply constraints to slab in case of mlopt
-        if ml and system.calc_id == 'slab' and settings.structure.constraints.fix_slab_ml_opt:
+        if ml and name == 'slab' and settings.structure.constraints.fix_slab_ml_opt:
             set_fixed_slab_constraints(atoms)
 
-        file_label : str = str(system.calc_id)
-        in_file_path = system.in_file_path
-        out_file_path = system.out_file_path
+        file_label = name
+        in_file_path = IN_FILE_PATHS[name][program]
+        out_file_path = OUT_FILE_PATHS[name][program]
+        log_file_path = LOG_FILE_PATHS[name][program]
         file_dir = Path(in_file_path).parent.as_posix()
 
-        if ask_before_overwrite and (Path(in_file_path).exists() or Path(out_file_path).exists()) \
-            and not answer_all:
-            answer = overwrite_question(f'{in_file_path} or {out_file_path}')
-            if answer == 'yall': answer_all = True #pylint: disable=multiple-statements,invalid-name
-            elif answer == 'nall': break #pylint: disable=multiple-statements
-            elif answer == 'n': continue #pylint: disable=multiple-statements
-
+        # overwrite check block ##############
+        if ask_before_overwrite and (Path(in_file_path).exists() or Path(out_file_path).exists()):
+            if 'all' not in ovewrite_answer:
+                # first time is 'y' as set above, so the question will be asked if
+                # ask_before_overwrite is True
+                ovewrite_answer = overwrite_question(f'{in_file_path} or {out_file_path}')
+            if 'n' in ovewrite_answer:
+                continue # skip only if file exists. Not break!
+        if Path(file_dir).exists():
             #remove the directory and all its content
             shutil.rmtree(file_dir)
+        ######################################
 
         #initialize the Calculator and write input files
-        write_file_with_calculator(atoms=atoms,
+        write_file_with_calculator(
+            atoms=atoms,
             program=program,
             settingsdict=settings.dft.get_settings_dict(calc_type='ml' if ml else 'relax'),
             label=file_label,
-            directory=file_dir)
+            directory=file_dir
+        )
+
+        written_systems_calcinfos.append(
+            CalculationInfo(
+                calc_id=name,
+                in_file_path=in_file_path,
+                out_file_path=out_file_path,
+                log_file_path=log_file_path
+            )
+        )
 
     if verbose: logging.info('All input files written.') #pylint: disable=multiple-statements
 
-    return written_systems
+    return written_systems_calcinfos
 
 
 def saveas(calc_type : str, saveas_format : str):

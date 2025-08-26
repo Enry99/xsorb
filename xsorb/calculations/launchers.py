@@ -91,7 +91,7 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
                 calc_type='screening',
                 jobscript=settings.input.jobscript_path,
                 scheduler_name=settings.input.scheduler,
-                systems=written_systems,
+                systems_calcinfos=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)
 
 
@@ -127,7 +127,7 @@ def launch_ml_opt(save_image : bool = False,):
                 calc_type='mlopt',
                 jobscript=settings.input.jobscript_ml_path,
                 scheduler_name=settings.input.scheduler,
-                systems=written_systems,
+                systems_calcinfos=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)
 
 
@@ -212,7 +212,7 @@ def launch_final_relax(*,
                 calc_type='relax',
                 jobscript=settings.input.jobscript_path,
                 scheduler_name=settings.input.scheduler,
-                systems=written_systems,
+                systems_calcinfos=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)
 
 
@@ -221,7 +221,8 @@ def launch_isolated_slab_and_molecule(*,
                                       ml : bool,
                                       launch_slab : bool = True,
                                       launch_mol: bool = True,
-                                      samecell : bool = False):
+                                      samecell : bool = False,
+                                      use_constraints : bool = False):
     '''
     Launch the calculations for the isolated slab and molecule.
 
@@ -230,6 +231,7 @@ def launch_isolated_slab_and_molecule(*,
     - launch_slab: launch the calculations for the slab
     - launch_mol: launch the calculations for the molecule
     - samecell: use the same slab cell also for the molecule (to remove coverage effects)
+    - use_constraints: include the constraints defined in settings file
     '''
 
     settings = Settings()
@@ -238,21 +240,40 @@ def launch_isolated_slab_and_molecule(*,
     mol = read(settings.input.molecule_filename)
 
     if slab.cell is None:
-        raise ValueError('The slab cell is not defined.')
+        raise RuntimeError('The slab cell is not defined.')
 
     if samecell:
         mol.cell = slab.cell
     elif not mol.cell:
         positions = mol.positions
-        deltax = np.max(positions[:,0]) - np.min(positions[:,0])
-        deltay = np.max(positions[:,1]) - np.min(positions[:,1])
-        deltaz = np.max(positions[:,2]) - np.min(positions[:,2])
+        deltax = np.max(positions[:,0]) - np.min(positions[:,0]) + 10
+        deltay = np.max(positions[:,1]) - np.min(positions[:,1]) + 10
+        deltaz = np.max(positions[:,2]) - np.min(positions[:,2]) + 10
 
         #large orthorombic cell
-        mol.cell = np.array([deltax, deltay, deltaz]) + np.array([10,10,10])
+        mol.cell = [deltax, deltay, deltaz]
 
     slab.pbc = True
     mol.pbc = True
+
+    if use_constraints:
+        from xsorb.structures.slab import Slab
+        from xsorb.structures.molecule import Molecule
+
+        slab = Slab(slab=slab,
+                    layers_threshold=settings.structure.constraints.layers_height,
+                    fixed_layers_slab=settings.structure.constraints.fixed_layers_slab,
+                    fixed_indices_slab=settings.structure.constraints.fixed_indices_slab,
+                    fix_slab_xyz=settings.structure.constraints.fix_slab_xyz
+                    ).slab_ase
+
+        mol = Molecule(mol=mol,
+                    atom_indexes=settings.structure.molecule.selected_atom_indexes,
+                    molecule_axis_mode=settings.structure.molecule.molecule_axis.mode,
+                    molecule_axis_values=settings.structure.molecule.molecule_axis.values,
+                    fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
+                    fix_mol_xyz=settings.structure.constraints.fix_mol_xyz
+                    ).mol_ase
 
 
     written_systems = write_slab_mol_inputs(slab=slab if launch_slab else None,
@@ -274,5 +295,5 @@ def launch_isolated_slab_and_molecule(*,
                 calc_type='isolated',
                 jobscript=jobscript,
                 scheduler_name=settings.input.scheduler,
-                systems=written_systems,
+                systems_calcinfos=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)

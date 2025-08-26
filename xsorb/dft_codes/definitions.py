@@ -12,8 +12,7 @@ from xsorb.io.filenames import (
     SCREENING_OUTDIR,
     RELAX_OUTDIR,
     ML_OPT_OUTDIR,
-    SLAB_OUTDIR,
-    MOL_OUTDIR
+    ISOLATED_OUTDIRS
 )
 
 
@@ -45,15 +44,15 @@ IN_FILE_PATHS = {
     },
 
     'slab': {
-        'vasp': SLAB_OUTDIR+'/DFT/POSCAR',
-        'espresso': SLAB_OUTDIR+'/DFT/slab.pwi',
-        'ml': SLAB_OUTDIR+'/ML/slab.xyz'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/slab/POSCAR',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/slab/slab.pwi',
+        'ml': ISOLATED_OUTDIRS+'/ML/slab/slab.xyz'
     },
 
     'mol': {
-        'vasp': MOL_OUTDIR+'/DFT/POSCAR',
-        'espresso': MOL_OUTDIR+'/DFT/mol.pwi',
-        'ml': MOL_OUTDIR+'/ML/mol.xyz'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/POSCAR',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/mol.pwi',
+        'ml': ISOLATED_OUTDIRS+'/ML/mol/mol.xyz'
     },
 
 }
@@ -74,15 +73,15 @@ OUT_FILE_PATHS = {
     },
 
     'slab': {
-        'vasp': SLAB_OUTDIR+'/DFT/vasprun.xml',
-        'espresso': SLAB_OUTDIR+'/DFT/slab.pwo',
-        'ml': SLAB_OUTDIR+'/ML/slab.traj'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/slab/vasprun.xml',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/slab/slab.pwo',
+        'ml': ISOLATED_OUTDIRS+'/ML/slab/slab.traj'
     },
 
     'mol': {
-        'vasp': MOL_OUTDIR+'/DFT/vasprun.xml',
-        'espresso': MOL_OUTDIR+'/DFT/mol.pwo',
-        'ml': MOL_OUTDIR+'/ML/mol.traj'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/vasprun.xml',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/mol.pwo',
+        'ml': ISOLATED_OUTDIRS+'/ML/mol/mol.traj'
     }
 }
 
@@ -102,15 +101,15 @@ LOG_FILE_PATHS = {
     },
 
     'slab': {
-        'vasp': SLAB_OUTDIR+'/DFT/vasprun.xml',
-        'espresso': SLAB_OUTDIR+'/DFT/slab.pwo',
-        'ml': SLAB_OUTDIR+'/ML/slab.log'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/slab/vasprun.xml',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/slab/slab.pwo',
+        'ml': ISOLATED_OUTDIRS+'/ML/slab/slab.log'
     },
 
     'mol': {
-        'vasp': MOL_OUTDIR+'/DFT/vasprun.xml',
-        'espresso': MOL_OUTDIR+'/DFT/mol.pwo',
-        'ml': MOL_OUTDIR+'/ML/mol.log'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/vasprun.xml',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/mol.pwo',
+        'ml': ISOLATED_OUTDIRS+'/ML/mol/mol.log'
     }
 }
 
