@@ -279,7 +279,8 @@ def launch_isolated_slab_and_molecule(*,
     written_systems = write_slab_mol_inputs(slab=slab if launch_slab else None,
                                             molecule=mol if launch_mol else None,
                                             settings=settings,
-                                            ml=ml)
+                                            ml=ml,
+                                            force_gamma=not samecell)
 
     if ml:
         if settings.input.jobscript_ml_path is None:

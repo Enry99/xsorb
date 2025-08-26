@@ -282,21 +282,32 @@ class DFTParams:
                 raise ValueError('vasp settings are missing.')
 
 
-    def get_settings_dict(self, calc_type: str = 'relax') -> dict:
+    def get_settings_dict(self, calc_type: str = 'relax', force_gamma : bool = False) -> dict:
         '''
         Get the settings dictionary for the specified calculation type.
         '''
         if self.program == 'espresso':
             if calc_type == 'screening' and self.espresso.settings_dict_screening is not None:
-                return self.espresso.settings_dict_screening
+                settings_dict = deepcopy(self.espresso.settings_dict_screening)
             else:
-                return self.espresso.settings_dict
+                settings_dict = deepcopy(self.espresso.settings_dict)
+
+            if force_gamma:
+                settings_dict['kpts'] = None
+                settings_dict['koffset'] = None
+
+            return settings_dict
 
         elif self.program == 'vasp':
             if calc_type == 'screening' and self.vasp.settings_dict_screening is not None:
-                return self.vasp.settings_dict_screening
+                settings_dict = deepcopy(self.vasp.settings_dict_screening)
             else:
-                return self.vasp.settings_dict
+                settings_dict = deepcopy(self.vasp.settings_dict)
+
+            if force_gamma:
+                settings_dict['kpoints_string'] = 'Gamma\n1\n0 0 0\n'
+
+            return settings_dict
 
         elif self.program == 'ml':
             return {'force_conv_thr': self.ml.force_conv_thr}

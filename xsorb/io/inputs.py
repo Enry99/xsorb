@@ -137,6 +137,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
                           molecule : Atoms | None,
                           settings : Settings,
                           ml : bool,
+                          force_gamma : bool = False,
                           ask_before_overwrite : bool = True,
                           verbose : bool = True) -> list[CalculationInfo]:
     '''
@@ -147,6 +148,7 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
     - molecule: Atoms object for the molecule
     - settings: Settings object, containing all the parameters
     - ml: True if the input files are for the machine learning model
+    - force_gamma: if True, use only the Gamma k-point
     - ask_before_overwrite: interactive mode: ask before overwriting files that are already present
 
     Returns:
@@ -199,7 +201,9 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
         write_file_with_calculator(
             atoms=atoms,
             program=program,
-            settingsdict=settings.dft.get_settings_dict(calc_type='ml' if ml else 'relax'),
+            settingsdict=settings.dft.get_settings_dict(
+                calc_type='ml' if ml else 'relax',
+                force_gamma=(name == 'mol' and force_gamma)),
             label=file_label,
             directory=file_dir
         )
