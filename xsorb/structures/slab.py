@@ -47,6 +47,7 @@ class Slab:
             (counting starts from the bottom, beginning with 0)
         - fixed_indices_slab: list of specific atoms to be fixed (-1: fix all)
             (indices start from 0, with the ordering of the atoms in the input file)
+        - fixed_thickness_slab: fix all atoms below a certain height (z coordinate)
         - fix_slab_xyz: which coordinates to fix for the fixed atoms,
             e.g. [True, True, False] = fix motion in x,y, free to move along z.
         - sort_atoms_by_z: sort the atoms of the slab according to their z coordinate,
@@ -60,6 +61,7 @@ class Slab:
                  layers_threshold : float = 0.5,
                  fixed_layers_slab : list | None = None,
                  fixed_indices_slab : list | None = None,
+                 fixed_thickness_slab : float | None = None,
                  fix_slab_xyz : list | None = None,
                  sort_atoms_by_z : bool = False,
                  translate_slab_from_below_cell_bottom : bool = True):
@@ -97,14 +99,21 @@ class Slab:
                 fixed_atoms_indices = list(range(self.natoms))
             fixed_atoms_indices = fixed_indices_slab
 
+        elif fixed_thickness_slab is not None:
+            if fixed_thickness_slab < 0:
+                raise ValueError('fixed_thickness_slab must be a positive number.')
+            cell_bottom = min(self.slab_ase.positions[:,2])
+            fixed_atoms_indices = [i for i, pos in enumerate(self.slab_ase.positions) \
+                                   if pos[2] < cell_bottom + fixed_thickness_slab]
+
         c = [FixCartesian(atom_index, mask=fix_slab_xyz) \
              for atom_index in fixed_atoms_indices] #True = fix, False = free
         self.slab_ase.set_constraint(c) #if no user-defined constraints, c is empty.
         #This is necessary to clean possible constraints read from file
         ###############################################################
 
-        if sort_atoms_by_z: #sort atoms by height (from higher to lower)
-            self.slab_ase = sort(self.slab_ase, tags= -self.slab_ase.positions[:, 2])
+        if sort_atoms_by_z: #sort atoms by height (from lower to higher)
+            self.slab_ase = sort(self.slab_ase, tags= self.slab_ase.positions[:, 2])
 
 
         #create pymatgen version of the slab, and initialize the AdsorbateSiteFinder
@@ -533,9 +542,8 @@ class Slab:
 
     def find_adsorption_sites_coord_number(self,
                                         cn_method: str,
+                                        range_selection: dict = {'mode': 'offset', 'value': 2},
                                         cn_plain_fixed_radius : float | None = 1.5,
-                                        max_cn_offset : float | None = 2,
-                                        max_cn: float | None = None,
                                         selected_sites: list | None = None,
                                         atomic_species: list | None = None,
                                         include_surrounding_sites : bool = False,
@@ -549,10 +557,9 @@ class Slab:
         Args:
         - cn_method: method to calculate the coordination number. It can be
             'plain', 'minimumdistancenn' or 'crystalnn'.
+        - range_selection: dictionary in the form {'mode': str (max/offset), 'value': int or float},
         - cn_plain_fixed_radius: fixed radius for the coordination number calculation,
             if cn_method is 'plain'.
-        - max_cn_offset: the max. coord. numb. will be set to min(cn) + max_cn_offset.
-        - max_cn: maximum coordination number allowed. Priority over max_cn_offset.
         - selected_sites: indices of the sites to be returned by this function,
             selected between those found by AdsorbateSiteFinder.
         - atomic_species: list of atomic species to be considered as adsorption sites.
@@ -572,7 +579,8 @@ class Slab:
         surf_coords, cn_list, surf_sites_indices = \
             self._coord_number_surface_analysis(cn_method, cn_plain_fixed_radius, verbose)
 
-        max_cn = max_cn if max_cn is not None else min(cn_list) + max_cn_offset
+        max_cn = range_selection['value'] if range_selection['mode']=='max' \
+            else min(cn_list) + range_selection['value']
 
         #build the list of AdsorptionSiteAmorphous objects, and include the info
         all_adsites = self._get_classified_coord_number_sites(

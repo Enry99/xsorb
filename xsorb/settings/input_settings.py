@@ -187,6 +187,7 @@ class ConstraintsParams:
     '''
     fixed_layers_slab: Optional[list[int]]
     fixed_indices_slab: Optional[list[int]]
+    fixed_thickness_slab: Optional[float]
     fixed_indices_mol: Optional[list[int]]
     layers_height: float = 0.5
     fix_slab_xyz: list[bool] = field(default_factory=lambda: [True,True,True])
@@ -194,9 +195,16 @@ class ConstraintsParams:
     fix_slab_ml_opt: bool = False
 
     def __post_init__(self):
-        if self.fixed_layers_slab is not None and self.fixed_indices_slab is not None:
-            raise ValueError('You can use either fixed_layers_slab or fixed_indices_slab, \
-                             not both at the same time.')
+        # Check that only one type of slab fixing method is used
+        slab_fixing_methods = [
+            self.fixed_layers_slab is not None,
+            self.fixed_indices_slab is not None,
+            self.fixed_thickness_slab is not None
+        ]
+
+        if sum(slab_fixing_methods) > 1:
+            raise ValueError('You can use only one of fixed_layers_slab, fixed_indices_slab, '
+                   'or fixed_thickness_slab at a time.')
 
 @dataclass
 class MiscParams:

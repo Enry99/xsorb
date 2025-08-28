@@ -70,6 +70,7 @@ class AdsorptionStructuresGenerator:
                     layers_threshold=settings.structure.constraints.layers_height,
                     fixed_layers_slab=settings.structure.constraints.fixed_layers_slab,
                     fixed_indices_slab=settings.structure.constraints.fixed_indices_slab,
+                    fixed_thickness_slab=settings.structure.constraints.fixed_thickness_slab,
                     fix_slab_xyz=settings.structure.constraints.fix_slab_xyz,
                     sort_atoms_by_z=settings.structure.misc.sort_atoms_by_z,
                     translate_slab_from_below_cell_bottom=settings.structure.misc.translate_slab)

@@ -268,6 +268,7 @@ def launch_isolated_slab_and_molecule(*,
                     layers_threshold=settings.structure.constraints.layers_height,
                     fixed_layers_slab=settings.structure.constraints.fixed_layers_slab,
                     fixed_indices_slab=settings.structure.constraints.fixed_indices_slab,
+                    fixed_thickness_slab=settings.structure.constraints.fixed_thickness_slab,
                     fix_slab_xyz=settings.structure.constraints.fix_slab_xyz
                     ).slab_ase
 
