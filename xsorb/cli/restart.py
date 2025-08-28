@@ -8,7 +8,7 @@ from xsorb.cli.command import CLICommandBase
 
 
 class CLICommand(CLICommandBase):
-    """restart all (unfinished) screening or relax calculations
+    """restart all (unfinished) calculations
 
 Example:
  $ xsorb restart screening
@@ -17,7 +17,7 @@ Example:
     @staticmethod
     def add_arguments(parser : argparse.ArgumentParser):
         parser.add_argument('calc_type',
-                        choices=['screening', 'relax'],
+                        choices=['screening', 'relax', 'mlopt'],
                         type=str,
                         help='''which type of calculation to restart''')
 

@@ -284,5 +284,9 @@ def edit_file_for_restart(program : str, path : str):
         #copy contcar to poscar to restart
         shutil.copyfile(contcar, poscar)
 
+    elif program == 'ml':
+        #nothing to do, the ML optimization  is re-launched from scratch
+        pass
+
     else:
         raise ValueError(f"Program {program} not recognized")

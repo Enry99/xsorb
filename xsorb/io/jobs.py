@@ -96,9 +96,8 @@ def launch_jobs(*,program : str,
 
 def restart_jobs(calc_type : str):
     '''
-    Restart the uncompleted dft calculations.
-    Associated to the command 'xsorb restart screening/relax' in the CLI.
-    Beware:no restart for ML!
+    Restart the uncompleted dft calculations, or re-launch crashed ML optimizations.
+    Associated to the command 'xsorb restart' in the CLI.
 
     Args:
     - calc_type: 'screening' or 'relax'.
