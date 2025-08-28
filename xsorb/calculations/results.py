@@ -17,6 +17,7 @@ from xsorb.dft_codes.definitions import (
     SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, OPTIMIZATION_COMPLETED_STRINGS)
 from xsorb.adsorptiondata import AdsorptionCalculation
 from xsorb.adsorptiondata.adsorptioncalculation import CalculationResults
+from xsorb.io.utils import progressbar
 
 
 def is_optimization_completed(filename : str, program : str):
@@ -146,7 +147,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
     - mult: multiplicative factor for the covalent radii to determine bonding.
     '''
 
-    for system in systems:
+    for system in progressbar(systems, prefix='Updating calculation results: '):
         assert system.calc_info is not None #DEBUG
 
         if not Path(system.calc_info.out_file_path).exists() \
