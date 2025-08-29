@@ -325,7 +325,7 @@ def plot_energy_evolution(calc_type : str):
     logging.info(f'Plot saved in {energy_plot_filename}')
 
 
-def plot_histo(calc_type : str):
+def plot_histo(calc_type : str, sort_by_counts: bool = False):
     """
     Plot a histogram of the adsorption energies for the given calculation type.
 
@@ -333,6 +333,8 @@ def plot_histo(calc_type : str):
     ----------
     calc_type : str
         The type of calculation: 'screening', 'relax', 'mlopt'.
+    sort_by_counts : bool, optional
+        If True, sort the histogram bars by counts in descending order. Default is False.
     """
 
     #### collect data from the database ####
@@ -346,66 +348,93 @@ def plot_histo(calc_type : str):
             continue
         relax_energies.append(adscalc.calc_results.adsorption_energy)
         if adscalc.calc_results.bonds is None:
-            bond_elements.append(['X'])  # 'X' for no bonds
+            els = ['None']
         else:
-            bond_elements.append([bond.mol_atom_species for bond in adscalc.calc_results.bonds])
+            els = [bond.mol_atom_species for bond in adscalc.calc_results.bonds]
+        bond_elements.append(els)
+    assert len(relax_energies) == len(bond_elements)
     if not relax_energies:
         logging.warning('No data found for %s. Quitting.', calc_type)
         return
     ########################################
 
-
-    matplotlib.rcParams.update({'font.size': 14})
-
+    #### try to read custom colors from file if present ####
     cs = CustomSettings()
     # convert array to dict with element symbols as keys
     colorcode_dict = dict(zip(chemical_symbols, cs.color_scheme))
     # update with mol_colors
     if cs.molecule_colors:
         colorcode_dict.update(cs.molecule_colors)
-    colorcode_dict['X'] = (169/255, 169/255, 169/255)  # gray for no bonds
-
+    colorcode_dict['None'] = (169/255, 169/255, 169/255)  # gray for no bonds
+    ########################################
 
     #### plot histogram with stacked coloring ####
     counts, bins = np.histogram(relax_energies)
 
     # Create the base histogram plot
     _, ax = plt.subplots()
+    matplotlib.rcParams.update({'font.size': 14})
 
-    for i, count in enumerate(counts):
-        if count == 0:
+    # Plot each bin with stacked segments for each bond combination
+    unique_combos: dict[str, tuple] = {} # to legend labels and colors
+    for i, bar_counts in enumerate(counts):
+        if bar_counts == 0:
             continue
 
+        print(f'Bin {i}: {bins[i]:.2f} to {bins[i+1]:.2f}, count: {bar_counts}')
+
         # Get indices of energies that fall into this bin
-        energies_ids = [j for j, energy in enumerate(relax_energies)
-                       if bins[i] <= energy < bins[i+1]]
+        if i == len(counts) - 1:  # include upper edge for last bin
+            energies_ids = [j for j, energy in enumerate(relax_energies)
+                   if bins[i] <= energy <= bins[i+1]]
+        else:
+            energies_ids = [j for j, energy in enumerate(relax_energies)
+                   if bins[i] <= energy < bins[i+1]]
 
-        # Collect all bond species in this bin
-        bin_bondspecies : list[str] = []
+        # Count occurrences of each (order-independent) bond combination
+        bin_bondscombos: dict[str, int] = {}
         for j in energies_ids:
-            bin_bondspecies.extend(bond_elements[j])
+            species_list = bond_elements[j]
+            # create an order-independent key for the combination
+            combo_key = '+'.join(sorted(species_list))
+            bin_bondscombos[combo_key] = bin_bondscombos.get(combo_key, 0) + 1
+        assert sum(bin_bondscombos.values()) == bar_counts, \
+            "Counting error in histogram bin: bar_counts: "\
+                f"{bar_counts}, bond counts: {bin_bondscombos}"
 
-        # Count occurrences of each element
-        el_counts : dict[str,int] = {}
-        for el in bin_bondspecies:
-            el_counts[el] = el_counts.get(el, 0) + 1
+        # sort by count descending
+        if sort_by_counts:
+            bin_bondscombos = dict(sorted(bin_bondscombos.items(),
+                                        key=lambda item: item[1],
+                                        reverse=True))
 
         # Calculate proportions and create stacked segments
-        total_bonds = sum(el_counts.values())
         bottom = 0
+        for combo_els, combo_count in bin_bondscombos.items():
+            height = bar_counts * (combo_count / bar_counts)
 
-        for el, el_count in el_counts.items():
-            height = count * (el_count / total_bonds)
-            color = colorcode_dict.get(el, (0,0,0)) # black fallback
+            # assign color based on elements in the combo, mixing if multiple
+            colors = [colorcode_dict[el] for el in combo_els.split('+')]
+            color = tuple(np.mean(colors, axis=0))
+            if combo_els not in unique_combos:
+                unique_combos[combo_els] = color
 
             ax.bar(bins[i], height, width=bins[i+1]-bins[i],
                   bottom=bottom, color=color, edgecolor='white', linewidth=0.5,
                   align='edge')
             bottom += height
 
+    # add legend inside the plot
+    legend_elements = [plt.Line2D([0], [0], marker='s', color=color,
+                                  label=combo, markersize=10, linestyle='None')
+                       for combo, color in unique_combos.items()]
+    ax.legend(handles=legend_elements, title='Bonded mol atoms', fontsize=8, title_fontsize=10)
+
     plt.title(f'{calc_type} adsorption energy histogram')
     plt.ylabel('Counts')
     plt.xlabel('E$_{ads}$(eV)')
     plt.ylim(ymin=0)
-    plt.savefig(f'histo_{calc_type}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{calc_type}_histo.png', dpi=300, bbox_inches='tight')
     plt.clf()
+
+    logging.info(f'Plot saved in {calc_type}_histo.png')
