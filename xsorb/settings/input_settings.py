@@ -146,6 +146,7 @@ class MoleculeParams:
     target_distance: float = 2.0
     min_distance: float = 1.5
     radius_scale_factor: float = 1.1
+    radius_scale_factor_gen: float = 0.9
 
     def __post_init__(self):
 

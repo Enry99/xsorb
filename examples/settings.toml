@@ -27,7 +27,7 @@
             #atomic_species             = ["Cu", "Ni"]          # explicitly select only certain atomic species for the site selection
 
     [Structure.molecule]
-        molecule_axis                   = {mode = "atom_indices", values = [3, 14]}  # indices of the two atoms to define the x-axis direction, or vector to take as x-axis, e.g. {mode = "vector", values = [1,0,0]}
+        molecule_axis                   = {mode = "atoms", values = [3, 14]}  # indices of the two atoms to define the x-axis direction, or vector to take as x-axis, e.g. {mode = "vector", values = [1,0,0]}
         selected_atom_indexes           = [0]                   # list of selected atom in molecule file, to be placed in all adsorption sites. If -1, use the geometric center of the molecule.
 
         x_rot_angles                    = [0, 90, 180]          # rotation angles (in deg) about x axis (performed first)
@@ -39,7 +39,8 @@
         adsorption_distance_mode        = "value"               # options: 'value', 'covalent_radius', 'vdw_radius'
         target_distance                 = 2.0                   # if adsorption_distance_mode is "value", DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
         min_distance                    = 1.5                   # if adsorption_distance_mode is "value", minimum distance (in A) of ANY mol atom from ANY slab atom, must be < target_distance. The molecule is translated upwards if necessary, in order to meet this requirement.
-        #radius_scale_factor            = 1.1                   # scaling factor for the covalent radii to determine bonding, and for the covalent/vdw radii when adsoption_distance_mode is "covalent_radius" or "vdw_radius"
+        #radius_scale_factor            = 1.1                   # scaling factor for the covalent radii to determine bonding
+        radius_scale_factor_gen         = 0.9                   # scaling factor for the covalent/van der Waals radii to determine the initial distance when generating the structures when adsoption_distance_mode is "covalent_radius" or "vdw_radius"
 
     #[Structure.constraints]
         #layers_height                  = 0.5                   # delta_z within which atoms are considered to be part of the same layer (for fixing atoms). This is different from the surface_height flag, used for surface adsorption sites.

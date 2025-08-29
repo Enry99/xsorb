@@ -172,7 +172,7 @@ class AdsorptionStructuresGenerator:
         mode = self.settings.structure.molecule.adsorption_distance_mode
         slab = self.slab.slab_ase
         min_distance = self.settings.structure.molecule.min_distance
-        mult = self.settings.structure.molecule.radius_scale_factor
+        mult = self.settings.structure.molecule.radius_scale_factor_gen
 
         if mode == 'value':
             radii = np.array([min_distance]*len(covalent_radii))/2 #dist. is diameter
@@ -196,7 +196,7 @@ class AdsorptionStructuresGenerator:
             diff_matrix = d_matrix.copy()
             for id1, at1 in enumerate(slab):
                 for id2, at2 in enumerate(molcopy):
-                    diff_matrix[id1,id2] -= mult*(radii[at1.number] + radii[at2.number])
+                    diff_matrix[id1,id2] -= radii[at1.number] + radii[at2.number]
 
             i_slab, j_mol, *_ = np.unravel_index(np.argmin(diff_matrix), diff_matrix.shape)
 
@@ -207,17 +207,22 @@ class AdsorptionStructuresGenerator:
             # is equal to the closest slab atom. In this way we can exploit the right triangle
             h = molcopy[j_mol].z - slab[i_slab].z
             if h < 0:
-                molcopy.translate([0,0,h])
-                dz_tot += h
+                molcopy.translate([0,0,-h])
+                dz_tot += -h
                 h = 0
 
             #Finally, translate so that the distance between the two atoms is equal
             # to the target distance
-            target_dist = mult * (radii[slab[i_slab].number] + radii[molcopy[j_mol].number])
+            target_dist = radii[slab[i_slab].number] + radii[molcopy[j_mol].number]
             distance = get_distances(slab[i_slab].position,
                                      molcopy[j_mol].position,
                                      slab.cell,pbc=True)[1][0,0]
-            b = np.sqrt(distance**2 - h**2)
+            if distance**2 - h**2 < 0: # deal numerical errors (small negative value)
+                if distance**2 - h**2 < -1e-4:
+                    raise RuntimeError("Serious problem in _mindistance_deltaz!")
+                b = 0
+            else:
+                b = np.sqrt(distance**2 - h**2)
             dz = np.sqrt(target_dist**2 - b**2) - h
 
             molcopy.translate([0,0,dz])
