@@ -123,11 +123,11 @@ class MoleculeParams:
         values: list[int | float]
 
         def __post_init__(self):
-            if self.mode not in ['atom_indices', 'vector']:
-                raise ValueError('molecule_axis mode must be either atom_indices or vector.')
-            if self.mode == 'atom_indices' and len(self.values) != 2:
+            if self.mode not in ['atoms', 'vector']:
+                raise ValueError('molecule_axis mode must be either atoms or vector.')
+            if self.mode == 'atoms' and len(self.values) != 2:
                 raise ValueError('molecule_axis values must be a list of two atom indices \
-                                    when mode is atom_indices.')
+                                    when mode is atoms.')
             if self.mode == 'vector' and len(self.values) != 3:
                 raise ValueError('molecule_axis values must be a list of three floats \
                                     when mode is vector.')

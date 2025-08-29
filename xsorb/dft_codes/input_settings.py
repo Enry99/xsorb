@@ -239,11 +239,11 @@ class VaspParams:
             missing_ediffg = True
             for i, line in enumerate(s):
                 if 'EDIFFG' in line:
-                    s[i] = f"EDIFFG = {self.settings_dict_screening['ediffg_screening']}"
+                    s[i] = f"EDIFFG = {self.ediffg_screening}"
                     missing_ediffg = False
                 if 'IBRION' in line:
                     missing_ibrion = False
-            if missing_ediffg: s.append(f"EDIFFG = {self.settings_dict_screening['ediffg_screening']}")
+            if missing_ediffg: s.append(f"EDIFFG = {self.ediffg_screening}")
             if missing_ibrion: s.append('IBRION = 2')
 
             self.settings_dict_screening['incar_string'] = '\n'.join(s)
