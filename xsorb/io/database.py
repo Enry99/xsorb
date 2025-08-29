@@ -235,11 +235,11 @@ class Database:
                                         'Total energies will be used instead of adsorption energies.', calc_type)
                         total_e_slab_mol = 0
                     else:
-                        total_e_slab_mol = db.metadata['total_e_slab_mol']
+                        total_e_slab_mol = db.metadata['total_e_slab_mol_ml']
 
                 else: # use the provided value, and update the metadata
                     total_e_slab_mol = total_e_slab_mol_ml
-                    db.metadata['total_e_slab_mol'] = total_e_slab_mol
+                    db.metadata['total_e_slab_mol_ml'] = total_e_slab_mol
             else:
                 if total_e_slab_mol_dft is None: # read from metadata
                     if not db.metadata.get('total_e_slab_mol'):
