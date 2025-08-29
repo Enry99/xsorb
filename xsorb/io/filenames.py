@@ -15,7 +15,7 @@ JOBS_FILENAME = '.submitted_jobs.txt' # for slab/mol, as their job ids are not w
 
 SCREENING_OUTDIR            = 'screening_outdirs'
 RELAX_OUTDIR                = 'relax_outdirs'
-ML_OPT_OUTDIR               = 'ml_opt_outdirs'
+ML_OPT_OUTDIR               = 'mlopt_outdirs'
 ISOLATED_OUTDIRS            = 'isolated_outdirs'
 
 

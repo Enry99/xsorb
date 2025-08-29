@@ -226,5 +226,5 @@ class StructureParams:
     adsorption_sites: AdsorptionSitesParams
     molecule: MoleculeParams
     constraints: ConstraintsParams = field(
-        default_factory=lambda: ConstraintsParams(None, None, None))
+        default_factory=lambda: ConstraintsParams(None, None, None, None))
     misc: MiscParams = field(default_factory=lambda: MiscParams(False,False,True,True))
