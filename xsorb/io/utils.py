@@ -91,4 +91,4 @@ def progressbar(it, prefix="", size=50):
     for i, item in enumerate(it):
         yield item
         show(i+1)
-    print("\n", flush=True)
+    print("", flush=True) # this ends the line

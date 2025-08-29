@@ -79,41 +79,27 @@ def is_scf_not_converged(filename : str, program : str):
     return nonconv
 
 
-def get_atoms_from_calc(filename : str, return_trajectory : bool = True):
+def get_atoms_traj_from_calc(filename : str):
     '''
     Reads the output file and returns the atoms object.
     If there is an error reading the file, it prints a message and returns None
 
     Args:
     - filename: path to the output file
-    - return_trajectory: if True, returns a list of Atoms objects
 
     Returns:
-    The atom object from the output file, or a list of Atoms objects if return_trajectory is True
+    list[Atoms] or None
     '''
 
-    if return_trajectory: #pylint: disable=no-else-return
-        try:
-            trajectory = read(filename, index=':')
-        except Exception as exc: #pylint: disable=broad-except
-            logging.error(f'Error reading trajectory from file {filename}: {exc}. '\
-                'Attempting to read only the last configuration.')
-            try:
-                trajectory = [read(filename)]
-            except Exception as exc2: #pylint: disable=broad-except
-                logging.error(f'Error reading file {filename}: {exc2}.')
-                return None
+    try:
+        trajectory = read(filename, index=':')
+        if not isinstance(trajectory, list):
+            trajectory = [trajectory]
+    except Exception as exc: #pylint: disable=broad-except
+        logging.error(f'Error reading file {filename}: {exc}.')
+        return None
 
-        return trajectory
-
-    else:
-        try:
-            atoms = read(filename)
-        except Exception as exc: #pylint: disable=broad-except
-            logging.error(f'Error reading file {filename}: {exc}.')
-            return None
-
-        return atoms
+    return trajectory
 
 
 def get_bond_status(atoms, mol_indices : list, mult : float):
@@ -136,6 +122,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
                              program : str,
                              total_e_slab_mol : float,
                              mult : float,
+                             save_full_trajectory : bool = True,
                              verbose : bool =True):
     '''
     Reads the output files and inplace updates the calculation results
@@ -145,6 +132,8 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
     - program: 'espresso','vasp','ml'
     - total_e_slab_mol: total energy of the slab and molecule
     - mult: multiplicative factor for the covalent radii to determine bonding.
+    - save_full_trajectory: if True, saves the full trajectory in the CalculationResults
+    - verbose: if True, prints warnings if files are missing
     '''
 
     for system in progressbar(systems, prefix='Updating calculation results: '):
@@ -160,7 +149,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
                 logging.warning(f'Warning! File {missing_file} not found. Skipping.')
             continue
 
-        traj = get_atoms_from_calc(system.calc_info.out_file_path)
+        traj = get_atoms_traj_from_calc(system.calc_info.out_file_path)
         if not traj:
             continue
 
@@ -199,7 +188,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
                 atoms=atoms,
                 adsorption_energy=adsorption_energy,
                 bonds=bonds,
-                trajectory=traj,
+                trajectory=traj if save_full_trajectory else [atoms],
                 adsorption_energy_evol=adsorption_energy_evol,
                 final_dz=final_dz
             )

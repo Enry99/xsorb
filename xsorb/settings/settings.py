@@ -22,7 +22,7 @@ except ModuleNotFoundError:
 
 from dacite import from_dict, Config
 
-from xsorb.settings.input_settings import InputParams, StructureParams
+from xsorb.settings.input_settings import InputParams, StructureParams, DatabaseParams
 from xsorb.dft_codes.input_settings import DFTParams
 from xsorb.dft_codes.definitions import OUT_FILE_PATHS
 from xsorb.ase_custom.io import ase_custom_read as read
@@ -46,9 +46,11 @@ class Settings:
     - dft : DFTParams dataclass containing the DFT program settings
     '''
 
-    input: InputParams
-    structure: StructureParams
-    dft: DFTParams
+    # Attibutes:
+    # input: InputParams
+    # structure: StructureParams
+    # dft: DFTParams
+    # database: DatabaseParams
 
     def __init__(self,
                  read_energies_dft: bool = False,
@@ -84,6 +86,9 @@ class Settings:
 
         self.dft = from_dict(data_class=DFTParams,
                              data=settings_dict["Calculation_parameters"])
+
+        self.database = from_dict(data_class=DatabaseParams,
+                                    data=settings_dict.get("Database", {}),)
 
         ################################
         #at this point, self.input.E_slab_mol can be None, if not specified in the settings file,

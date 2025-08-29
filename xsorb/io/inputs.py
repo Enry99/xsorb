@@ -125,6 +125,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
         xsorb.io.database.Database.add_calculations(systems=written_systems,
                                   program=program,
                                   mult=settings.structure.molecule.radius_scale_factor,
+                                  save_full_trajectory=settings.database.save_full_trajectory,
                                   total_e_slab_mol=total_e_slab_mol,
                                   calc_type=calc_type)
 

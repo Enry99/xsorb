@@ -134,6 +134,7 @@ class Database:
     def add_calculations(systems : list [AdsorptionCalculation],
                          program : str,
                          mult : float,
+                         save_full_trajectory : bool,
                          total_e_slab_mol : float | None,
                          calc_type : str) -> None:
         '''
@@ -169,6 +170,7 @@ class Database:
 
             db.metadata = {'program': program,
                            'mult': mult,
+                           'save_full_trajectory': save_full_trajectory,
                            'total_e_slab_mol': total_e_slab_mol}
 
 
@@ -178,6 +180,7 @@ class Database:
                             total_e_slab_mol_dft : float | None = None,
                             total_e_slab_mol_ml : float | None = None,
                             mult : float | None = None,
+                            save_full_trajectory : bool | None = None,
                             write_csv : bool = True,
                             txt : bool = False,
                             verbose: bool=False) -> None:
@@ -193,6 +196,7 @@ class Database:
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding. Needs to be passed when refreshing the database
             if the value was changed from the settings
+        - save_full_trajectory: bool to store the full trajectory in the database
         - write_csv: bool to write the results to a csv file
         - txt: bool to write a txt file instead of a csv file
         - verbose: bool to print messages
@@ -225,6 +229,11 @@ class Database:
                 db.metadata['mult'] = mult
             else:
                 mult = db.metadata['mult']
+
+            if save_full_trajectory is not None:
+                db.metadata['save_full_trajectory'] = save_full_trajectory
+            else:
+                save_full_trajectory = db.metadata['save_full_trajectory']
 
             if calc_type == 'mlopt':
                 if total_e_slab_mol_ml is None: # read from metadata
@@ -266,6 +275,7 @@ class Database:
                     program=program,
                     mult=mult,
                     total_e_slab_mol=total_e_slab_mol,
+                    save_full_trajectory=save_full_trajectory,
                     verbose=verbose)
             ################################################
 
@@ -603,10 +613,12 @@ def manual_update_calculations(calc_type : str,
         total_e_slab_mol = settings.total_e_slab_mol
         total_e_slab_mol_ml = settings.total_e_slab_mol_ml
         mult=settings.structure.molecule.radius_scale_factor
+        save_full_trajectory = settings.database.save_full_trajectory
     else:
         mult = None
         total_e_slab_mol = None
         total_e_slab_mol_ml = None
+        save_full_trajectory = None
 
 
     dbs_to_update = [calc_type] if calc_type != 'all' else CALC_DB_NAMES.keys()
@@ -618,6 +630,7 @@ def manual_update_calculations(calc_type : str,
                 total_e_slab_mol_dft=total_e_slab_mol,
                 total_e_slab_mol_ml=total_e_slab_mol_ml,
                 mult=mult,
+                save_full_trajectory=save_full_trajectory,
                 write_csv=False
             )
 

@@ -228,3 +228,12 @@ class StructureParams:
     constraints: ConstraintsParams = field(
         default_factory=lambda: ConstraintsParams(None, None, None, None))
     misc: MiscParams = field(default_factory=lambda: MiscParams(False,False,True,True))
+
+
+@dataclass
+class DatabaseParams:
+    '''
+    Dataclass to store the parameters in the
+    database card of the settings file.
+    '''
+    save_full_trajectory: bool = True
