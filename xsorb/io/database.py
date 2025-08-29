@@ -134,7 +134,7 @@ class Database:
     def add_calculations(systems : list [AdsorptionCalculation],
                          program : str,
                          mult : float,
-                         save_full_trajectory : bool,
+                         store_full_trajectories : bool,
                          total_e_slab_mol : float | None,
                          calc_type : str) -> None:
         '''
@@ -170,7 +170,7 @@ class Database:
 
             db.metadata = {'program': program,
                            'mult': mult,
-                           'save_full_trajectory': save_full_trajectory,
+                           'store_full_trajectories': store_full_trajectories,
                            'total_e_slab_mol': total_e_slab_mol}
 
 
@@ -180,7 +180,7 @@ class Database:
                             total_e_slab_mol_dft : float | None = None,
                             total_e_slab_mol_ml : float | None = None,
                             mult : float | None = None,
-                            save_full_trajectory : bool | None = None,
+                            store_full_trajectories : bool | None = None,
                             write_csv : bool = True,
                             txt : bool = False,
                             verbose: bool=False) -> None:
@@ -196,7 +196,7 @@ class Database:
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding. Needs to be passed when refreshing the database
             if the value was changed from the settings
-        - save_full_trajectory: bool to store the full trajectory in the database
+        - store_full_trajectories: bool to store the full trajectory in the database
         - write_csv: bool to write the results to a csv file
         - txt: bool to write a txt file instead of a csv file
         - verbose: bool to print messages
@@ -230,10 +230,10 @@ class Database:
             else:
                 mult = db.metadata['mult']
 
-            if save_full_trajectory is not None:
-                db.metadata['save_full_trajectory'] = save_full_trajectory
+            if store_full_trajectories is not None:
+                db.metadata['store_full_trajectories'] = store_full_trajectories
             else:
-                save_full_trajectory = db.metadata['save_full_trajectory']
+                store_full_trajectories = db.metadata['store_full_trajectories']
 
             if calc_type == 'mlopt':
                 if total_e_slab_mol_ml is None: # read from metadata
@@ -275,7 +275,7 @@ class Database:
                     program=program,
                     mult=mult,
                     total_e_slab_mol=total_e_slab_mol,
-                    save_full_trajectory=save_full_trajectory,
+                    store_full_trajectories=store_full_trajectories,
                     verbose=verbose)
             ################################################
 
@@ -329,7 +329,8 @@ class Database:
                          exclude_ids : list[int] | None = None,
                          columns : list[str] | str = 'all',
                          sort_key : str | None = None,
-                         include_data : bool = True) -> list:
+                         include_data : bool = True,
+                         update: bool = True) -> list:
         '''
         Get the rows corresponding to the calculations of a given type,
         with the possibility to sort them by a given key
@@ -343,6 +344,8 @@ class Database:
         - exclude_ids: list of integers with the ids of the calculations to be excluded
         - columns: list of strings with the columns to be included
         - sort_key: string with the key to sort the rows, e.g. 'energy'
+        - include_data: bool to include the data dictionary in the rows
+        - update: bool to update the database before getting the calculations
 
         Returns:
         - list: list of rows
@@ -355,7 +358,8 @@ class Database:
             return []
 
         #Make sure that the database is up to date
-        Database.update_calc_db(calc_type, verbose=False)
+        if update:
+            Database.update_calc_db(calc_type, verbose=False)
 
         with ase.db.connect(CALC_DB_NAMES[calc_type]) as db:
             rows = list(db.select(selection=selection,
@@ -613,12 +617,12 @@ def manual_update_calculations(calc_type : str,
         total_e_slab_mol = settings.total_e_slab_mol
         total_e_slab_mol_ml = settings.total_e_slab_mol_ml
         mult=settings.structure.molecule.radius_scale_factor
-        save_full_trajectory = settings.database.save_full_trajectory
+        store_full_trajectories = settings.database.store_full_trajectories
     else:
         mult = None
         total_e_slab_mol = None
         total_e_slab_mol_ml = None
-        save_full_trajectory = None
+        store_full_trajectories = None
 
 
     dbs_to_update = [calc_type] if calc_type != 'all' else CALC_DB_NAMES.keys()
@@ -630,7 +634,7 @@ def manual_update_calculations(calc_type : str,
                 total_e_slab_mol_dft=total_e_slab_mol,
                 total_e_slab_mol_ml=total_e_slab_mol_ml,
                 mult=mult,
-                save_full_trajectory=save_full_trajectory,
+                store_full_trajectories=store_full_trajectories,
                 write_csv=False
             )
 

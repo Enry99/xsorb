@@ -122,7 +122,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
                              program : str,
                              total_e_slab_mol : float,
                              mult : float,
-                             save_full_trajectory : bool = True,
+                             store_full_trajectories : bool = True,
                              verbose : bool =True):
     '''
     Reads the output files and inplace updates the calculation results
@@ -132,7 +132,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
     - program: 'espresso','vasp','ml'
     - total_e_slab_mol: total energy of the slab and molecule
     - mult: multiplicative factor for the covalent radii to determine bonding.
-    - save_full_trajectory: if True, saves the full trajectory in the CalculationResults
+    - store_full_trajectories: if True, saves the full trajectory in the CalculationResults
     - verbose: if True, prints warnings if files are missing
     '''
 
@@ -188,7 +188,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
                 atoms=atoms,
                 adsorption_energy=adsorption_energy,
                 bonds=bonds,
-                trajectory=traj if save_full_trajectory else [atoms],
+                trajectory=traj if store_full_trajectories else [atoms],
                 adsorption_energy_evol=adsorption_energy_evol,
                 final_dz=final_dz
             )

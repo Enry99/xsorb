@@ -236,4 +236,4 @@ class DatabaseParams:
     Dataclass to store the parameters in the
     database card of the settings file.
     '''
-    save_full_trajectory: bool = True
+    store_full_trajectories: bool = False

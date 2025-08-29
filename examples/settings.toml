@@ -80,4 +80,4 @@
         #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces (Ry/bohr, QE units)
 
 [Database]
-    save_full_trajectory            = true                  # store the full trajectories in the database
+    store_full_trajectories            = false                  # store the full trajectories in the database
