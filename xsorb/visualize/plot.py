@@ -27,7 +27,8 @@ from matplotlib import colormaps
 from matplotlib import cm
 from matplotlib.colors import Normalize
 from pymatgen.core import Structure
-from pymatgen.analysis.adsorption import plot_slab, get_rot, color_dict #pylint: disable=unused-import
+import pymatgen.analysis.adsorption
+from pymatgen.analysis.adsorption import plot_slab, get_rot
 from ase.visualize.plot import plot_atoms
 
 
@@ -103,7 +104,8 @@ def plot_adsites_image(mode : str,
     color_scheme_dict_by_element = {
         el: rgb for el, rgb in zip(chemical_symbols, custom_settings.color_scheme)
     }
-    color_dict = color_scheme_dict_by_element # monkey patch pymatgen's color_dict #pylint: disable=unused-variable
+    # monkey patch pymatgen's color_dict
+    pymatgen.analysis.adsorption.color_dict = color_scheme_dict_by_element  #pylint: disable=unused-variable
 
     # preparation to plot the sites ####################################################
     fig = plt.figure(figsize=(4,3))

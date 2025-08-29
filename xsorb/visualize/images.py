@@ -372,6 +372,7 @@ def plot_histo(calc_type : str, sort_by_counts: bool = False):
     counts, bins = np.histogram(relax_energies)
 
     # Create the base histogram plot
+    logging.info('Plotting histogram...')
     _, ax = plt.subplots()
     matplotlib.rcParams.update({'font.size': 14})
 
@@ -381,7 +382,7 @@ def plot_histo(calc_type : str, sort_by_counts: bool = False):
         if bar_counts == 0:
             continue
 
-        print(f'Bin {i}: {bins[i]:.2f} to {bins[i+1]:.2f}, count: {bar_counts}')
+        logging.debug(f'Bin {i}: {bins[i]:.2f} to {bins[i+1]:.2f}, count: {bar_counts}')
 
         # Get indices of energies that fall into this bin
         if i == len(counts) - 1:  # include upper edge for last bin
@@ -428,7 +429,7 @@ def plot_histo(calc_type : str, sort_by_counts: bool = False):
     legend_elements = [plt.Line2D([0], [0], marker='s', color=color,
                                   label=combo, markersize=10, linestyle='None')
                        for combo, color in unique_combos.items()]
-    ax.legend(handles=legend_elements, title='Bonded mol atoms', fontsize=8, title_fontsize=10)
+    ax.legend(handles=legend_elements, title='Bonds', fontsize=8, title_fontsize=10)
 
     plt.title(f'{calc_type} adsorption energy histogram')
     plt.ylabel('Counts')
