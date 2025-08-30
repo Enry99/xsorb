@@ -241,18 +241,18 @@ class Database:
 
             if calc_type == 'mlopt':
                 if total_e_slab_mol_ml is None: # read from metadata
-                    if not db.metadata.get('total_e_slab_mol_ml'):
+                    if not db.metadata.get('total_e_slab_mol'):
                         logging.warning('No total_e_slab_mol available in %s database. '
                                         'If you calculated slab and mol energies, try to '
                                         'refresh the database with "xsorb update -refresh". '
                                         'Total energies will be used instead of adsorption energies.', calc_type)
                         total_e_slab_mol = 0
                     else:
-                        total_e_slab_mol = db.metadata['total_e_slab_mol_ml']
+                        total_e_slab_mol = db.metadata['total_e_slab_mol']
 
                 else: # use the provided value, and update the metadata
                     total_e_slab_mol = total_e_slab_mol_ml
-                    db.metadata['total_e_slab_mol_ml'] = total_e_slab_mol
+                    db.metadata['total_e_slab_mol'] = total_e_slab_mol
             else:
                 if total_e_slab_mol_dft is None: # read from metadata
                     if not db.metadata.get('total_e_slab_mol'):
