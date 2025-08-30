@@ -228,15 +228,9 @@ class Slab:
                     i_site += 1
                     continue
 
-                unique_id = "{0:.2f},{1:.2f}".format(*site_coords[:2]) #pylint: disable=consider-using-f-string
-
                 if selected_sites and i_site not in selected_sites:
                     i_site += 1
                     continue
-                if any(unique_id == x.unique_id for x in existing_sites):
-                    i_site += 1
-                    continue
-
 
                 #dummy structure just to place one atom in the site and obtain CN and NN list
                 dummy_coords = site_coords.copy()
@@ -448,8 +442,8 @@ class Slab:
         nn = MinimumDistanceNN(tol=0.2)
 
 
-        all_main_idxs = [adsite.unique_id for adsite in adsites]
-        all_connected_idxs = []
+        all_main_coords = [adsite.coords for adsite in adsites]
+        all_connected_idxs: list[int] = []
 
         for adsite in adsites:
 
@@ -461,22 +455,24 @@ class Slab:
             for nnsite in nnsites:
 
                 nnindex = nnsite['site_index']
+                coords = nnsite['site'].coords
 
                 if (nnindex in surf_sites_indices if surrounding_sites_deltaz is None \
-                    else abs(adsite.coords[2]-nnsite['site'].coords[2]) < surrounding_sites_deltaz):
+                    else abs(adsite.coords[2]-coords[2]) < surrounding_sites_deltaz):
 
                     atom_species = self.asf.slab[nnindex].species_string
 
                     #calculate vector from main site to surrounding site
-                    vector = nnsite['site'].coords - adsite.coords
+                    vector = coords - adsite.coords
 
                     surrounding_site = SurroundingSite(
                         label = f'{adsite.label}:{nn_counter_for_this_site}',
-                        coords = nnsite['site'].coords,
+                        coords = coords,
                         info = atom_species,
                         atom_index = nnindex,
                         duplicate_surrounding = nnindex in all_connected_idxs,
-                        duplicate_main = nnindex in all_main_idxs,
+                        duplicate_main = np.any(
+                            [np.allclose(coords, main_coords) for main_coords in all_main_coords]),
                         vector = vector
                     )
                     adsite.surrounding_sites.append(surrounding_site)

@@ -130,7 +130,7 @@ class AdsorptionStructuresGenerator:
                 "z_rot_angles must be 'surrounding' for surrounding mode"
 
             if structure_settings.adsorption_sites.coord_number_params is None:
-                raise ValueError("coord_number_params must be present "\
+                raise ValueError("coord_number_params must be present "
                                  "in settings file for amorphous mode")
             if adsite is None:
                 raise ValueError("adsite must be provided for surrounding mode")
@@ -299,7 +299,7 @@ class AdsorptionStructuresGenerator:
         '''
 
         if adsite.surrounding_sites is None:
-            raise ValueError("adsite must have surrounding_sites "\
+            raise ValueError("adsite must have surrounding_sites "
                              "defined for vertical surrounding sites")
 
         adsorption_structures : list[AdsorptionStructure] = []
@@ -396,6 +396,20 @@ class AdsorptionStructuresGenerator:
                 if np.all(0-TOL < flatposlist) and np.all(flatposlist < 1+TOL):
                     filtered_adsorption_structures.append(ads)
             adsorption_structures = filtered_adsorption_structures
+
+
+        # check for duplicates
+        unique_structures : list[AdsorptionStructure] = []
+        for ads_struct in adsorption_structures:
+            for us in unique_structures:
+                if ads_struct.atoms == us.atoms:
+                    raise RuntimeError(
+                'Duplicate structure found in the generated structures! '
+                f'The structure with site {ads_struct.adsite} ({type(ads_struct.adsite)}), '
+                f'rotations={ads_struct.mol_rot.xrot},{ads_struct.mol_rot.yrot},{ads_struct.mol_rot.zrot} '
+                f'is identical to the one with site {us.adsite} ({type(us.adsite)}), '
+                f'rotations={us.mol_rot.xrot},{us.mol_rot.yrot},{us.mol_rot.zrot}.')
+            unique_structures.append(ads_struct)
 
         if verbose:
             logging.info('Adsorption structures generated.')

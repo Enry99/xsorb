@@ -12,6 +12,8 @@ Classes shoul all inherit from JsonableBase to be able to be serialized to JSON.
 from __future__ import annotations
 from dataclasses import dataclass
 
+import numpy as np
+
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.adsorptiondata.base import JsonableBase
 
@@ -141,11 +143,10 @@ class AdsorptionSite(JsonableBase):
         '''
         return "{0:.2f},{1:.2f},{2:.2f}".format(*self.coords) #pylint: disable=consider-using-f-string
 
-    #define equality as the equality of the unique_id
     def __eq__(self, other) -> bool:
         if not isinstance(other, AdsorptionSite):
             return NotImplemented
-        return self.unique_id == other.unique_id
+        return np.allclose(self.coords, other.coords)
 
     def todict(self):
         """Convert class instance to a dictionary."""
@@ -267,9 +268,6 @@ class SurroundingSite(AdsorptionSite):
     vector: list[float]   #vector from the main site to the surrounding site
 
     __xsorb_objtype__ : str = "SurroundingSite"
-
-    def __str__(self) -> str:
-        return self.label
 
     def todict(self):
         return self.__dict__
