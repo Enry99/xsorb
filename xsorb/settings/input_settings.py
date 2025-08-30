@@ -174,6 +174,8 @@ class MoleculeParams:
             if self.vertical_angles == 'x':
                 self.vertical_angles = self.x_rot_angles
             elif self.vertical_angles == 'z':
+                if self.z_rot_angles == 'surrounding':
+                    raise ValueError('vertical_angles cannot be "z" for z_rot_angles = "surrounding".')
                 if isinstance(self.z_rot_angles, str):
                     raise ValueError('z_rot_angles must be a list when vertical_angles is "z".')
                 self.vertical_angles = self.z_rot_angles

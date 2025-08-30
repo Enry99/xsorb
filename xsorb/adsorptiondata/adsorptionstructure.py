@@ -269,6 +269,10 @@ class SurroundingSite(AdsorptionSite):
 
     __xsorb_objtype__ : str = "SurroundingSite"
 
+    def __str__(self) -> str:
+        # to be printed in csvfile as z_rot
+        return f"to_{self.label}"
+
     def todict(self):
         return self.__dict__
 
