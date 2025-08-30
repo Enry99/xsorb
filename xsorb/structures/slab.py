@@ -215,7 +215,7 @@ class Slab:
 
 
         #handle the case of existing sites
-        existing_sites = Database.get_adsorption_sites()
+        existing_sites = Database.get_adsorption_sites(AdsorptionSiteCrystal)
         all_adsites.extend(existing_sites)
 
         i_site = len(all_adsites)
@@ -501,7 +501,7 @@ class Slab:
         all_adsites : list[AdsorptionSite] = []
 
         #handle the case of existing sites
-        existing_sites = Database.get_adsorption_sites()
+        existing_sites = Database.get_adsorption_sites(AdsorptionSiteAmorphous)
         all_adsites.extend(existing_sites)
 
 

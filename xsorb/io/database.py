@@ -117,7 +117,10 @@ class Database:
                     calc_ids.append(calc_id)
 
                 # add the adsorption sites if not already present
-                if ads_struct.adsite not in adsorption_sites:
+                # do not write SurroundingSites, as the they are
+                # already contained in amorphous main sites
+                if ads_struct.adsite not in adsorption_sites and \
+                    not isinstance(ads_struct.adsite, SurroundingSite):
                     adsorption_sites.append(ads_struct.adsite)
 
             # Update the metadata with the adsorption sites
@@ -439,7 +442,8 @@ class Database:
 
     @staticmethod
     def get_adsorption_sites(
-            ) -> list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous|SurroundingSite]:
+            cls_type: AdsorptionSiteCrystal|AdsorptionSiteAmorphous|None=None
+            ) -> list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous]:
         '''
         Get the unique adsorption sites from the structures database
 
@@ -464,10 +468,13 @@ class Database:
                 site = AdsorptionSiteCrystal.fromdict(site)
             elif site['__xsorb_objtype__'] == 'AdsorptionSiteAmorphous':
                 site = AdsorptionSiteAmorphous.fromdict(site)
-            elif site['__xsorb_objtype__'] == 'SurroundingSite':
-                site = SurroundingSite.fromdict(site)
             else:
                 raise ValueError(f"Unknown site type: {site['__xsorb_objtype__']}")
+
+            if cls_type is None or isinstance(site, cls_type):
+                converted_sites.append(site)
+            else:
+                raise TypeError(f"Expected site of type {cls_type}, got {type(site)}")
 
         return converted_sites
 
