@@ -305,7 +305,7 @@ class DFTParams:
                 settings_dict = deepcopy(self.vasp.settings_dict)
 
             if force_gamma:
-                settings_dict['kpoints_string'] = 'Gamma\n1\n0 0 0\n'
+                settings_dict['kpoints_string'] = 'Gamma-point only\n0\nMonkhorst Pack\n1 1 1\n0 0 0'
 
             return settings_dict
 
