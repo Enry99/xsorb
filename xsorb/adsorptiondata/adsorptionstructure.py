@@ -353,6 +353,8 @@ class AdsorptionStructure(JsonableBase):
             dct['adsite'] = AdsorptionSiteCrystal.fromdict(dct['adsite'])
         elif dct['adsite']['__xsorb_objtype__'] == "AdsorptionSiteAmorphous":
             dct['adsite'] = AdsorptionSiteAmorphous.fromdict(dct['adsite'])
+        elif dct['adsite']['__xsorb_objtype__'] == "SurroundingSite":
+            dct['adsite'] = SurroundingSite.fromdict(dct['adsite'])
         else:
             raise ValueError(f"Unknown AdsorptionSite type: {dct['adsite']['__xsorb_objtype__']}")
 
