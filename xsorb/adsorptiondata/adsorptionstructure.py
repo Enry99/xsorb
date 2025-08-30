@@ -52,9 +52,17 @@ class MoleculeRotation(JsonableBase):
         """
         Returns a dictionary with the keys to be explicitly stored in the database.
         """
-        xrot = self.xrot if not self.xrot.isdigit() else float(self.xrot)
-        yrot = self.yrot if not self.yrot.isdigit() else float(self.yrot)
-        zrot = self.zrot if not self.zrot.isdigit() else float(self.zrot)
+
+        def is_numeric(s):
+            try:
+                float(s)
+                return True
+            except (ValueError, TypeError):
+                return False
+
+        xrot = self.xrot if not is_numeric(self.xrot) else float(self.xrot)
+        yrot = self.yrot if not is_numeric(self.xrot) else float(self.yrot)
+        zrot = self.zrot if not is_numeric(self.zrot) else float(self.zrot)
         return {
             'xrot': xrot,
             'yrot': yrot,
