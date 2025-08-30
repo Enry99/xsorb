@@ -142,7 +142,7 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
 
     atoms : Atoms = kwargs.get("atoms")
     dftsettings : dict = kwargs.get("settingsdict")
-    directory : str = kwargs.get("directory")
+    directory : Path = Path(kwargs.get("directory"))
 
     preset_incar_settings = {}
 
@@ -174,6 +174,7 @@ def setup_Vasp_calculator(**kwargs) -> Vasp:
                 setups=dftsettings["vasp_pseudo_setups"],
                 **preset_incar_settings) #set here the default values from pymat recommended
 
+    directory.mkdir(exist_ok=True, parents=True)
 
     #write user-defined settings to string, to be parsed by ASE, overriding the preset flags
     if dftsettings.get("incar_string"):
