@@ -635,7 +635,8 @@ def manual_update_calculations(calc_type : str,
                 total_e_slab_mol_ml=total_e_slab_mol_ml,
                 mult=mult,
                 store_full_trajectories=store_full_trajectories,
-                write_csv=False
+                write_csv=False,
+                verbose=True
             )
 
     # Write the results file only once at the end

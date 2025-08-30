@@ -110,7 +110,10 @@ def restart_jobs(calc_type : str):
     rows = xsorb.io.database.Database.get_calculations(calc_type=calc_type,
                                      selection='status!=completed')
 
+    logging.info(f"Restarting {calc_type} calculations...")
+
     main_dir = os.getcwd()
+    restard_ids = []
     for row in rows:
         if row.job_id in active_jobs:
             logging.info(f"Job {row.job_id} for Calculation {row.calc_id}" \
@@ -132,6 +135,12 @@ def restart_jobs(calc_type : str):
 
             os.chdir(main_dir)
             xsorb.io.database.Database.add_job_id(calc_type, row.calc_id, jobid)
+            restard_ids.append(row.calc_id)
+
+    if len(restard_ids) > 0:
+        logging.info(f"Restarted calculations with ids: {restard_ids}.")
+    else:
+        logging.info("No calculations to restart.")
 
 
 def cancel_jobs():

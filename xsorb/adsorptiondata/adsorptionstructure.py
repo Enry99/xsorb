@@ -115,7 +115,7 @@ class AdsorptionSite(JsonableBase):
         """
         return {
             'site': self.label if not self.label.isdigit() else int(self.label),
-            'coords': self.unique_id,
+            #'coords': self.unique_id,
             'site_info': self.info
         }
 
@@ -307,6 +307,10 @@ class AdsorptionStructure(JsonableBase):
         dct.update(self.mol_rot.db_keys())
         dct.update({'initial_dz': self.distance})
 
+        #check that the keys are the same as the column names.
+        #(to avoid introducing bugs when adding new columns in the code)
+        assert set(self.dataframe_column_names()) == set(dct.keys())
+
         return dct
 
     @property
@@ -322,35 +326,7 @@ class AdsorptionStructure(JsonableBase):
         '''
         Returns the names of the columns of the AdsorptionStructure object
         '''
-        return ("site", "site_info", "mol_atom", "initial_dz", "xrot", "yrot", "zrot")
-
-    def info(self):
-        """
-        Returns a dictionary with information of the AdsorptionStructure object
-        to be exposed in the results table.
-        """
-
-        try: #to make the ase db check happy
-            site = int(self.adsite.label)
-        except ValueError:
-            site = self.adsite.label
-        try: #to make the ase db check happy
-            zrot = float(self.mol_rot.zrot)
-        except ValueError:
-            zrot = self.mol_rot.zrot
-        infodict = {"site": site,
-                    "site_info": self.adsite.info,
-                    "mol_atom": self.mol_rot.mol_atom,
-                    "initial_dz": self.distance,
-                    "xrot": float(self.mol_rot.xrot),
-                    "yrot": float(self.mol_rot.yrot),
-                    "zrot": zrot}
-
-        #check that the keys are the same as the column names.
-        #(to avoid introducing bugs when adding new columns in the code)
-        assert self.dataframe_column_names() == tuple(infodict.keys())
-
-        return infodict
+        return ("site", "site_info", "xrot", "yrot", "zrot", "mol_atom", "initial_dz")
 
 
     def todict(self):

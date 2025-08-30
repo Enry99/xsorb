@@ -136,7 +136,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
     - verbose: if True, prints warnings if files are missing
     '''
 
-    for system in progressbar(systems, prefix='Updating calculation results: '):
+    for system in progressbar(systems, prefix='Reading calculation results: '):
         assert system.calc_info is not None #DEBUG
 
         if not Path(system.calc_info.out_file_path).exists() \
