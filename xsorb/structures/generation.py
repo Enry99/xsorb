@@ -148,7 +148,7 @@ class AdsorptionStructuresGenerator:
             vert_angles_list=structure_settings.molecule.vertical_angles,
             individual_rotations=structure_settings.molecule.individual_rotations,
             save_image=save_image,
-            verbose=verbose)
+            verbose=False)
 
         if rot_mode == 'standard':
             #in case of standard, store the rotations to avoid calling the function multiple times

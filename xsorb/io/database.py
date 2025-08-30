@@ -65,7 +65,8 @@ import ase.db
 import xsorb.calculations.results
 from xsorb.io.filenames import STRUCTURES_DB_NAME, CALC_DB_NAMES
 from xsorb.ase_custom.atoms import AtomsCustom
-from xsorb.adsorptiondata.adsorptionstructure import AdsorptionSiteCrystal, AdsorptionSiteAmorphous
+from xsorb.adsorptiondata.adsorptionstructure import (
+    AdsorptionSiteCrystal, AdsorptionSiteAmorphous, SurroundingSite)
 from xsorb.adsorptiondata import AdsorptionCalculation
 from xsorb.adsorptiondata import AdsorptionStructure
 
@@ -438,8 +439,7 @@ class Database:
 
     @staticmethod
     def get_adsorption_sites(
-            cls_type: AdsorptionSiteCrystal|AdsorptionSiteAmorphous|None=None
-            ) -> list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous]:
+            ) -> list[AdsorptionSiteCrystal|AdsorptionSiteAmorphous|SurroundingSite]:
         '''
         Get the unique adsorption sites from the structures database
 
@@ -464,13 +464,10 @@ class Database:
                 site = AdsorptionSiteCrystal.fromdict(site)
             elif site['__xsorb_objtype__'] == 'AdsorptionSiteAmorphous':
                 site = AdsorptionSiteAmorphous.fromdict(site)
+            elif site['__xsorb_objtype__'] == 'SurroundingSite':
+                site = SurroundingSite.fromdict(site)
             else:
                 raise ValueError(f"Unknown site type: {site['__xsorb_objtype__']}")
-
-            if cls_type is None or isinstance(site, cls_type):
-                converted_sites.append(site)
-            else:
-                raise TypeError(f"Expected site of type {cls_type}, got {type(site)}")
 
         return converted_sites
 

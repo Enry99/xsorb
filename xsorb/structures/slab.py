@@ -215,7 +215,7 @@ class Slab:
 
 
         #handle the case of existing sites
-        existing_sites = Database.get_adsorption_sites(AdsorptionSiteCrystal)
+        existing_sites = Database.get_adsorption_sites()
         all_adsites.extend(existing_sites)
 
         i_site = len(all_adsites)
@@ -471,7 +471,7 @@ class Slab:
                     vector = nnsite['site'].coords - adsite.coords
 
                     surrounding_site = SurroundingSite(
-                        label = f'{adsite.label}.{nn_counter_for_this_site}',
+                        label = f'{adsite.label}:{nn_counter_for_this_site}',
                         coords = nnsite['site'].coords,
                         info = atom_species,
                         atom_index = nnindex,
@@ -501,7 +501,7 @@ class Slab:
         all_adsites : list[AdsorptionSite] = []
 
         #handle the case of existing sites
-        existing_sites = Database.get_adsorption_sites(AdsorptionSiteAmorphous)
+        existing_sites = Database.get_adsorption_sites()
         all_adsites.extend(existing_sites)
 
 
