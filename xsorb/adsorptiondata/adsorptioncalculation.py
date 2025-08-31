@@ -55,6 +55,7 @@ class CalculationInfo(JsonableBase):
             'calc_id': int(self.calc_id) if self.calc_id.isdigit() else self.calc_id,
             'in_file_path': self.in_file_path,
             'out_file_path': self.out_file_path,
+            'log_file_path': self.log_file_path,
             'status': self.status,
         }
 

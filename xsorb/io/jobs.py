@@ -129,7 +129,7 @@ def restart_jobs(calc_type : str):
             os.chdir(j_dir)
             postfix = SBATCH_POSTFIX[settings.dft.program].format(in_file=Path(in_file).name,
                                                     out_file=Path(row.out_file_path).name,
-                                                    log_file='',
+                                                    log_file=Path(row.log_file_path).name,
                                                     main_dir=main_dir)
             jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
 
