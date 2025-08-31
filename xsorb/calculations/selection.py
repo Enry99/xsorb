@@ -148,11 +148,11 @@ def obtain_calc_indices(*,
 
     # loop over the subsets, adding the ids as a flat list
     selected_calc_ids = []
-    for chemphys_subset in _chemphys_subsets(rows, separate_chem_phys):
-        for mol_atom_subset in _mol_atoms_subsets(chemphys_subset, by_mol_atom):
-            for site_subset in _site_subsets(mol_atom_subset, by_site):
+    for subset in _mol_atoms_subsets(rows, by_mol_atom):
+        for subset in _site_subsets(subset, by_site):
+            for subset in _chemphys_subsets(subset, separate_chem_phys):
 
-                calc_ids = _select_calculations(rows=site_subset,
+                calc_ids = _select_calculations(rows=subset,
                                                 n_configs=n_configs,
                                                 threshold=threshold)
 
