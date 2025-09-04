@@ -71,6 +71,12 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     settings=Settings(read_energies_dft=True) #need the energies to store them into the db metadata
 
     if from_ml_opt:
+    #this check also updates the db
+        if not Database.all_completed(calc_type='mlopt') and \
+            not yes_no_question('Not all calculations are completed. '\
+                                'Continue anyway with those that are present?'):
+            logging.info('Quitting.')
+            sys.exit(0)
         calc_ids = obtain_calc_indices(calc_type='mlopt')
         adsorption_structures = get_adsorption_structures(calc_ids=calc_ids,
                                                           get_structures_from='mlopt')

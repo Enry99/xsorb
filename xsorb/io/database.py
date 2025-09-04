@@ -334,7 +334,7 @@ class Database:
                          columns : list[str] | str = 'all',
                          sort_key : str | None = None,
                          include_data : bool = True,
-                         update: bool = True) -> list:
+                         update: bool = False) -> list:
         '''
         Get the rows corresponding to the calculations of a given type,
         with the possibility to sort them by a given key
