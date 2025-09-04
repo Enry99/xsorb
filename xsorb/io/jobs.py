@@ -49,6 +49,10 @@ def launch_jobs(*,program : str,
 
     main_dir = os.getcwd()
 
+    if len(systems_calcinfos) == 0:
+        logging.info(f"No {calc_type} calculations to launch.")
+        return
+
     for system in systems_calcinfos:
 
         j_dir = Path(system.in_file_path).parent
@@ -108,7 +112,8 @@ def restart_jobs(calc_type : str):
     active_jobs = scheduler.get_active_job_ids()
 
     rows = xsorb.io.database.Database.get_calculations(calc_type=calc_type,
-                                     selection='status!=completed')
+                                     selection='status!=completed',
+                                     update=True)
 
     logging.info(f"Restarting {calc_type} calculations...")
 
