@@ -323,9 +323,6 @@ class Database:
                 calc_ids = [calc_ids]
             rows = [row for row in rows if row.id in calc_ids]
 
-        #sort by calc_id
-        rows.sort(key=lambda row: int(row.calc_id))
-
         return rows
 
     #@db_getter
@@ -380,8 +377,9 @@ class Database:
         if exclude_ids:
             rows = [row for row in rows if row.calc_id not in exclude_ids]
 
-        #sort by calc_id
-        rows.sort(key=lambda row: int(row.calc_id))
+        if not sort_key:
+            #sort by calc_id
+            rows.sort(key=lambda row: int(row.calc_id))
 
         return rows
 

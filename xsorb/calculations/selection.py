@@ -113,8 +113,8 @@ def obtain_calc_indices(*,
         or [all_rows] depending on the choose_by_subsets flag.
         '''
         if choose_by_subsets:
-            return [[row for row in rows_list if row.bonds != 'none'],
-                        [row for row in rows_list if row.bonds == 'none']]
+            return [[row for row in rows_list if row.get('bonds')],
+                        [row for row in rows_list if row.get('bonds') is None]]
         else:
             return [rows_list]
 
@@ -187,19 +187,23 @@ def get_adsorption_structures(get_structures_from : str,
 
     #get structures from database
     rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
-    rows_original = Database.get_structures(calc_ids=calc_ids)
+
+    if get_structures_from == 'mlopt':
+        # need to get the original structures to obtain the constraints
+        rows_original = Database.get_structures(calc_ids=calc_ids)
+        constraints_dict = {row.calc_id: row.get('constraints') for row in rows_original}
 
 
     # prepare the structures by substituting the atoms with the one from the previous calculation
     adsorption_structures : list [AdsorptionStructure] = []
 
-    for row, row_original in zip(rows, rows_original):
+    for row in rows:
         ads_struct = AdsorptionStructure.fromdict(
             row.data.AdsorptionCalculation.get('adsorption_structure'))
         atoms = AtomsCustom(row.toatoms())
 
         if get_structures_from == 'mlopt':
-            atoms.set_constraint(row_original.get('constraints'))
+            atoms.set_constraint(constraints_dict.get(row.calc_id))
 
         ads_struct.atoms = atoms
         adsorption_structures.append(ads_struct)
