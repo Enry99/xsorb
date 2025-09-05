@@ -10,7 +10,7 @@ Script to optimize a structure using a ML calculator.
 import sys
 import os
 
-from ase.optimize import BFGS, BFGSLineSearch
+from ase.optimize import BFGSLineSearch, FIRE2
 
 from xsorb.ase_custom.io import ase_custom_read as read
 
@@ -51,9 +51,9 @@ def main():
     opt = BFGSLineSearch(atoms, trajectory=out_file, logfile=log_file, maxstep=0.1)
     converged = opt.run(fmax=0.01, steps=300)
 
-    #If not converged, try with regular BFGS
+    #If not converged, try with FIRE (more robust, but can require more force calls)
     if not converged:
-        opt = BFGS(atoms, trajectory=out_file, logfile=log_file, append_trajectory=True)
+        opt = FIRE2(atoms, trajectory=out_file, logfile=log_file, append_trajectory=True)
         converged = opt.run(fmax=0.01, steps=2000)
 
     with open(log_file, "a", encoding=sys.getfilesystemencoding()) as f:
