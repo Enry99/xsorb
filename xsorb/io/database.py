@@ -552,7 +552,11 @@ class Database:
                 if Path(db_name).exists():
                     with ase.db.connect(db_name) as db:
                         for calc_id in info_dicts: #pylint: disable=consider-using-dict-items
-                            row = db.get(f'calc_id={calc_id}', include_data=False)
+
+                            try:
+                                row = db.get(f'calc_id={calc_id}', include_data=False)
+                            except KeyError:
+                                continue #calc_id not present in this db
 
                             eads = row.get('adsorption_energy') #can be a float or None
                             if eads is not None:
