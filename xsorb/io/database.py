@@ -218,54 +218,42 @@ class Database:
             if not rows:
                 if verbose:
                     logging.info(
-                        'All %s calculations weare already completed. ' \
+                        'All %s calculations were already completed. ' \
                         'db is already up to date.', calc_type)
                 return
 
             ### read stuff from the database metadata ###
+            metadata = db.metadata.copy() # workaround for ase.db bug
             try:
                 program = db.metadata['program']
             except KeyError as exc:
                 raise RuntimeError(f'No program metadata found in {calc_type} database') from exc
 
-
+            # update the metadata with respective values if provided
             if mult is not None:
-                db.metadata['mult'] = mult
-            else:
-                mult = db.metadata['mult']
+                metadata['mult'] = mult
 
             if store_full_trajectories is not None:
-                db.metadata['store_full_trajectories'] = store_full_trajectories
-            else:
-                store_full_trajectories = db.metadata['store_full_trajectories']
+                metadata['store_full_trajectories'] = store_full_trajectories
+            if calc_type == 'mlopt' and total_e_slab_mol_ml is not None:
+                metadata['total_e_slab_mol'] = total_e_slab_mol_ml
+            elif calc_type in ['screening', 'relax'] and total_e_slab_mol_dft is not None:
+                metadata['total_e_slab_mol'] = total_e_slab_mol_dft
+                print(metadata['total_e_slab_mol'])
+            # end of updating metadata ###
 
-            if calc_type == 'mlopt':
-                if total_e_slab_mol_ml is None: # read from metadata
-                    if not db.metadata.get('total_e_slab_mol'):
-                        logging.warning('No total_e_slab_mol available in %s database. '
-                                        'If you calculated slab and mol energies, try to '
-                                        'refresh the database with "xsorb update -refresh". '
-                                        'Total energies will be used instead of adsorption energies.', calc_type)
-                        total_e_slab_mol = 0
-                    else:
-                        total_e_slab_mol = db.metadata['total_e_slab_mol']
 
-                else: # use the provided value, and update the metadata
-                    total_e_slab_mol = total_e_slab_mol_ml
-                    db.metadata['total_e_slab_mol'] = total_e_slab_mol
-            else:
-                if total_e_slab_mol_dft is None: # read from metadata
-                    if not db.metadata.get('total_e_slab_mol'):
-                        logging.warning('No total_e_slab_mol available in %s database. '
-                                        'If you calculated slab and mol energies, try to '
-                                        'refresh the database with "xsorb update -refresh". '
-                                        'Total energies will be used instead of adsorption energies.', calc_type)
-                        total_e_slab_mol = 0
-                    else:
-                        total_e_slab_mol = db.metadata['total_e_slab_mol']
-                else: # use the provided value, and update the metadata
-                    total_e_slab_mol = total_e_slab_mol_dft
-                    db.metadata['total_e_slab_mol'] = total_e_slab_mol
+
+            if not metadata.get('total_e_slab_mol'):
+                logging.warning('No total_e_slab_mol available in %s database. '
+                                'If you calculated slab and mol energies, try to '
+                                'refresh the database with "xsorb update -refresh". '
+                                'Total energies will be used instead of adsorption energies.', calc_type)
+                metadata['total_e_slab_mol'] = 0
+
+            mult = metadata['mult']
+            store_full_trajectories = metadata['store_full_trajectories']
+            total_e_slab_mol = metadata['total_e_slab_mol']
             ### end of reading metadata ###
 
 
@@ -284,7 +272,6 @@ class Database:
             ################################################
 
             # Update the database with the new results
-            metadata = db.metadata.copy() # workaround for ase.db bug
             for row, system in zip(rows, systems):
                 logging.debug('Updating calculation %s (row %s)', system.calc_info.calc_id, row.id)
                 if system.calc_results is not None:
