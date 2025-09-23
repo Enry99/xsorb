@@ -21,9 +21,9 @@ class InputParams:
 
     slab_filename: str
     molecule_filename: str
-    jobscript_path: str
     scheduler: str
     E_slab_mol : Optional[list[float]] # pylint: disable=invalid-name
+    jobscript_path: Optional[str]
     jobscript_ml_path: Optional[str]
     submit_command_ml: Optional[str]
     jobname_prefix: str = ''
