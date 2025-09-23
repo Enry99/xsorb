@@ -509,6 +509,7 @@ class Database:
     @staticmethod
     def write_csvfile(include_results : bool = True,
                       txt : bool = False,
+                      sort_txt: bool = False,
                       verbose: bool = False) -> None:
         '''
         Reads the structures database and writes the info to a csv file.
@@ -523,6 +524,7 @@ class Database:
         Args:
         - include_results: bool to include the results of the calculations
         - txt: bool to write a txt file instead of a csv file
+        - sort_txt: bool to sort the txt output by energy
         - verbose: bool to print messages
         '''
 
@@ -593,7 +595,7 @@ class Database:
         df.index.name = 'calc_id'
         df.reset_index(inplace=True)
 
-        if last_calc_e_column_name and include_results and txt: #sort by energy column
+        if last_calc_e_column_name and include_results and txt and sort_txt: #sort by energy column
             print(f'Sorting results by {last_calc_e_column_name}')
             df.sort_values(by=last_calc_e_column_name, inplace=True, ascending=False)
 
@@ -608,7 +610,8 @@ class Database:
 
 def manual_update_calculations(calc_type : str,
                                refresh : bool = False,
-                               txt : bool = False) -> None:
+                               txt : bool = False,
+                               sort_txt: bool = False) -> None:
     '''
     Manually update the calculations in the database and write the results file.
     This function is meant to be called from the CLI
@@ -618,6 +621,7 @@ def manual_update_calculations(calc_type : str,
     - refresh: bool to force the update of the database, re-reading all the output files
       and updating the bonding status.
     - txt: bool to write a txt file instead of a csv file
+    - sort_txt: bool to sort the txt output by energy
     '''
 
     if refresh:
@@ -652,4 +656,4 @@ def manual_update_calculations(calc_type : str,
             )
 
     # Write the results file only once at the end
-    Database.write_csvfile(txt=txt, verbose=True)
+    Database.write_csvfile(txt=txt, sort_txt=sort_txt, verbose=True)

@@ -34,6 +34,10 @@ class CLICommand(CLICommandBase):
                         action='store_true',
                         default=False,
                         help='''output to txt instead of csv''')
+        parser.add_argument('--sort-txt',
+                        action='store_true',
+                        default=False,
+                        help='''sort the txt output by energy''')
 
 
     @staticmethod
@@ -41,7 +45,8 @@ class CLICommand(CLICommandBase):
         from xsorb.io.database import manual_update_calculations # pylint: disable=import-outside-toplevel
         manual_update_calculations(args.calc_type,
                                    args.refresh,
-                                   txt=args.txt)
+                                   txt=args.txt,
+                                   sort_txt=args.sort_txt)
 
 
     @staticmethod
