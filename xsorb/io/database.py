@@ -239,10 +239,7 @@ class Database:
                 metadata['total_e_slab_mol'] = total_e_slab_mol_ml
             elif calc_type in ['screening', 'relax'] and total_e_slab_mol_dft is not None:
                 metadata['total_e_slab_mol'] = total_e_slab_mol_dft
-                print(metadata['total_e_slab_mol'])
             # end of updating metadata ###
-
-
 
             if not metadata.get('total_e_slab_mol'):
                 logging.warning('No total_e_slab_mol available in %s database. '
