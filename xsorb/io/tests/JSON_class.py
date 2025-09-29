@@ -1,100 +1,95 @@
-# from xsorb.adsorptiondata.adsorptionstructure import MoleculeRotation
-from ase import Atoms
-
-
-atoms = Atoms('H2O', positions=[[0, 0, 0], [0, 0.757, 0.587], [0, -0.757, 0.587]])
-
-# aaa = MoleculeRotation(
-#     atoms,
-#     xrot="45.0",
-#     yrot="30.0",
-#     zrot="60",
-#     mol_atom=1
-# )
-
-# # # Encode to JSON
-# # json_data = encode(aaa)
-# # print("Encoded JSON:", json_data)
-
-
-# # # Decode from JSON
-# # decodeddict = decode(json_data)
-# # new_aaa = MoleculeRotation.fromdict(decodeddict)
-# # print("Decoded object:", new_aaa)
-
-# from ase.db import connect
-# db = connect('test.json')
-
-# db.write(atoms, data={'molecule_rotation': aaa})
-
-
-# # Read the data back
-# with connect('test.json') as db:
-#     for row in db.select():
-#         print("Row ID:", row.id)
-#         xxx = row.data['molecule_rotation']
-#         new_aaa = MoleculeRotation.fromdict(xxx)
-#         print("Decoded object:", new_aaa)
-#         print("Z Rotation:", new_aaa.zrot)
-
 from dataclasses import dataclass, asdict
+from dacite import from_dict, Config
+from typing import Union
+
+
+def dict_without_none(data):
+    '''Return a dictionary excluding keys with None values.'''
+    return dict(x for x in data if x[1] is not None)
+
 
 @dataclass
-class Nested:
+class NestedA:
     """
     Example dataclass to demonstrate JSON serialization and deserialization.
     """
     nested_value: int
+    __objtype__ : str = 'NestedA'
 
-    def todict(self) -> dict:
-        return self.__dict__
-
-    @classmethod
-    def fromdict(cls, data: dict) -> 'Nested':
-        return cls(**data)
 
 @dataclass
-class prova:
+class NestedB:
     """
     Example dataclass to demonstrate JSON serialization and deserialization.
     """
+    nested_value: int
+    possible_none: int | None = None
+    __objtype__ : str = 'NestedB'
+
+
+@dataclass
+class Intermediate:
+    '''
+    Class that contains either NestedA or NestedB
+    '''
+    nested: NestedA | NestedB
+
+
+@dataclass
+class External:
+    """
+    External class that should be directly serializable.
+    """
     name: str
     value: int
-    nested: Nested
+    intermediate: Intermediate
 
-    def todict(self) -> dict:
-        return self.__dict__
+
+    def todict(self):
+        return asdict(self, dict_factory=dict_without_none)
 
     @classmethod
-    def fromdict(cls, data: dict) -> 'prova':
-        data['nested'] = Nested.fromdict(data['nested'])
-        return cls(**data)
+    def fromdict(cls, data: dict):
+        def union_type_hook(value):
+            # Gestisce la union NestedA | NestedB
+            if isinstance(value, dict) and '__objtype__' in value:
+                objtype = value['__objtype__']
+                if objtype == 'NestedA':
+                    return from_dict(NestedA, value)
+                elif objtype == 'NestedB':
+                    return from_dict(NestedB, value)
+            raise ValueError(f"Unknown objtype: {value.get('__objtype__', 'missing') if isinstance(value, dict) else 'not a dict'}")
+
+        return from_dict(cls, data, config=Config(type_hooks={
+            Union[NestedA, NestedB]: union_type_hook
+        }))
 
 
-x = prova(
+x = External(
     name="example",
     value=42,
-    nested=Nested(nested_value=100)
+    intermediate=Intermediate(NestedB(nested_value=100))
 )
 
-# print("Original Instance:", x)
+print("Original Instance:", x)
 
-# # Encode to dictionary
-# encoded_dict = x.todict()
-# print("Encoded Dictionary:", encoded_dict)
+# Encode to dictionary
+encoded_dict = x.todict()
+print("Encoded Dictionary:", encoded_dict)
 
-# # Decode from dictionary
-# decoded_instance = prova.fromdict(encoded_dict)
-# print("Decoded Instance:", decoded_instance)
+# Decode from dictionary
+decoded_instance = External.fromdict(encoded_dict)
+print("Decoded Instance:", decoded_instance)
 
-from ase.db import connect
-db = connect('test.json')
 
-# db.write(atoms, bonds=[])
+print("Equality check:", x == decoded_instance)
 
-# for row in db.select():
-#     print("Row ID:", row.id)
-#     print("bonds:", row.bonds)
+
+
+# from ase.db import connect
+# from ase import Atoms
+# atoms = Atoms('H2O', positions=[[0, 0, 0], [0, 0.757, 0.587], [0, -0.757, 0.587]])
+# db = connect('test.json')
 
 # db.write(atoms, data={'prova': x})
 
@@ -103,15 +98,5 @@ db = connect('test.json')
 # for row in db.select():
 #     print("Row ID:", row.id)
 #     xxx = row.data['prova']
-#     new_aaa = prova.fromdict(xxx)
+#     new_aaa = External.fromdict(xxx)
 #     print("Decoded object:", new_aaa)
-
-
-
-from ase.constraints import FixCartesian
-
-c = FixCartesian(a=0, mask=[True, False, True])
-
-atoms.set_constraint(c)
-
-db.write(atoms)

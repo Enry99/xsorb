@@ -3,17 +3,19 @@ Module containing the AdsorptionCalculation class.
 '''
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional, Any
 
-from xsorb.adsorptiondata.base import JsonableBase
+from dacite import from_dict, Config
+
+from xsorb.adsorptiondata.base import JsonableBase, dict_without_none
 from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
 from xsorb.ase_custom import AtomsCustom
 
 ALLOWED_STATUSES = ('completed', 'incomplete', 'scf_nonconverged')
 
 @dataclass
-class CalculationInfo(JsonableBase):
+class CalculationInfo:
     '''
     Small dataclass to store info about the written systems
     '''
@@ -59,22 +61,9 @@ class CalculationInfo(JsonableBase):
             'status': self.status,
         }
 
-    def todict(self) -> dict:
-        dct = self.__dict__.copy()
-        dct = {k: v for k, v in dct.items() if v is not None}
-        return dct
-
-    @classmethod
-    def fromdict(cls, dct: dict) -> 'CalculationInfo':
-        """
-        Create an instance of the class from a dictionary.
-        Used by xsorb to reconstruct objects after reading from JSON or database.
-        """
-        return cls(**dct)
-
 
 @dataclass
-class BondInfo(JsonableBase):
+class BondInfo:
     """
     Dataclass to store information about a bond between a molecule and a slab.
     """
@@ -91,20 +80,9 @@ class BondInfo(JsonableBase):
         return f"{self.mol_atom_species}{self.mol_atom_id}-"\
             f"{self.slab_atom_species}{self.slab_atom_id}({self.length:.2f})"
 
-    def todict(self) -> dict:
-        return self.__dict__
-
-    @classmethod
-    def fromdict(cls, dct: dict) -> 'BondInfo':
-        """
-        Create an instance of the class from a dictionary.
-        Used by xsorb to reconstruct objects after reading from JSON or database.
-        """
-        return cls(**dct)
-
 
 @dataclass
-class CalculationResults(JsonableBase):
+class CalculationResults:
     '''
     Dataclass to store the results of a calculation
     '''
@@ -134,26 +112,6 @@ class CalculationResults(JsonableBase):
             dct['bonds'] = ','.join(str(bond) for bond in self.bonds)
 
         return dct
-
-
-    def todict(self) -> dict:
-        dct = self.__dict__.copy()
-        dct = {k: v for k, v in dct.items() if v is not None}
-        return dct
-
-    @classmethod
-    def fromdict(cls, dct: dict) -> 'CalculationResults':
-        """
-        Create an instance of the class from a dictionary.
-        Used by xsorb to reconstruct objects after reading from JSON or database.
-        """
-        # Convert nested objects
-        dct['atoms'] = AtomsCustom(dct['atoms'])
-        if 'trajectory' in dct:
-            dct['trajectory'] = [AtomsCustom(atoms) for atoms in dct['trajectory']]
-        if 'bonds' in dct:
-            dct['bonds'] = [BondInfo.fromdict(bond) for bond in dct['bonds']]
-        return cls(**dct)
 
 
 @dataclass
@@ -190,9 +148,7 @@ class AdsorptionCalculation(JsonableBase):
 
 
     def todict(self) -> dict:
-        dct = self.__dict__.copy()
-        dct = {k: v for k, v in dct.items() if v is not None}
-        return dct
+        return asdict(self, dict_factory=dict_without_none)
 
     @classmethod
     def fromdict(cls, dct: dict) -> 'AdsorptionCalculation':
@@ -200,10 +156,23 @@ class AdsorptionCalculation(JsonableBase):
         Create an instance of the class from a dictionary.
         Used by xsorb to reconstruct objects after reading from JSON or database.
         """
-        # Convert nested objects
-        dct['adsorption_structure'] = AdsorptionStructure.fromdict(dct['adsorption_structure'])
-        if dct.get('calc_info'):
-            dct['calc_info'] = CalculationInfo.fromdict(dct['calc_info'])
-        if dct.get('calc_results'):
-            dct['calc_results'] = CalculationResults.fromdict(dct['calc_results'])
-        return cls(**dct)
+
+        def convert_generators_to_lists(obj):
+            if isinstance(obj, dict): #if dict, call this function recursively for each element
+                return {k: convert_generators_to_lists(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)): #if list or tuple, call on each element
+                return [convert_generators_to_lists(item) for item in obj]
+            elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
+                # generator, excluding strings and bytes
+                try:
+                    return list(obj)
+                except: #pylint: disable=bare-except
+                    return obj
+            else:
+                return obj
+
+        return from_dict(
+            data_class=cls,
+            data=convert_generators_to_lists(dct),
+            config=Config(type_hooks={AtomsCustom: lambda data: AtomsCustom(data)})
+        )

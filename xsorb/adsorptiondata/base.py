@@ -23,3 +23,8 @@ class JsonableBase(ABC):
         Create an instance of the class from a dictionary.
         Used by xsorb to reconstruct objects after reading from JSON or database.
         """
+
+
+def dict_without_none(data):
+    '''Return a dictionary excluding keys with None values.'''
+    return dict(x for x in data if x[1] is not None)

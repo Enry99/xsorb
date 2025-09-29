@@ -10,16 +10,19 @@ Classes shoul all inherit from JsonableBase to be able to be serialized to JSON.
 '''
 
 from __future__ import annotations
-from dataclasses import dataclass
+from abc import ABC
+from typing import Union
+from dataclasses import dataclass, asdict
 
 import numpy as np
+from dacite import from_dict, Config
 
 from xsorb.ase_custom.atoms import AtomsCustom
-from xsorb.adsorptiondata.base import JsonableBase
+from xsorb.adsorptiondata.base import JsonableBase, dict_without_none
 
 
 @dataclass
-class MoleculeRotation(JsonableBase):
+class MoleculeRotation:
     '''
     Class to store a rotated molecule and the rotation angles.
     The rotation angles are stored as strings, to be able to store also the
@@ -85,21 +88,9 @@ class MoleculeRotation(JsonableBase):
             return NotImplemented
         return self.unique_id == other.unique_id
 
-    def todict(self):
-        """Convert class instance to a dictionary."""
-        return self.__dict__
-
-    @classmethod
-    def fromdict(cls, dct: dict):
-        '''
-        Creates a MoleculeRotation object from a dictionary
-        '''
-        dct['atoms'] = AtomsCustom(dct['atoms'])
-        return cls(**dct)
-
 
 @dataclass
-class AdsorptionSite(JsonableBase):
+class AdsorptionSite(JsonableBase, ABC):
     '''
     Base class of Adsorption Site, to be inherited by the two different modes.
 
@@ -129,12 +120,6 @@ class AdsorptionSite(JsonableBase):
             'site_info': self.info
         }
 
-    @classmethod
-    def from_dict(cls, data: dict):
-        '''
-        Creates an AdsorptionSite object from a dictionary
-        '''
-        return cls(data['label'], list(data['coords']), data['info'])
 
     @property
     def unique_id(self):
@@ -150,7 +135,7 @@ class AdsorptionSite(JsonableBase):
 
     def todict(self):
         """Convert class instance to a dictionary."""
-        return self.__dict__
+        return asdict(self, dict_factory=dict_without_none)
 
     @classmethod
     def fromdict(cls, dct: dict):
@@ -182,7 +167,7 @@ class AdsorptionSiteCrystal(AdsorptionSite):
     __xsorb_objtype__ : str = "AdsorptionSiteCrystal"
 
     def todict(self):
-        return self.__dict__
+        return asdict(self, dict_factory=dict_without_none)
 
     @classmethod
     def fromdict(cls, dct: dict):
@@ -222,20 +207,14 @@ class AdsorptionSiteAmorphous(AdsorptionSite):
     __xsorb_objtype__ : str = "AdsorptionSiteAmorphous"
 
     def todict(self):
-        #remove None values from the dictionary to write into ase db
-        dct = self.__dict__.copy()
-        dct = {k: v for k, v in dct.items() if v is not None}
-        return dct
+        return asdict(self, dict_factory=dict_without_none)
 
     @classmethod
     def fromdict(cls, dct: dict):
         '''
         Creates an AdsorptionSiteAmorphous object from a dictionary
         '''
-        if 'surrounding_sites' in dct:
-            dct['surrounding_sites'] = [SurroundingSite.fromdict(ss) \
-                    for ss in dct['surrounding_sites']]
-        return cls(**dct)
+        return from_dict(data_class=cls, data=dct)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, AdsorptionSiteAmorphous):
@@ -274,7 +253,7 @@ class SurroundingSite(AdsorptionSite):
         return f"to_{self.label}"
 
     def todict(self):
-        return self.__dict__
+        return asdict(self, dict_factory=dict_without_none)
 
     @classmethod
     def fromdict(cls, dct: dict):
@@ -340,7 +319,7 @@ class AdsorptionStructure(JsonableBase):
 
 
     def todict(self):
-        return self.__dict__
+        return asdict(self, dict_factory=dict_without_none)
 
 
     @classmethod
@@ -349,17 +328,21 @@ class AdsorptionStructure(JsonableBase):
         Creates an AdsorptionStructure object from a dictionary
         '''
 
-        dct['atoms'] = AtomsCustom(dct['atoms'])
-        dct['mol_rot'] = MoleculeRotation.fromdict(dct['mol_rot'])
+        def union_type_hook(input_dict):
+            if '__xsorb_objtype__' in input_dict:
+                objtype = input_dict['__xsorb_objtype__']
 
-        #handle different types of AdsorptionSite
-        if dct['adsite']['__xsorb_objtype__'] == "AdsorptionSiteCrystal":
-            dct['adsite'] = AdsorptionSiteCrystal.fromdict(dct['adsite'])
-        elif dct['adsite']['__xsorb_objtype__'] == "AdsorptionSiteAmorphous":
-            dct['adsite'] = AdsorptionSiteAmorphous.fromdict(dct['adsite'])
-        elif dct['adsite']['__xsorb_objtype__'] == "SurroundingSite":
-            dct['adsite'] = SurroundingSite.fromdict(dct['adsite'])
-        else:
-            raise ValueError(f"Unknown AdsorptionSite type: {dct['adsite']['__xsorb_objtype__']}")
+                if objtype == 'AdsorptionSiteCrystal':
+                    return from_dict(AdsorptionSiteCrystal, input_dict)
+                elif objtype == 'AdsorptionSiteAmorphous':
+                    return from_dict(AdsorptionSiteAmorphous, input_dict)
+                elif objtype == 'SurroundingSite':
+                    return from_dict(SurroundingSite, input_dict)
+            raise ValueError(f"Unknown objtype: {input_dict.get('__xsorb_objtype__', 'missing')}")
 
-        return cls(**dct)
+        return from_dict(cls, dct, config=Config(type_hooks={
+            Union[AdsorptionSiteCrystal,
+                  AdsorptionSiteAmorphous,
+                  SurroundingSite]: union_type_hook,
+            AtomsCustom: lambda atoms: AtomsCustom(atoms),
+        }))
