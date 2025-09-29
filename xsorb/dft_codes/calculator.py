@@ -229,7 +229,7 @@ def adjust_constraints(atoms : Atoms, program : str):
 
     if program == 'vasp':
         #convert from FixCartesian to FixScaled
-        c = [FixScaled(a=constr.a, mask=constr.mask) \
+        c = [FixScaled(a=constr.index, mask=constr.mask) \
              for constr in atoms.constraints]
         atoms.set_constraint(c)
 
