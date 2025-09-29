@@ -44,6 +44,8 @@ def launch_jobs(*,program : str,
     - jobname_prefix: prefix for the job name
 
     '''
+    if jobscript is None:
+        raise RuntimeError(f"jobscript path for {program} missing in settings file.")
 
     scheduler = JobScheduler(scheduler_name)
 
