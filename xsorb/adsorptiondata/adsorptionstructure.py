@@ -18,7 +18,8 @@ import numpy as np
 from dacite import from_dict, Config
 
 from xsorb.ase_custom.atoms import AtomsCustom
-from xsorb.adsorptiondata.base import JsonableBase, dict_without_none
+from xsorb.adsorptiondata.base import JsonableBase
+from xsorb.adsorptiondata.utils import dict_without_none, convert_generators_to_lists
 
 
 @dataclass
@@ -340,9 +341,11 @@ class AdsorptionStructure(JsonableBase):
                     return from_dict(SurroundingSite, input_dict)
             raise ValueError(f"Unknown objtype: {input_dict.get('__xsorb_objtype__', 'missing')}")
 
-        return from_dict(cls, dct, config=Config(type_hooks={
-            Union[AdsorptionSiteCrystal,
-                  AdsorptionSiteAmorphous,
-                  SurroundingSite]: union_type_hook,
-            AtomsCustom: lambda atoms: AtomsCustom(atoms),
-        }))
+        return from_dict(
+            data_class=cls,
+            data=convert_generators_to_lists(dct),
+            config=Config(type_hooks={
+                Union[AdsorptionSiteCrystal,AdsorptionSiteAmorphous,SurroundingSite]: union_type_hook,
+                AtomsCustom: lambda atoms: AtomsCustom(atoms)}
+            )
+        )

@@ -8,7 +8,8 @@ from typing import Optional, Any
 
 from dacite import from_dict, Config
 
-from xsorb.adsorptiondata.base import JsonableBase, dict_without_none
+from xsorb.adsorptiondata.base import JsonableBase
+from xsorb.adsorptiondata.utils import dict_without_none, convert_generators_to_lists
 from xsorb.adsorptiondata.adsorptionstructure import AdsorptionStructure
 from xsorb.ase_custom import AtomsCustom
 
@@ -156,20 +157,6 @@ class AdsorptionCalculation(JsonableBase):
         Create an instance of the class from a dictionary.
         Used by xsorb to reconstruct objects after reading from JSON or database.
         """
-
-        def convert_generators_to_lists(obj):
-            if isinstance(obj, dict): #if dict, call this function recursively for each element
-                return {k: convert_generators_to_lists(v) for k, v in obj.items()}
-            elif isinstance(obj, (list, tuple)): #if list or tuple, call on each element
-                return [convert_generators_to_lists(item) for item in obj]
-            elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
-                # generator, excluding strings and bytes
-                try:
-                    return list(obj)
-                except: #pylint: disable=bare-except
-                    return obj
-            else:
-                return obj
 
         return from_dict(
             data_class=cls,
