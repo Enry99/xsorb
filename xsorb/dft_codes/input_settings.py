@@ -225,8 +225,9 @@ class VaspParams:
 
 
         if self.incar_path_screening is not None or self.kpoints_path_screening is not None:
-            self.settings_dict_screening = self.build_settings_dict(
-                self.incar_path_screening, self.kpoints_path_screening)
+            self.settings_dict_screening = deepcopy(self.settings_dict)
+            self.settings_dict_screening.update(self.build_settings_dict(
+                self.incar_path_screening, self.kpoints_path_screening))
 
             #fix if user forgot to put the correct IBRION for relax, and add EDIFFG for screening.
             #EDIFFG is put here so that in any case this will be the final value, even if the user had
