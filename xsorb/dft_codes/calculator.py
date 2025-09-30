@@ -22,7 +22,7 @@ from pymatgen.io.vasp.sets import (MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet,
                                    MPHSERelaxSet, MITRelaxSet)
 from pymatgen.io.ase import AseAtomsAdaptor
 from ase import Atoms
-from ase.constraints import FixScaled
+from ase.constraints import FixScaled, FixAtoms, FixCartesian
 from ase.calculators.vasp import Vasp
 
 from xsorb.ase_custom import vasp, write_xyz_custom
@@ -228,6 +228,11 @@ def adjust_constraints(atoms : Atoms, program : str):
     '''
 
     if program == 'vasp':
+        #if constraints are FixAtoms, convert first to FixCartesian
+        for i, constr in enumerate(atoms.constraints):
+            if isinstance(constr, FixAtoms):
+                c = FixCartesian(a=constr.index) #mask is all True by default
+                atoms.constraints[i] = c
         #convert from FixCartesian to FixScaled
         c = [FixScaled(a=constr.index, mask=constr.mask) \
              for constr in atoms.constraints]
