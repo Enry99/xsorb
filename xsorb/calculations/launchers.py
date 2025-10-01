@@ -255,13 +255,7 @@ def launch_isolated_slab_and_molecule(*,
     if samecell:
         mol.cell = slab.cell
     elif not mol.cell:
-        positions = mol.positions
-        deltax = np.max(positions[:,0]) - np.min(positions[:,0]) + 10
-        deltay = np.max(positions[:,1]) - np.min(positions[:,1]) + 10
-        deltaz = np.max(positions[:,2]) - np.min(positions[:,2]) + 10
-
-        #large orthorombic cell
-        mol.cell = [deltax, deltay, deltaz]
+        mol.center(vacuum=5.0)
 
     slab.pbc = True
     mol.pbc = True
