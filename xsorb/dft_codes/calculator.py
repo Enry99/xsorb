@@ -267,6 +267,10 @@ def edit_file_for_restart(program : str, path : str):
         vasprun = parentpath + '/vasprun.xml'
         oszicar = parentpath + '/OSZICAR'
 
+        #if CONTCAR is empty, do nothing, as the calculation probably did not start
+        if os.path.getsize(contcar) == 0:
+            return
+
         with open(incar, 'r',encoding=sys.getfilesystemencoding()) as f:
             lines = f.readlines()
             istart_found = False

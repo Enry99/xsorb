@@ -8,7 +8,8 @@ from xsorb.cli.command import CLICommandBase
 
 
 class CLICommand(CLICommandBase):
-    """restart all (unfinished) calculations
+    """restart all (unfinished) calculations for a given type,
+    excluding those with a still running job.
 
 Example:
  $ xsorb restart screening
