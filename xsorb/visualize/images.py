@@ -116,7 +116,9 @@ def plot_images(calc_type : str,
     if calc_type == 'initial':
         rows = Database.get_structures(calc_ids=calc_id)
     else:
-        rows = Database.get_calculations(calc_type=calc_type, calc_ids=calc_id)
+        rows = Database.get_calculations(calc_type=calc_type,
+                                         calc_ids=calc_id,
+                                         sort_key='calc_id')
 
     if not rows:
         logging.warning("No images to be generated.")
@@ -294,7 +296,9 @@ def plot_energy_evolution(calc_type : str):
     - calc_type: 'screening','relax','mlopt'
     '''
 
-    rows = Database.get_calculations(calc_type=calc_type, selection='adsorption_energy')
+    rows = Database.get_calculations(calc_type=calc_type,
+                                     selection='adsorption_energy',
+                                     sort_key='calc_id')
 
     for row in rows:
 
@@ -338,7 +342,9 @@ def plot_histo(calc_type : str, sort_by_counts: bool = False):
     """
 
     #### collect data from the database ####
-    rows = Database.get_calculations(calc_type=calc_type, selection='adsorption_energy')
+    rows = Database.get_calculations(calc_type=calc_type,
+                                     selection='adsorption_energy',
+                                     sort_key='calc_id')
 
     relax_energies : list[float] = []
     bond_elements: list[list[str]] = []

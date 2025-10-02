@@ -328,7 +328,8 @@ class Database:
         - selection: string with the selection criteria (e.g. 'status=completed')
         - calc_ids: list of integers with the ids of the calculations to be included,
             or a single integer with the id of the calculation to be included.
-            If None, all the calculations are included
+            If None, all the calculations are included.
+            IMPORTANT: this selects only which ids to include, not the order
         - exclude_ids: list of integers with the ids of the calculations to be excluded
         - columns: list of strings with the columns to be included
         - sort_key: string with the key to sort the rows, e.g. 'energy'
@@ -360,10 +361,6 @@ class Database:
             rows = [row for row in rows if row.calc_id in calc_ids]
         if exclude_ids:
             rows = [row for row in rows if row.calc_id not in exclude_ids]
-
-        if not sort_key:
-            #sort by calc_id
-            rows.sort(key=lambda row: int(row.calc_id))
 
         return rows
 

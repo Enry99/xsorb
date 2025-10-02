@@ -188,6 +188,13 @@ def get_adsorption_structures(get_structures_from : str,
     #get structures from database
     rows = Database.get_calculations(calc_type=get_structures_from, calc_ids=calc_ids)
 
+    if calc_ids is not None:
+        if len(rows) != len(calc_ids):
+            raise ValueError('Some calc_ids were not found in the database.')
+        # ensure that rows has the same order as calc_ids
+        rows_dict = {row.calc_id: row for row in rows}
+        rows = [rows_dict[calc_id] for calc_id in calc_ids]
+
     if get_structures_from == 'mlopt':
         # need to get the original structures to obtain the constraints
         rows_original = Database.get_structures(calc_ids=calc_ids)
