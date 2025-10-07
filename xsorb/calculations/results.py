@@ -175,7 +175,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
             adsize_z = system.adsorption_structure.adsite.coords[2]
             if mol_ref_idx == -1:
                 #geometric center of the molecule
-                final_dz = atoms.positions[mol_indices].mean(axis=0) - adsize_z
+                final_dz = atoms.positions[mol_indices].mean(axis=0)[2] - adsize_z
             else:
                 #reference atom of the molecule
                 mol_ref_index = mol_ref_idx + mol_indices[0]
