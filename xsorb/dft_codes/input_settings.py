@@ -14,8 +14,12 @@ import sys
 from copy import deepcopy
 
 from ase.io.espresso import read_fortran_namelist
+from ase.units import Ry, Bohr
 
-from xsorb.dft_codes.definitions import HYBRID_SCREENING_THRESHOLDS
+from xsorb.dft_codes.definitions import (SUPPORTED_PROGRAMS,
+                                         HYBRID_SCREENING_THRESHOLD,
+                                         RELAX_THRESHOLD)
+
 
 # dataclasses to store DFT program settings
 @dataclass
@@ -25,8 +29,9 @@ class EspressoParams:
     '''
     pwi_path: str
     pwi_path_screening : Optional[str]
-    etot_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLDS['espresso'][0]
-    forc_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLDS['espresso'][1]
+    etot_conv_thr_screening: float = 1  # large value so only force is the criterion
+    forc_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLD
+    forc_conv_thr: float = RELAX_THRESHOLD
 
     # non-initialized attributes (filled in __post_init__)
     settings_dict = None
@@ -121,11 +126,17 @@ class EspressoParams:
 
     def __post_init__(self):
 
+        # convert thresholds from eV/Ang to Ry/Bohr
+        self.forc_conv_thr_screening *= Bohr / Ry
+        self.forc_conv_thr *=Bohr / Ry
+        self.etot_conv_thr_screening /= Ry
+
         #read pwi file and build settings_dict
         self.settings_dict = self.build_settings_dict(self.pwi_path)
         self.settings_dict['control'].update({'calculation': 'relax' })
         self.settings_dict['control'].update({'restart_mode': 'from_scratch'})
         self.settings_dict['control'].update({'outdir': 'OUT'})
+        self.settings_dict['control'].update({'forc_conv_thr': self.forc_conv_thr})
         if 'ions' not in self.settings_dict: self.settings_dict['ions'] = {}
 
         #if screening pwi file is provided, build screening settings_dict
@@ -154,7 +165,8 @@ class VaspParams:
     kpoints_path: Optional[str]
     incar_path_screening: Optional[str]
     kpoints_path_screening: Optional[str]
-    ediffg_screening: float = HYBRID_SCREENING_THRESHOLDS['vasp']
+    ediffg: float = RELAX_THRESHOLD
+    ediffg_screening: float = HYBRID_SCREENING_THRESHOLD
     vasp_xc_functional: str = "PBE"
 
     # non-initialized attributes (filled in __post_init__)
@@ -217,10 +229,15 @@ class VaspParams:
                 s = self.settings_dict['incar_string'].split('\n')
 
                 missing_ibrion = True
+                missing_ediffg = True
                 for i, line in enumerate(s):
-                    if 'IBRION' in line: missing_ibrion = False
+                    if 'EDIFFG' in line:
+                        s[i] = f"EDIFFG = {self.ediffg}"
+                        missing_ediffg = False
+                    if 'IBRION' in line:
+                        missing_ibrion = False
+                if missing_ediffg: s.append(f"EDIFFG = {self.ediffg}")
                 if missing_ibrion: s.append('IBRION = 2')
-
                 self.settings_dict['incar_string'] = '\n'.join(s)
 
 
@@ -255,32 +272,48 @@ class MLParams:
     '''
     Dataclass to store machine learning settings.
     '''
-    force_conv_thr: float = 0.01 # force threshold (in eV/A). NOT IMPLEMENTED YET!
+    force_conv_thr: float = RELAX_THRESHOLD # force threshold (in eV/A)
 
 
 @dataclass
-class DFTParams:
+class CalculationsParams:
     '''
     Dataclass to store DFT program settings.
     '''
 
     program: str  # for convenience
+
     vasp: Optional[VaspParams]
     espresso: Optional[EspressoParams]
     ml: Optional[MLParams]
 
+    force_conv_thr_screening: float = HYBRID_SCREENING_THRESHOLD # force threshold (in eV/A)
+    force_conv_thr: float = RELAX_THRESHOLD # force threshold (in eV/A)
+
+    use_ase_optimizer_for_dft: bool = True
+    ase_optimizer: str = "BFGSLineSearch"
+    ase_optimizer_params: Optional[dict] = None  # https://wiki.fysik.dtu.dk/ase/ase/optimize.html
+
 
     def __post_init__(self):
         self.program = self.program.lower()
-        if self.program not in ['espresso', 'vasp', 'ml']:
-            raise ValueError(f'DFT program must be one of ["espresso", "vasp", "ml"].')
+        if self.program not in SUPPORTED_PROGRAMS:
+            raise ValueError(f'DFT program must be one of {SUPPORTED_PROGRAMS}.')
 
         if self.program == 'espresso':
             if self.espresso is None:
                 raise ValueError('espresso settings are missing.')
+            self.espresso.forc_conv_thr_screening = self.force_conv_thr_screening
+            self.espresso.forc_conv_thr = self.force_conv_thr
         if self.program == 'vasp':
             if self.vasp is None:
                 raise ValueError('vasp settings are missing.')
+            self.vasp.ediffg_screening = self.force_conv_thr_screening
+            self.vasp.ediffg = self.force_conv_thr
+        if self.program == 'ml':
+            if self.ml is None:
+                raise ValueError('ml settings are missing.')
+            self.ml.force_conv_thr = self.force_conv_thr
 
 
     def get_settings_dict(self, calc_type: str = 'relax', force_gamma : bool = False) -> dict:

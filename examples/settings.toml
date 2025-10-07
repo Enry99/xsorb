@@ -40,7 +40,7 @@
         target_distance                 = 2.0                   # if adsorption_distance_mode is "value", DESIRED distance (in A) of the selected atom from the surface (z coord. above the topmost layer)
         min_distance                    = 1.5                   # if adsorption_distance_mode is "value", minimum distance (in A) of ANY mol atom from ANY slab atom, must be < target_distance. The molecule is translated upwards if necessary, in order to meet this requirement.
         #radius_scale_factor            = 1.1                   # scaling factor for the covalent radii to determine bonding
-        radius_scale_factor_gen         = 0.9                   # scaling factor for the covalent/van der Waals radii to determine the initial distance when generating the structures when adsoption_distance_mode is "covalent_radius" or "vdw_radius"
+        #radius_scale_factor_gen         = 0.9                   # scaling factor for the covalent/van der Waals radii to determine the initial distance when generating the structures when adsoption_distance_mode is "covalent_radius" or "vdw_radius"
 
     #[Structure.constraints]
         #layers_height                  = 0.5                   # delta_z within which atoms are considered to be part of the same layer (for fixing atoms). This is different from the surface_height flag, used for surface adsorption sites.
@@ -59,26 +59,30 @@
         #translate_slab                 = true                  # translate the slab upwards so that the lowest atom is exactly 1 Angstrom above the cell bottom
 
 
-[Calculation_parameters]
+[Calculations]
     program                             = "vasp"                # vasp, espresso, ml (write ml only if you do not want to run DFT at all
 
+    force_conv_thr                      = 0.02                  # force convergence threshold (eV/A) for the full relaxations and mlopt
+    force_conv_thr_screening            = 0.3                   # force convergence threshold (eV/A) for the screening calculations
 
-    [Calculation_parameters.vasp]
+    use_ase_optimizer_for_dft           = true                  # use ASE optimizers (instead of the built-in optimizers of the DFT code)
+    #ase_optimizer                      = "BFGSLineSearch"
+    #ase_optimizer_params               = {maxstep = 0.2}       # parameters for the ASE optimizer (see https://wiki.fysik.dtu.dk/ase/ase/optimize.html)
+
+
+    [Calculations.vasp]
         vasp_pp_path                    = "path/to/pseudo"      # The pseudopotentials are expected to be in: LDA: VASP_PP_PATH/potpaw/, PBE: VASP_PP_PATH/potpaw_PBE/, PW91: $VASP_PP_PATH/potpaw_GGA/ (see https://wiki.fysik.dtu.dk/ase/ase/calculators/vasp.html)
         #vasp_xc_functional             = "PBE"                 # default: PBE
         #vasp_pseudo_setups             = {"base": "recommended", "6": "C_h", "C": "_s"}  # for the default versions (without subscripts) just remove/comment this line. Options for base are "minimal", "recommended", "materialsproject", "gw" (see ase.calculators.vasp.setups)
         #pymatgen_set                   = "MPRelaxSet"          # Use INCAR/KPOINTS preset from Pymatgen's sets, as defined in pymatgen.io.vasp.sets (options: MPRelaxSet, MPMetalRelaxSet, MPScanRelaxSet, MPHSERelaxSet, MITRelaxSet)
         incar_path                      = "INCAR"               # path of the INCAR file
         kpoints_path                    = "KPOINTS"             # path of the KPOINTS file
-        incar_path_screening            = "INCAR_screening"     # path of the INCAR file for screening calculations (e.g. with lowered cutoff/PREC)
-        kpoints_path_screening          = "KPOINTS_screening"   # path of the KPOINTS file for screening calculations (e.g. less dense k-point mesh)
-        ediffg_screening                = -0.5                  # convergence threshold for forces (eV/A, VASP units)
+        #incar_path_screening           = "INCAR_screening"     # path of the INCAR file for screening calculations (e.g. with lowered cutoff/PREC)
+        #kpoints_path_screening         = "KPOINTS_screening"   # path of the KPOINTS file for screening calculations (e.g. less dense k-point mesh)
 
-    #[Calculation_parameters.espresso]
+    #[Calculations.espresso]
         #pwi_path                       = "template.pwi"        # path of the input file for Quantum Espresso (containing the settings, without the positions)
         #pwi_path_screening             = "template_screening.pwi"  # path of the input file for Quantum Espresso for screening calculations (e.g. with lowered cutoff/k-point mesh)
-        #etot_conv_thr_screening        = 5e-3                  # convergence threshold for energy (Ry, QE units)
-        #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces (Ry/bohr, QE units)
 
 [Database]
     store_full_trajectories            = false                  # store the full trajectories in the database

@@ -19,10 +19,8 @@ from xsorb.io.filenames import (
 SUPPORTED_PROGRAMS = ['vasp', 'espresso', 'ml']
 
 
-HYBRID_SCREENING_THRESHOLDS = {
-    'vasp' : -0.5,              # eV/A, ~ -2e-2 Ry/Bohr
-    'espresso' : (5e-3, 5e-2)   # [Ry, Ry/Bohr]
-}
+HYBRID_SCREENING_THRESHOLD = 0.5  # force threshold (eV/,  ~2e-2 Ry/Bohr)
+RELAX_THRESHOLD = 0.01            # force threshold (eV/A, ~4e-4 Ry/Bohr)
 
 
 # File paths #######################################################

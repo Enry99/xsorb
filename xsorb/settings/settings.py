@@ -23,7 +23,7 @@ except ModuleNotFoundError:
 from dacite import from_dict, Config
 
 from xsorb.settings.input_settings import InputParams, StructureParams, DatabaseParams
-from xsorb.dft_codes.input_settings import DFTParams
+from xsorb.dft_codes.input_settings import CalculationsParams
 from xsorb.dft_codes.definitions import OUT_FILE_PATHS
 from xsorb.ase_custom.io import ase_custom_read as read
 
@@ -43,13 +43,13 @@ class Settings:
     Attributes:
     - input : InputParams dataclass containing the input parameters
     - structure : StructureParams dataclass containing the structure parameters
-    - dft : DFTParams dataclass containing the DFT program settings
+    - dft : CalculationsParams dataclass containing the DFT program settings
     '''
 
     # Attibutes:
     # input: InputParams
     # structure: StructureParams
-    # dft: DFTParams
+    # dft: CalculationsParams
     # database: DatabaseParams
 
     def __init__(self,
@@ -84,8 +84,10 @@ class Settings:
                                    data=settings_dict["Structure"],
                                    config=Config(type_hooks={str: str.lower}, strict=True))
 
-        self.dft = from_dict(data_class=DFTParams,
-                             data=settings_dict["Calculation_parameters"])
+        self.dft = from_dict(data_class=CalculationsParams,
+                             data=settings_dict.get(
+                                 "Calculations",
+                                  settings_dict["Calculation_parameters"]),) #backward compatibility
 
         self.database = from_dict(data_class=DatabaseParams,
                                     data=settings_dict.get("Database", {}),)

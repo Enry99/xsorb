@@ -1,6 +1,6 @@
 '''
 Module containing all the dataclasses included in the input Settings class,
-except for DFTParams, which is defined in a separate module (to keep evrything
+except for CalculationsParams, which is defined in a separate module (to keep evrything
 related to DFT codes in a single module).
 '''
 
