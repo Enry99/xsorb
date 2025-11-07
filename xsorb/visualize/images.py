@@ -299,6 +299,9 @@ def plot_energy_evolution(calc_type : str):
     rows = Database.get_calculations(calc_type=calc_type,
                                      selection='adsorption_energy',
                                      sort_key='calc_id')
+    if not rows:
+        logging.warning(f'No energies to plot for {calc_type}. Quitting.')
+        return
 
     for row in rows:
 

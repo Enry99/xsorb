@@ -111,7 +111,7 @@ def launch_ml_opt(save_image : bool = False,):
     and of the molecular rotations when generating the configurations
     '''
 
-    fresh_start()  # ask the user if they want to start a fresh run
+    #fresh_start()  # ask the user if they want to start a fresh run
 
     settings=Settings(read_energies_ml=True) #need the energies to store them into the db metadata
 

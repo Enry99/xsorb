@@ -27,6 +27,8 @@ from xsorb.adsorptiondata.adsorptionstructure import (AdsorptionSite, Adsorption
     MoleculeRotation, AdsorptionStructure)
 
 TOL = 0.01 #tolerance for checking if an atom is outside the cell (scaled positions)
+DEF_RADIUS_SCALE_FACTOR_GEN_COVALENT = 1.1
+DEF_RADIUS_SCALE_FACTOR_GEN_VDW = 0.9
 
 
 class AdsorptionStructuresGenerator:
@@ -177,9 +179,10 @@ class AdsorptionStructuresGenerator:
         if mode == 'value':
             radii = np.array([min_distance]*len(covalent_radii))/2 #dist. is diameter
         elif mode == 'covalent_radius':
-            radii = covalent_radii*mult
+            radii = covalent_radii * (
+                mult if mult is not None else DEF_RADIUS_SCALE_FACTOR_GEN_COVALENT)
         elif mode == 'vdw_radius':
-            radii = vdw_radii*mult
+            radii = vdw_radii * (mult if mult is not None else DEF_RADIUS_SCALE_FACTOR_GEN_VDW)
         else:
             raise ValueError("mode must be one of 'value', 'covalent_radius', 'vdw_radius'")
 
