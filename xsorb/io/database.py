@@ -318,7 +318,8 @@ class Database:
                          columns : list[str] | str = 'all',
                          sort_key : str | None = None,
                          include_data : bool = True,
-                         update: bool = False) -> list:
+                         update: bool = False,
+                         verbose : bool = True) -> list:
         '''
         Get the rows corresponding to the calculations of a given type,
         with the possibility to sort them by a given key
@@ -335,6 +336,7 @@ class Database:
         - sort_key: string with the key to sort the rows, e.g. 'energy'
         - include_data: bool to include the data dictionary in the rows
         - update: bool to update the database before getting the calculations
+        - verbose: bool to print messages
 
         Returns:
         - list: list of rows
@@ -343,7 +345,8 @@ class Database:
             raise ValueError('Cannot use both selection and calc_ids')
 
         if not Path(CALC_DB_NAMES[calc_type]).exists():
-            logging.warning('Warning: No %s calculations present in the database.', calc_type)
+            if verbose:
+                logging.warning('Warning: No %s calculations present in the database.', calc_type)
             return []
 
         #Make sure that the database is up to date

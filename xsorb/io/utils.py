@@ -52,7 +52,7 @@ def yes_no_question(question : str) -> bool:
             print('Value not recognized. Try again.')
 
 
-def progressbar(it, prefix="", size=50):
+def progressbar(it, prefix="", size=50, transparent=False):
     '''
     Simple progress bar for any iterable, similar to tqdm, but without
     the need of external dependencies.
@@ -67,7 +67,14 @@ def progressbar(it, prefix="", size=50):
         Prefix to be shown in the progress bar.
     size : int
         Size of the progress bar.
+    transparent : bool
+        If True, the progress bar will not print anything.
     '''
+    if transparent:
+        for item in it:
+            yield item
+        return
+
     count = len(it)
     spacing = int(math.log10(count+0.1)) + 1
     start = time.time() # time estimate start

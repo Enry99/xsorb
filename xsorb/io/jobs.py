@@ -181,3 +181,18 @@ def cancel_jobs():
         scheduler.cancel_job(job_id)
 
     logging.info("All jobs cancelled.")
+
+
+def get_running_and_queued_job_ids() -> tuple[list[int], list[int]]:
+    '''
+    Get separate lists of running and queued job IDs for the current user.
+
+    Returns:
+    - running_job_ids: list of running job IDs
+    - queued_job_ids: list of queued job IDs
+    '''
+
+    settings = Settings(verbose=False)
+    scheduler = JobScheduler(settings.input.scheduler)
+
+    return scheduler.get_lists_of_running_and_queued_job_ids()

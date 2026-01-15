@@ -312,6 +312,97 @@ class JobScheduler:
             self.logger.error(f"Failed to get active jobs: {str(e)}")
             raise
 
+    def get_lists_of_running_and_queued_job_ids(self) -> tuple[List[int], List[int]]:
+        """
+        Get separate lists of running and queued job IDs for the current user.
+
+        Returns:
+            Tuple of two lists:
+                - List of running job IDs (integers)
+                - List of queued job IDs (integers)
+        Raises:
+            JobSchedulerError: If command execution fails
+        """
+        if "list_active_jobs" not in self.config:
+            raise JobSchedulerError(f"Active job listing not supported for {self.scheduler_name}")
+
+        cmd = self.config["list_active_jobs"].copy()
+
+        # Replace $USER placeholder with actual username
+        if "$USER" in cmd:
+            username = os.getenv("USER") or os.getenv("USERNAME")
+            if not username:
+                raise JobSchedulerError("Cannot determine current username")
+            cmd = [arg.replace("$USER", username) if arg == "$USER" else arg for arg in cmd]
+
+        try:
+            result = self._run_command(cmd)
+
+            running_jobs = []
+            queued_jobs = []
+
+            lines = result.stdout.strip().split('\n')
+            for line in lines:
+                if not line.strip():
+                    continue
+
+                fields = line.split()
+                if not fields:
+                    continue
+
+                job_id_str = fields[0]
+                try:
+                    if self.scheduler_name in ["pbs", "torque"] and "." in job_id_str:
+                        job_id_str = job_id_str.split(".")[0]
+                    job_id = int(job_id_str)
+
+                    if self.scheduler_name in ["pbs", "torque"]:
+                        if len(fields) >= 6:
+                            status = fields[5]
+                            if status == "R":
+                                running_jobs.append(job_id)
+                            elif status == "Q":
+                                queued_jobs.append(job_id)
+                    elif self.scheduler_name == "lsf":
+                        if len(fields) >= 3:
+                            status = fields[2]
+                            if status == "RUN":
+                                running_jobs.append(job_id)
+                            elif status == "PEND":
+                                queued_jobs.append(job_id)
+                    elif self.scheduler_name == "slurm":
+                        if len(fields) >= 5:
+                            status = fields[4]  # ST column in squeue output
+                            if status in ["R", "CG"]:  # Running or completing
+                                running_jobs.append(job_id)
+                            elif status in ["PD", "CF", "S"]:  # Pending, configuring, suspended
+                                queued_jobs.append(job_id)
+                    elif self.scheduler_name == "sge":
+                        if len(fields) >= 5:
+                            status = fields[4]  # state column in qstat output
+                            if status in ["r", "t", "s"]:  # running, transferring, suspended
+                                running_jobs.append(job_id)
+                            elif status in ["qw", "hqw", "hRwq"]:  # queued waiting, hold queued waiting
+                                queued_jobs.append(job_id)
+                    elif self.scheduler_name in ["htcondor", "condor"]:
+                        if len(fields) >= 6:
+                            status = fields[5]  # ST column in condor_q output
+                            if status in ["R"]:  # Running
+                                running_jobs.append(job_id)
+                            elif status in ["I", "H"]:  # Idle (queued), Hold
+                                queued_jobs.append(job_id)
+
+                except ValueError:
+                    continue
+
+            self.logger.debug(f"Found {len(running_jobs)} running and {len(queued_jobs)} queued jobs for user")
+            return running_jobs, queued_jobs
+
+        except JobSchedulerError as e:
+            self.logger.error(f"Failed to get active jobs: {str(e)}")
+            raise
+
+
     def _extract_active_job_ids(self, output: str) -> List[int]:
         """
         Extract active job IDs from scheduler output (running + queued).
