@@ -33,6 +33,7 @@ def build_xsorb_parser():
         ('relax', 'xsorb.cli.relax'),
         ('mlopt', 'xsorb.cli.mlopt'),
         ('isolated', 'xsorb.cli.isolated'),
+        ('pubchem', 'xsorb.cli.pubchem'),
         ('restart', 'xsorb.cli.restart'),
         ('cancel', 'xsorb.cli.cancel'),
         ('status', 'xsorb.cli.status'),

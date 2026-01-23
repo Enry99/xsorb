@@ -18,6 +18,8 @@ RELAX_OUTDIR                = 'relax_outdirs'
 ML_OPT_OUTDIR               = 'mlopt_outdirs'
 ISOLATED_OUTDIRS            = 'isolated_outdirs'
 
+CONFORMERS_FILENAME         = 'molecule_conformers.xyz'
+
 
 ######## for convenience in check and cleanup ########
 ALL_DB_NAMES = list(CALC_DB_NAMES.values()) + [STRUCTURES_DB_NAME]
