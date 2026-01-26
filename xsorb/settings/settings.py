@@ -172,3 +172,61 @@ class Settings:
         except Exception as e: # pylint: disable=broad-except
             if verbose:
                 logging.error(f"Error reading ML molecule energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
+
+    @staticmethod
+    def _format_dataclass(obj, indent: int = 1) -> str:
+        '''
+        Recursively format a dataclass for pretty printing,
+        skipping None values.
+        '''
+        from dataclasses import fields, is_dataclass
+
+        lines = []
+        prefix = "  " * indent
+
+        if is_dataclass(obj):
+            for field in fields(obj):
+                value = getattr(obj, field.name)
+                if value is None:
+                    continue
+                if is_dataclass(value):
+                    lines.append(f"{prefix}{field.name}:")
+                    lines.append(Settings._format_dataclass(value, indent + 1))
+                else:
+                    lines.append(f"{prefix}{field.name}: {value}")
+        else:
+            lines.append(f"{prefix}{obj}")
+
+        return "\n".join(lines)
+
+    def print_summary(self):
+        '''
+        Print a summary of the settings read from file.
+        '''
+
+        print("===== Settings Summary =====")
+
+        print("\n-- Input Parameters --")
+        print(self._format_dataclass(self.input))
+
+        print("\n-- Structure Parameters --")
+        print(self._format_dataclass(self.structure))
+
+        print("\n-- DFT Parameters --")
+        print(self._format_dataclass(self.dft))
+
+        print("\n-- Database Parameters --")
+        print(self._format_dataclass(self.database))
+
+        print("\n-- Energies --")
+        energies_items = [
+            ("Slab DFT energy", self.energies.E_slab, "eV"),
+            ("Molecule DFT energy", self.energies.E_mol, "eV"),
+            ("Slab ML energy", self.energies.E_slab_ml, "eV"),
+            ("Molecule ML energy", self.energies.E_mol_ml, "eV"),
+        ]
+        for label, value, unit in energies_items:
+            if value is not None and value != 0.0:
+                print(f"{label}: {value} {unit}")
+
+        print("============================")
