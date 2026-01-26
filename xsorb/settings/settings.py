@@ -14,6 +14,8 @@ from pathlib import Path
 import json
 import sys
 import logging
+from glob import glob
+from dataclasses import dataclass
 
 try:
     import tomllib
@@ -26,6 +28,20 @@ from xsorb.settings.input_settings import InputParams, StructureParams, Database
 from xsorb.dft_codes.input_settings import DFTParams
 from xsorb.dft_codes.definitions import OUT_FILE_PATHS
 from xsorb.ase_custom.io import ase_custom_read as read
+
+
+@dataclass
+class Energies:
+    '''
+    Dataclass to store the "final" energies of the slab and molecule
+    after reading settings and calculation files.
+    Values are set to 0 if no actual values are provided.
+    '''
+    E_slab : float = 0.0 # pylint: disable=invalid-name
+    E_mol : float|list[float] = 0.0 # pylint: disable=invalid-name
+    E_slab_ml : float = 0.0 # pylint: disable=invalid-name
+    E_mol_ml : float|list[float] = 0.0 # pylint: disable=invalid-name
+
 
 
 class Settings:
@@ -51,6 +67,7 @@ class Settings:
     # structure: StructureParams
     # dft: DFTParams
     # database: DatabaseParams
+    # energies: Energies
 
     def __init__(self,
                  read_energies_dft: bool = False,
@@ -90,76 +107,68 @@ class Settings:
         self.database = from_dict(data_class=DatabaseParams,
                                     data=settings_dict.get("Database", {}),)
 
+        self.energies = Energies()
+
         ################################
-        #at this point, self.input.E_slab_mol can be None, if not specified in the settings file,
-        #or a list of two floats, if specified. One can be 0, e.g. [13.6, 0.0] if only the
-        #slab energy or molecule energy is known. We need to fill in the missing energies if
-        #available if read_energies is True.
+        #read energies if requested
         if read_energies_dft:
-            self.total_e_slab_mol = self.read_E_slab_mol(verbose)
-        else:
-            self.total_e_slab_mol = None
+            self.read_E_slab_mol(verbose)
         if read_energies_ml:
-            self.total_e_slab_mol_ml = self.read_E_slab_mol_ml(verbose)
-        else:
-            self.total_e_slab_mol_ml = None
+            self.read_E_slab_mol_ml(verbose)
 
 
     def read_E_slab_mol(self, verbose : bool = True): # pylint: disable=invalid-name
         '''
         Attempt to read the energies of the slab and molecule from the slab and molecule files,
-        and store them in E_slab_mol of the input dataclass.
+        and store them in the input dataclass.
         If either file is not found, the corresponding energy will be set to 0.0.
         '''
 
-        if self.input.E_slab_mol is None:
-            self.input.E_slab_mol = [0,0]
-
-        if int(self.input.E_slab_mol[0]) == 0:
+        if self.input.E_slab is None:
             try:
-                self.input.E_slab_mol[0] = \
+                self.energies.E_slab = \
                     read(OUT_FILE_PATHS['slab'][self.dft.program]).get_potential_energy()
             except Exception: # pylint: disable=broad-except
                 try:
-                    self.input.E_slab_mol[0] = read(self.input.slab_filename).get_potential_energy()
+                    self.energies.E_slab = read(self.input.slab_filename).get_potential_energy()
                 except Exception as e: # pylint: disable=broad-except
                     if verbose:
-                        logging.error(f"Error reading slab energy: {e}. Setting to 0")
-        if int(self.input.E_slab_mol[1]) == 0:
+                        logging.error(f"Error reading slab energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
+        if self.input.E_mol is None:
             try:
-                self.input.E_slab_mol[1] = \
-                    read(OUT_FILE_PATHS['mol'][self.dft.program]).get_potential_energy()
-
+                n_conformers = len(glob(OUT_FILE_PATHS['mol'][self.dft.program].format('*')))
+                energies = [read(
+                    OUT_FILE_PATHS['mol'][self.dft.program].format(i)).get_potential_energy()
+                    for i in range(n_conformers)]
+                self.energies.E_mol = energies[0] if len(energies) == 1 else energies
             except Exception: # pylint: disable=broad-except
                 try:
-                    self.input.E_slab_mol[1] = read(self.input.molecule_filename).get_potential_energy()
+                    traj = read(self.input.molecule_filename, index=':')
+                    energies = [at.get_potential_energy() for at in traj]
+                    self.energies.E_mol = energies[0] if len(energies) == 1 else energies
                 except Exception as e: # pylint: disable=broad-except
                     if verbose:
-                        logging.error(f"Error reading molecule energy: {e}. Setting to 0")
-
-        return sum(self.input.E_slab_mol)
+                        logging.error(f"Error reading molecule energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
 
 
     def read_E_slab_mol_ml(self, verbose : bool = True): # pylint: disable=invalid-name
         '''
         Attempt to read the energies of the slab and molecule from the slab and molecule files,
-        and store them in E_slab_mol of the input dataclass.
+        and store them in the input dataclass.
         If either file is not found, the corresponding energy will be set to 0.0.
         '''
 
         try:
-            eslab_ml = \
-                read(OUT_FILE_PATHS['slab']['ml']).get_potential_energy()
+            self.energies.E_slab_ml = read(OUT_FILE_PATHS['slab']['ml']).get_potential_energy()
         except Exception as e: # pylint: disable=broad-except
-            eslab_ml = 0.0
             if verbose:
-                logging.error(f"Error reading ML slab energy: {e}. Setting to 0")
+                logging.error(f"Error reading ML slab energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
         try:
-            emol_ml = \
-                read(OUT_FILE_PATHS['mol']['ml']).get_potential_energy()
+            n_conformers = len(glob(OUT_FILE_PATHS['mol']['ml'].format('*')))
+            #read preserving order
+            energies = [read(OUT_FILE_PATHS['mol']['ml'].format(i)).get_potential_energy()
+                            for i in range(n_conformers)]
+            self.energies.E_mol_ml = energies[0] if len(energies) == 1 else energies
         except Exception as e: # pylint: disable=broad-except
-            emol_ml = 0.0
             if verbose:
-                logging.error(f"Error reading ML molecule energy: {e}. Setting to 0")
-
-        return eslab_ml + emol_ml
+                logging.error(f"Error reading ML molecule energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation

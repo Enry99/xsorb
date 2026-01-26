@@ -52,16 +52,21 @@ Examples:
                         type=_positive_int,
                         help='''Exclude the configurations with the given IDs
                         from the final relaxation''')
+        parser.add_argument('--by-conformer',
+                        action='store_true',
+                        default=False,
+                        help='''Select the configurations for the final relaxation
+                        on a per-conformer basis''')
+        parser.add_argument('--by-mol-idx',
+                        action='store_true',
+                        default=False,
+                        help='''Select the configurations for the final relaxation
+                        on a per-molecule reference atom basis''')
         parser.add_argument('--by-site',
                         action='store_true',
                         default=False,
                         help='''Select the configurations for the final relaxation
                         on a per-site basis''')
-        parser.add_argument('--by-mol-idx',
-                        action='store_true',
-                        default=False,
-                        help='''Select the configurations for the final relaxation
-                        on a per-molecule referenc atom basis''')
         parser.add_argument('--chem-phys',
                         action='store_true',
                         default=False,
@@ -90,6 +95,7 @@ Examples:
                            relax_from_initial=args.regenerate,
                            by_site=args.by_site,
                            by_mol_idx=args.by_mol_idx,
+                           by_conformer=args.by_conformer,
                            separate_chem_phys=args.chem_phys,
                            )
 

@@ -50,9 +50,9 @@ IN_FILE_PATHS = {
     },
 
     'mol': {
-        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/POSCAR',
-        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/mol.pwi',
-        'ml': ISOLATED_OUTDIRS+'/ML/mol/mol.xyz'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/{0}/POSCAR',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.pwi',
+        'ml': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.xyz'
     },
 
 }
@@ -79,9 +79,9 @@ OUT_FILE_PATHS = {
     },
 
     'mol': {
-        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/vasprun.xml',
-        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/mol.pwo',
-        'ml': ISOLATED_OUTDIRS+'/ML/mol/mol.traj'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/{0}/vasprun.xml',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.pwo',
+        'ml': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.traj'
     }
 }
 
@@ -97,7 +97,7 @@ LOG_FILE_PATHS = {
     },
 
     'mlopt': {
-        'ml' : ML_OPT_OUTDIR+'/{0}/mlopt_{0}.log'
+        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.log'
     },
 
     'slab': {
@@ -107,9 +107,9 @@ LOG_FILE_PATHS = {
     },
 
     'mol': {
-        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/vasprun.xml',
-        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/mol.pwo',
-        'ml': ISOLATED_OUTDIRS+'/ML/mol/mol.log'
+        'vasp': ISOLATED_OUTDIRS+'/DFT/mol/{0}/vasprun.xml',
+        'espresso': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.pwo',
+        'ml': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.log'
     }
 }
 

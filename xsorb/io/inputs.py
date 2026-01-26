@@ -120,13 +120,11 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
     #if we are not in generation mode, update the databases.
     if calc_type is not None:
-        total_e_slab_mol=settings.total_e_slab_mol if program != 'ml' \
-            else settings.total_e_slab_mol_ml
         xsorb.io.database.Database.add_calculations(systems=written_systems,
                                   program=program,
                                   mult=settings.structure.molecule.radius_scale_factor,
                                   store_full_trajectories=settings.database.store_full_trajectories,
-                                  total_e_slab_mol=total_e_slab_mol,
+                                  energies=settings.energies,
                                   calc_type=calc_type)
 
     if verbose: logging.info('All input files written.') #pylint: disable=multiple-statements
@@ -135,7 +133,7 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
 
 
 def write_slab_mol_inputs(*,slab : Atoms | None,
-                          molecule : Atoms | None,
+                          molecules : list[Atoms] | None,
                           settings : Settings,
                           ml : bool,
                           force_gamma : bool = False,
@@ -160,29 +158,32 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
 
     structures : list[Atoms] = []
     names: list[str] = []
+    ids: list[int] = []
     if slab is not None:
         structures.append(slab)
         names.append('slab')
+        ids.append(0)
 
-    if molecule is not None:
-        structures.append(molecule)
-        names.append('mol')
-
+    if molecules is not None:
+        for j, molecule in enumerate(molecules):
+            structures.append(molecule)
+            names.append('mol')
+            ids.append(j) #conformer id
 
     if verbose: logging.info('Writing input files...') #pylint: disable=multiple-statements
 
     written_systems_calcinfos : list[CalculationInfo] = []
     ovewrite_answer = 'y'
-    for atoms, name in zip(structures, names):
+    for atoms, name, ids_i in zip(structures, names, ids):
 
         #possibly apply constraints to slab in case of mlopt
         if ml and name == 'slab' and settings.structure.constraints.fix_slab_ml_opt:
             set_fixed_slab_constraints(atoms)
 
         file_label = name
-        in_file_path = IN_FILE_PATHS[name][program]
-        out_file_path = OUT_FILE_PATHS[name][program]
-        log_file_path = LOG_FILE_PATHS[name][program]
+        in_file_path = IN_FILE_PATHS[name][program].format(ids_i)
+        out_file_path = OUT_FILE_PATHS[name][program].format(ids_i)
+        log_file_path = LOG_FILE_PATHS[name][program].format(ids_i)
         file_dir = Path(in_file_path).parent.as_posix()
 
         # overwrite check block ##############

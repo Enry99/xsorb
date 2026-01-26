@@ -26,6 +26,7 @@ from xsorb.io.cleanup import fresh_start
 from xsorb.io.database import Database
 from xsorb.io.utils import yes_no_question
 from xsorb.calculations.selection import obtain_calc_indices, get_adsorption_structures
+from xsorb.ase_custom.atoms import AtomsCustom
 
 
 def generate(save_image : bool = False):
@@ -44,9 +45,8 @@ def generate(save_image : bool = False):
     settings=Settings()
 
     slab = read(settings.input.slab_filename)
-    mol = read(settings.input.molecule_filename)
-
-    gen = AdsorptionStructuresGenerator(slab, mol, settings, verbose=True)
+    mols = read(settings.input.molecule_filename, index = ':')
+    gen = AdsorptionStructuresGenerator(slab, mols, settings, verbose=True)
     adsorption_structures = gen.generate_adsorption_structures(save_image=save_image)
 
     write_inputs(adsorption_structures=adsorption_structures, settings=settings)
@@ -83,8 +83,8 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
     else:
         calc_ids = None # generate the ids when inserting the structures into the database
         slab = read(settings.input.slab_filename)
-        mol = read(settings.input.molecule_filename)
-        gen = AdsorptionStructuresGenerator(slab, mol, settings, verbose=True)
+        mols = read(settings.input.molecule_filename, index = ':')
+        gen = AdsorptionStructuresGenerator(slab, mols, settings, verbose=True)
         adsorption_structures = gen.generate_adsorption_structures(save_image=save_image)
 
 
@@ -116,9 +116,9 @@ def launch_ml_opt(save_image : bool = False,):
     settings=Settings(read_energies_ml=True) #need the energies to store them into the db metadata
 
     slab = read(settings.input.slab_filename)
-    mol = read(settings.input.molecule_filename)
+    mols = read(settings.input.molecule_filename, index = ':')
 
-    gen = AdsorptionStructuresGenerator(slab, mol, settings, verbose=True)
+    gen = AdsorptionStructuresGenerator(slab, mols, settings, verbose=True)
     adsorption_structures = gen.generate_adsorption_structures(save_image=save_image)
 
     written_systems = write_inputs(adsorption_structures=adsorption_structures,
@@ -147,6 +147,7 @@ def launch_final_relax(*,
                        relax_from_initial : bool = False,
                        by_site : bool = False,
                        by_mol_idx : bool = False,
+                       by_conformer : bool = False,
                        separate_chem_phys : bool = False):
     '''
     Reads/generates adsorption configurations, writes inputs and launches the
@@ -163,7 +164,8 @@ def launch_final_relax(*,
     - relax_from_initial: use the initial configuration as starting point for the relaxation
     - by_site: do the configuration identification separately for each site.
         One or more configuration for each site will be produced
-    - by_mol_atom: do the configuration identification separately for each molecule ref. atom.
+    - by_mol_idx: do the configuration identification separately for each molecule ref. atom.
+    - by_conformer: do the configuration identification separately for each conformer.
     - separate_chem_phys: do the configuration identification separately
         for physisorption and chemisorption
     '''
@@ -199,7 +201,8 @@ def launch_final_relax(*,
                                        threshold=threshold,
                                        excluded_calc_ids=excluded_calc_ids,
                                        by_site=by_site,
-                                       by_mol_atom=by_mol_idx,
+                                       by_mol_idx=by_mol_idx,
+                                       by_conformer=by_conformer,
                                        separate_chem_phys=separate_chem_phys)
     else:
         #use the user-specified indices, exclude unwanted calculations
@@ -247,18 +250,21 @@ def launch_isolated_slab_and_molecule(*,
     settings = Settings()
 
     slab = read(settings.input.slab_filename)
-    mol = read(settings.input.molecule_filename)
+    mols : list[AtomsCustom] = read(settings.input.molecule_filename, index = ':')
 
     if slab.cell is None:
         raise RuntimeError('The slab cell is not defined.')
 
     if samecell:
-        mol.cell = slab.cell
-    elif not mol.cell:
-        mol.center(vacuum=5.0)
+        for i, mol in enumerate(mols):
+            mols[i].set_cell(slab.cell)
+    elif not mols[0].cell:
+        for i, mol in enumerate(mols):
+            mols[i].center(vacuum=5.0)
 
     slab.pbc = True
-    mol.pbc = True
+    for i, mol in enumerate(mols):
+        mols[i].pbc = True
 
     if use_constraints:
         from xsorb.structures.slab import Slab
@@ -272,17 +278,18 @@ def launch_isolated_slab_and_molecule(*,
                     fix_slab_xyz=settings.structure.constraints.fix_slab_xyz
                     ).slab_ase
 
-        mol = Molecule(mol=mol,
-                    atom_indexes=settings.structure.molecule.selected_atom_indexes,
-                    molecule_axis_mode=settings.structure.molecule.molecule_axis.mode,
-                    molecule_axis_values=settings.structure.molecule.molecule_axis.values,
-                    fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
-                    fix_mol_xyz=settings.structure.constraints.fix_mol_xyz
-                    ).mol_ase
+        for i, mol in enumerate(mols):
+            mols[i] = Molecule(mol=mol,
+                        atom_indexes=settings.structure.molecule.selected_atom_indexes,
+                        molecule_axis_mode=settings.structure.molecule.molecule_axis.mode,
+                        molecule_axis_values=settings.structure.molecule.molecule_axis.values,
+                        fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
+                        fix_mol_xyz=settings.structure.constraints.fix_mol_xyz
+                        ).mol_ase
 
 
     written_systems = write_slab_mol_inputs(slab=slab if launch_slab else None,
-                                            molecule=mol if launch_mol else None,
+                                            molecules=mols if launch_mol else None,
                                             settings=settings,
                                             ml=ml,
                                             force_gamma=not samecell)

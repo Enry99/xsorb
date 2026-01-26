@@ -15,6 +15,7 @@ from xsorb.structures.utils import slab_mol_bonds
 from xsorb.ase_custom.io import ase_custom_read as read
 from xsorb.dft_codes.definitions import (
     SCF_NONCONVERGED_STRINGS, SCF_CONVERGED_STRINGS, OPTIMIZATION_COMPLETED_STRINGS)
+from xsorb.settings.settings import Energies
 from xsorb.adsorptiondata import AdsorptionCalculation
 from xsorb.adsorptiondata.adsorptioncalculation import CalculationResults
 from xsorb.io.utils import progressbar
@@ -120,7 +121,7 @@ def get_bond_status(atoms, mol_indices : list, mult : float):
 
 def update_calculations_results(*,systems: list[AdsorptionCalculation],
                              program : str,
-                             total_e_slab_mol : float,
+                             energies : Energies,
                              mult : float,
                              store_full_trajectories : bool = True,
                              verbose : bool =True):
@@ -130,7 +131,7 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
     Args:
     - systems: list of AdsorptionCalculation objects
     - program: 'espresso','vasp','ml'
-    - total_e_slab_mol: total energy of the slab and molecule
+    - energies: Energies dataclass with slab and molecule energies
     - mult: multiplicative factor for the covalent radii to determine bonding.
     - store_full_trajectories: if True, saves the full trajectory in the CalculationResults
     - verbose: if True, prints warnings if files are missing
@@ -157,6 +158,13 @@ def update_calculations_results(*,systems: list[AdsorptionCalculation],
         try:
             # read results from file
             atoms = traj[-1]
+
+            e_slab = energies.E_slab_ml if program == 'ml' else energies.E_slab
+            e_mol = energies.E_mol_ml if program == 'ml' else energies.E_mol
+            if isinstance(e_mol, list):
+                e_mol = e_mol[system.adsorption_structure.mol_rot.conform_id]
+            total_e_slab_mol = e_slab + e_mol
+
             adsorption_energy = atoms.get_potential_energy() - total_e_slab_mol
 
             adsorption_energy_evol = \

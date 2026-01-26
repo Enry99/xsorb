@@ -51,7 +51,8 @@ def obtain_calc_indices(*,
                         threshold : float | None = None,
                         excluded_calc_ids : list | None = None,
                         by_site : bool = False,
-                        by_mol_atom : bool = False,
+                        by_mol_idx : bool = False,
+                        by_conformer : bool = False,
                         separate_chem_phys : bool = False,
                         verbose : bool = True) -> list[int]:
     '''
@@ -66,7 +67,8 @@ def obtain_calc_indices(*,
         The configuration with E - Emin < threshold will be selected
     - excluded_calc_ids: indices of the configurations to be excluded
     - by_site: do the configuration identification separately for each site.
-    - by_mol_atom: do the configuration identification separately for each ref. atom of the molecule
+    - by_mol_idx: do the configuration identification separately for each ref. atom of the molecule
+    - by_conformer: do the configuration identification separately for each conformer
     - separate_chem_phys: do the configuration identification separately
         for physisorption and chemisorption
     - verbose: print messages
@@ -132,6 +134,20 @@ def obtain_calc_indices(*,
             return [rows_list]
 
 
+    def _conformers_subsets(rows_list: list, choose_by_subsets: bool) -> list:
+        '''
+        Returns either [rows_conformer1, rows_conformer2, ...]
+        or [all_rows] depending on the choose_by_subsets flag.
+        '''
+        if choose_by_subsets:
+            local_rows = []
+            for conformer in set(row.get('conform_id') for row in rows_list):
+                local_rows.append([row for row in rows_list if row.get('conform_id') == conformer])
+            return local_rows
+        else:
+            return [rows_list]
+
+
     def _site_subsets(rows_list: list, choose_by_subsets: bool) -> list:
         '''
         Returns either [rows_site1, rows_site2, ...]
@@ -148,15 +164,16 @@ def obtain_calc_indices(*,
 
     # loop over the subsets, adding the ids as a flat list
     selected_calc_ids = []
-    for subset1 in _mol_atoms_subsets(rows, by_mol_atom):
-        for subset2 in _site_subsets(subset1, by_site):
-            for subset3 in _chemphys_subsets(subset2, separate_chem_phys):
+    for subset1 in _conformers_subsets(rows, by_conformer):
+        for subset2 in _mol_atoms_subsets(subset1, by_mol_idx):
+            for subset3 in _site_subsets(subset2, by_site):
+                for subset4 in _chemphys_subsets(subset3, separate_chem_phys):
 
-                calc_ids = _select_calculations(rows=subset3,
-                                                n_configs=n_configs,
-                                                threshold=threshold)
+                    calc_ids = _select_calculations(rows=subset4,
+                                                    n_configs=n_configs,
+                                                    threshold=threshold)
 
-                selected_calc_ids.extend(calc_ids)
+                    selected_calc_ids.extend(calc_ids)
 
     # DEBUG: check that no duplicates are present
     if len(selected_calc_ids) != len(set(selected_calc_ids)):

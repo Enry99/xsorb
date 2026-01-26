@@ -57,12 +57,12 @@ class AdsorptionStructuresGenerator:
         the combinations of molecular rotations and adsorption sites
     '''
 
-    def __init__(self, slab: AtomsCustom, mol: AtomsCustom,
+    def __init__(self, slab: AtomsCustom, mol: AtomsCustom | list[AtomsCustom],
                  settings: Settings, verbose : bool = False) -> None:
 
 
         self.settings = settings
-        self.molecule_rotations = None
+        self.molecule_rotations : dict[int, list[MoleculeRotation]] = {}
 
         #Slab import from file
         if verbose:
@@ -84,12 +84,20 @@ class AdsorptionStructuresGenerator:
         if verbose:
             logging.info('Loading molecule...')
 
-        self.mol = Molecule(mol=mol,
-                    atom_indexes=settings.structure.molecule.selected_atom_indexes,
-                    molecule_axis_mode=settings.structure.molecule.molecule_axis.mode,
-                    molecule_axis_values=settings.structure.molecule.molecule_axis.values,
-                    fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
-                    fix_mol_xyz=settings.structure.constraints.fix_mol_xyz)
+        if not isinstance(mol, list):
+            mol = [mol]
+        self.mols = {
+            conf_id: Molecule(
+                mol=mol_i,
+                atom_indexes=settings.structure.molecule.selected_atom_indexes,
+                molecule_axis_mode=settings.structure.molecule.molecule_axis.mode,
+                molecule_axis_values=settings.structure.molecule.molecule_axis.values,
+                conform_id=conf_id,
+                fixed_indices_mol=settings.structure.constraints.fixed_indices_mol,
+                fix_mol_xyz=settings.structure.constraints.fix_mol_xyz)
+            for conf_id, mol_i in enumerate(mol)
+        }
+
         if verbose:
             logging.info('Molecule loaded.')
 
@@ -98,27 +106,28 @@ class AdsorptionStructuresGenerator:
     def _generate_molecule_rotations(self,
                                      rot_mode : str = 'standard',
                                      which_index : int = 0,
+                                     conform_id : int = 0,
                                      adsite : AdsorptionSiteAmorphous | None = None,
-                                     save_image : bool = False,
-                                     verbose : bool = True):
+                                     save_image : bool = False):
         '''
         Generate the molecule rotations, depending on the mode.
 
         Args:
         - rot_mode: 'standard' for the standard mode, 'surrounding' for the surrounding mode
         - which_index: index of the atom to be used as reference in the list of indexes
+        - conform_id: id of the molecule conformer
         - adsite: for the surrounding mode, AdsorptionSiteAmorphous object that contains info to
             rotate the molecule towards the surrounding sites
         - save_image: save an image of the molecule rotations
-        - verbose: print additional information during the generation
         '''
 
         structure_settings = self.settings.structure
 
         if rot_mode == 'standard':
-            if self.molecule_rotations is not None and \
-                self.molecule_rotations[-1].mol_atom == which_index:
-                return self.molecule_rotations
+            if conform_id in self.molecule_rotations and \
+                self.molecule_rotations[conform_id][-1].mol_atom == which_index:
+                # avoid recalculating when calling function multiple times for all adsorption sites
+                return self.molecule_rotations[conform_id]
 
             assert isinstance(structure_settings.molecule.z_rot_angles, list), \
                 "z_rot_angles must be a list for standard mode"
@@ -138,11 +147,11 @@ class AdsorptionStructuresGenerator:
                 raise ValueError("adsite must be provided for surrounding mode")
 
             z_rot_angles = adsite.surrounding_sites
-            verbose = False
+            #verbose = False
         else:
             raise ValueError("rot_mode must be either 'standard' or 'surrounding'")
 
-        molecule_rotations = self.mol.generate_molecule_rotations(
+        molecule_rotations = self.mols[conform_id].generate_molecule_rotations(
             which_index=which_index,
             x_rot_angles=structure_settings.molecule.x_rot_angles,
             y_rot_angles=structure_settings.molecule.y_rot_angles,
@@ -153,8 +162,8 @@ class AdsorptionStructuresGenerator:
             verbose=False)
 
         if rot_mode == 'standard':
-            #in case of standard, store the rotations to avoid calling the function multiple times
-            self.molecule_rotations = molecule_rotations
+            #in case of standard, store the rotations to avoid recomputing them
+            self.molecule_rotations[conform_id] = molecule_rotations
 
         return molecule_rotations
 
@@ -370,25 +379,27 @@ class AdsorptionStructuresGenerator:
             rot_mode = 'standard'
 
         adsorption_structures : list[AdsorptionStructure] = []
-        for mol_ref_index in self.mol.reference_atom_indices:
-            logging.info(f"Molecule atom {mol_ref_index}:")
-            for adsite in progressbar(adsites, "Generating structures for each site:"):
-                molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
-                                                                    which_index=mol_ref_index,
-                                                                    adsite=adsite,
-                                                                    save_image=save_image,
-                                                                    verbose=verbose)
-                for mol_rot in molecule_rotations:
-                    structure = self._put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
-                    adsorption_structures.append(structure)
+        for conform_id, mol in self.mols.items():
+            for mol_ref_index in mol.reference_atom_indices:
+                #logging.info(f"Conformer {conform_id}, atom {mol_ref_index}:") #pylint: disable=logging-fstring-interpolation
+                for adsite in progressbar(adsites,
+                    f"Generating structures for conformer {conform_id}, atom {mol_ref_index}:"):
+                    molecule_rotations = self._generate_molecule_rotations(rot_mode=rot_mode,
+                                                                        which_index=mol_ref_index,
+                                                                        conform_id=conform_id,
+                                                                        adsite=adsite,
+                                                                        save_image=save_image)
+                    for mol_rot in molecule_rotations:
+                        structure = self._put_together_slab_and_mol(adsite=adsite,mol_rot=mol_rot)
+                        adsorption_structures.append(structure)
 
 
-                #handle the case of vertical molecule on surrounding sites
-                if sites_settings.coord_number_params is not None and \
-                        sites_settings.coord_number_params.include_surrounding_sites and \
-                        rot_mode == 'standard' and isinstance(adsite, AdsorptionSiteAmorphous):
-                    adsorption_structures.extend(
-                        self._get_structures_for_vertical_surrounding_sites(adsite))
+                    #handle the case of vertical molecule on surrounding sites
+                    if sites_settings.coord_number_params is not None and \
+                            sites_settings.coord_number_params.include_surrounding_sites and \
+                            rot_mode == 'standard' and isinstance(adsite, AdsorptionSiteAmorphous):
+                        adsorption_structures.extend(
+                            self._get_structures_for_vertical_surrounding_sites(adsite))
 
 
         #Exclude configs outside cell if requested
@@ -401,20 +412,19 @@ class AdsorptionStructuresGenerator:
             adsorption_structures = filtered_adsorption_structures
 
 
-        # check for duplicates
-        unique_structures : list[AdsorptionStructure] = []
-        for ads_struct in adsorption_structures:
-            for us in unique_structures:
-                if ads_struct.atoms == us.atoms:
-                    raise RuntimeError(
-                'Duplicate structure found in the generated structures! '
-                f'The structure with site {ads_struct.adsite} ({type(ads_struct.adsite)}), '
-                f'rotations={ads_struct.mol_rot.xrot},{ads_struct.mol_rot.yrot},{ads_struct.mol_rot.zrot} '
-                f'is identical to the one with site {us.adsite} ({type(us.adsite)}), '
-                f'rotations={us.mol_rot.xrot},{us.mol_rot.yrot},{us.mol_rot.zrot}.')
-            unique_structures.append(ads_struct)
+        # unique_structures : list[AdsorptionStructure] = []
+        # for ads_struct in adsorption_structures:
+        #     for us in unique_structures:
+        #         if ads_struct.atoms == us.atoms:
+        #             raise RuntimeError(
+        #         'Duplicate structure found in the generated structures! '
+        #         f'The structure with site {ads_struct.adsite} ({type(ads_struct.adsite)}), '
+        #         f'rotations={ads_struct.mol_rot.xrot},{ads_struct.mol_rot.yrot},{ads_struct.mol_rot.zrot} '
+        #         f'is identical to the one with site {us.adsite} ({type(us.adsite)}), '
+        #         f'rotations={us.mol_rot.xrot},{us.mol_rot.yrot},{us.mol_rot.zrot}.')
+        #     unique_structures.append(ads_struct)
 
         if verbose:
-            logging.info('Adsorption structures generated.')
+            logging.info(f'Generated {len(adsorption_structures)} adsorption structures.') #pylint: disable=logging-fstring-interpolation
 
         return adsorption_structures

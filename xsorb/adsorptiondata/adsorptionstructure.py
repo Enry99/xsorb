@@ -50,6 +50,7 @@ class MoleculeRotation:
     yrot: str
     zrot: str
     mol_atom: int
+    conform_id: int = 0
 
     __xsorb_objtype__ : str = "MoleculeRotation"
 
@@ -73,7 +74,8 @@ class MoleculeRotation:
             'xrot': xrot,
             'yrot': yrot,
             'zrot': zrot,
-            'mol_atom': self.mol_atom
+            'mol_atom': self.mol_atom,
+            'conform_id': self.conform_id
         }
 
     @property
@@ -316,7 +318,7 @@ class AdsorptionStructure(JsonableBase):
         '''
         Returns the names of the columns of the AdsorptionStructure object
         '''
-        return ("site", "site_info", "xrot", "yrot", "zrot", "mol_atom", "initial_dz")
+        return ("site", "site_info", "xrot", "yrot", "zrot", "mol_atom", "conform_id", "initial_dz")
 
 
     def todict(self):

@@ -22,7 +22,7 @@ The calculation databases have the following columns:
 
 --- Extra columns, defined in xsorb.adsorptiondata.AdsorptionCalculation.db_keys() ---
 AdsorptionStructure data:
-- "site", "site_info", "xrot", "yrot", "zrot", "mol_atom", "coords", "initial_dz"
+- "site", "site_info", "xrot", "yrot", "zrot", "mol_atom", "conform_id", "coords", "initial_dz"
 
 CalculationInfo data:
 - calc_id (str): unique id of the calculation (consistent with numeration in structures.json)
@@ -50,7 +50,9 @@ Each calculation database also has the following metadata:
 - program (str): name of the program used for the calculations
 - mult (float): multiplicative factor for the covalent radii to determine bonding
     The mult factor is updated from settings only when refreshing the database
-- total_e_slab_mol (float): total energy of the isolated molecule and slab if available
+- e_slab (float): total energy of the isolated slab
+- e_mol (float or list of float): total energy of the isolated molecule
+    (if multiple conformers are used, this is a list)
 - adsorption_sites (list): list of AdsorptionSiteCrystal or AdsorptionSiteAmorphous objects
 
 '''
@@ -69,6 +71,7 @@ from xsorb.adsorptiondata.adsorptionstructure import (
     AdsorptionSiteCrystal, AdsorptionSiteAmorphous, SurroundingSite)
 from xsorb.adsorptiondata import AdsorptionCalculation
 from xsorb.adsorptiondata import AdsorptionStructure
+from xsorb.settings.settings import Energies
 
 
 class Database:
@@ -100,7 +103,7 @@ class Database:
         with ase.db.connect(STRUCTURES_DB_NAME) as db:
             try:
                 metadata = db.metadata.copy() # workaround for ase.db bug
-            except:
+            except: #pylint: disable=bare-except
                 metadata = {}
             adsorption_sites = Database.get_adsorption_sites() # get existing sites
             for ads_struct in adsorption_structures:
@@ -139,7 +142,7 @@ class Database:
                          program : str,
                          mult : float,
                          store_full_trajectories : bool,
-                         total_e_slab_mol : float | None,
+                         energies : Energies,
                          calc_type : str) -> None:
         '''
         Write new calculations to corresponding database
@@ -151,7 +154,7 @@ class Database:
             'vasp', 'espresso', 'ml'
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding
-        - total_e_slab_mol: float with the total energy of the isolated molecule and slab
+        - energies: Energies object with slab and mol energies
         - calc_type: screening, relax or mlopt
         '''
 
@@ -175,14 +178,70 @@ class Database:
             db.metadata = {'program': program,
                            'mult': mult,
                            'store_full_trajectories': store_full_trajectories,
-                           'total_e_slab_mol': total_e_slab_mol}
+                           'e_slab': energies.E_slab_ml if program == 'ml' else energies.E_slab,
+                           'e_mol': energies.E_mol_ml if program == 'ml' else energies.E_mol}
+
+
+    @staticmethod
+    def get_updated_energies(metadata : dict,
+                             energies : Energies,
+                             program : str,
+                             calc_type : str) -> Energies:
+        '''
+        Get the slab and molecule energies, either from the provided Energies object,
+        or from the database metadata if not provided.
+
+        Parameters
+        ----------
+        - metadata: dict with the database metadata
+        - energies: Energies object with slab and mol energies, or None
+        - program: string with the name of the program used for the calculations:
+            'vasp', 'espresso', 'ml'
+        - calc_type: string with the type of calculation: 'screening', 'relax', 'mlopt'
+
+        Returns
+        ----------
+        - Energies object with the slab and mol energies
+        '''
+
+        # hack workaround for backward compatibility
+        if 'total_e_slab_mol' in metadata:
+            if program == 'ml':
+                return Energies(E_slab_ml=metadata['total_e_slab_mol'], E_mol_ml=0.0)
+            else:
+                return Energies(E_slab=metadata['total_e_slab_mol'], E_mol=0.0)
+
+        if energies is not None:
+            # store the energies in the metadata and return the original object
+            if program == 'ml':
+                metadata['e_slab'] = energies.E_slab_ml
+                metadata['e_mol'] = energies.E_mol_ml
+            else:
+                metadata['e_slab'] = energies.E_slab
+                metadata['e_mol'] = energies.E_mol
+            return energies
+        else:
+            # read the energies from the metadata, setting to 0 if were not set before or present from the beginning
+            if not metadata.get('e_slab') or not metadata.get('e_mol'):
+                logging.warning(f'No slab/molecule energy available in {calc_type} database. ' #pylint: disable=logging-fstring-interpolation
+                                'If you calculated slab and mol energies, try to '
+                                'refresh the database with "xsorb update -refresh". '
+                                'Total energies will be used instead of adsorption energies.')
+                metadata['e_slab'] = 0.0
+                metadata['e_mol'] = 0.0
+
+            e_slab = metadata['e_slab']
+            e_mol = metadata['e_mol']
+            if program == 'ml':
+                return Energies(E_slab_ml=e_slab, E_mol_ml=e_mol)
+            else:
+                return Energies(E_slab=e_slab, E_mol=e_mol)
 
 
     @staticmethod
     def update_calc_db(calc_type : str,
                             refresh : bool = False,
-                            total_e_slab_mol_dft : float | None = None,
-                            total_e_slab_mol_ml : float | None = None,
+                            energies : Energies | None = None,
                             mult : float | None = None,
                             store_full_trajectories : bool | None = None,
                             write_csv : bool = True,
@@ -195,8 +254,7 @@ class Database:
         Args:
         - calc_type: string with the type of calculation: 'screening'/'relax'/'mlopt', or 'all'
         - refresh: bool to force the update of the database
-        - total_e_slab_mol_dft: float with the dft total energy of the isolated molecule and slab.
-        - total_e_slab_mol_ml: float with total energy of the isolated molecule and slab (for ML)
+        - energies: Energies object with slab and mol energies
         - mult: float with the multiplicative factor for the covalent radii to
             determine bonding. Needs to be passed when refreshing the database
             if the value was changed from the settings
@@ -229,29 +287,26 @@ class Database:
             except KeyError as exc:
                 raise RuntimeError(f'No program metadata found in {calc_type} database') from exc
 
-            # update the metadata with respective values if provided
+
+            ### update the metadata with respective values if provided,
+            # otherwise read values from metadata
             if mult is not None:
                 metadata['mult'] = mult
+            else:
+                mult = metadata['mult']
 
             if store_full_trajectories is not None:
                 metadata['store_full_trajectories'] = store_full_trajectories
-            if calc_type == 'mlopt' and total_e_slab_mol_ml is not None:
-                metadata['total_e_slab_mol'] = total_e_slab_mol_ml
-            elif calc_type in ['screening', 'relax'] and total_e_slab_mol_dft is not None:
-                metadata['total_e_slab_mol'] = total_e_slab_mol_dft
-            # end of updating metadata ###
+            else:
+                store_full_trajectories = metadata['store_full_trajectories']
 
-            if not metadata.get('total_e_slab_mol'):
-                logging.warning('No total_e_slab_mol available in %s database. '
-                                'If you calculated slab and mol energies, try to '
-                                'refresh the database with "xsorb update -refresh". '
-                                'Total energies will be used instead of adsorption energies.', calc_type)
-                metadata['total_e_slab_mol'] = 0
-
-            mult = metadata['mult']
-            store_full_trajectories = metadata['store_full_trajectories']
-            total_e_slab_mol = metadata['total_e_slab_mol']
-            ### end of reading metadata ###
+            #Get the updated slab and mol energies
+            updated_energies = Database.get_updated_energies(
+                metadata=metadata,
+                energies=energies,
+                program=program,
+                calc_type=calc_type)
+            ###############################################
 
 
             ### read results and update the calculations ###
@@ -263,7 +318,7 @@ class Database:
                     systems=systems,
                     program=program,
                     mult=mult,
-                    total_e_slab_mol=total_e_slab_mol,
+                    energies=updated_energies,
                     store_full_trajectories=store_full_trajectories,
                     verbose=verbose)
             ################################################
@@ -609,19 +664,17 @@ def manual_update_calculations(calc_type : str,
     '''
 
     if refresh:
-        logging.info('Re-reading the output files, updating e_slab_mol, '
+        logging.info('Re-reading the output files, updating slab and mol energies, '
                 'the radii mult factor, and recalculating the bonding status...')
         from xsorb.settings import Settings # pylint: disable=import-outside-toplevel
-        settings = Settings(read_energies_dft= (calc_type != 'mlopt'),
-                            read_energies_ml= (calc_type == 'mlopt' or calc_type == 'all'))
-        total_e_slab_mol = settings.total_e_slab_mol
-        total_e_slab_mol_ml = settings.total_e_slab_mol_ml
+        settings = Settings(read_energies_dft=(calc_type != 'mlopt'),
+                            read_energies_ml=(calc_type == 'mlopt' or calc_type == 'all'))
         mult=settings.structure.molecule.radius_scale_factor
+        energies = settings.energies
         store_full_trajectories = settings.database.store_full_trajectories
     else:
         mult = None
-        total_e_slab_mol = None
-        total_e_slab_mol_ml = None
+        energies = None
         store_full_trajectories = None
 
 
@@ -631,8 +684,7 @@ def manual_update_calculations(calc_type : str,
             Database.update_calc_db(
                 calc_type=calc_type,
                 refresh=refresh,
-                total_e_slab_mol_dft=total_e_slab_mol,
-                total_e_slab_mol_ml=total_e_slab_mol_ml,
+                energies=energies,
                 mult=mult,
                 store_full_trajectories=store_full_trajectories,
                 write_csv=False,

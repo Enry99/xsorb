@@ -62,8 +62,8 @@ def plot_rotations_images(mol_rotations_ase : list[MoleculeRotation],
         center = conf.cell[:][0]/2 + conf.cell[:][1]/2
         conf.translate(center)
         plot_atoms(conf, axes[i], show_unit_cell=2)
-        axes[i].set_title(f'({rotation.xrot}, {rotation.yrot}, {rotation.zrot})')
-    fig.suptitle('Molecule orientations (xrot, yrot, zrot)')
+        axes[i].set_title(f'a:{rotation.mol_atom}, c:{rotation.conform_id}, r:({rotation.xrot}, {rotation.yrot}, {rotation.zrot})')
+    fig.suptitle('Molecule orientations (a=atom id, c=conformer id, r=rotation(x,y,z)')
     fig.savefig(figname, dpi=800, bbox_inches='tight')
 
     if verbose: logging.info("Image saved.") #pylint: disable=multiple-statements

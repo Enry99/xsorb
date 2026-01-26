@@ -1,8 +1,10 @@
 
 [Input]
     slab_filename                       = "./slab/OUTCAR"       # path of file containing the slab atomic coordinates. The list of supported file types can be found on ASE website
-    molecule_filename                   = "./mol/OUTCAR"        # path of file containing the molecule atomic coordinates. The list of supported file types can be found on ASE website
-    #E_slab_mol                         = [0.0, 0.0]            # slab and isolated molecule energies ***in eV !***
+    molecule_filename                   = "./mol/OUTCAR"        # path of file containing the molecule atomic coordinates. The list of supported file types can be found on ASE website. If using conformers downloaded from pubchem, do not specify this key. If using your own file, call it 'molecule_conformers.xyz'
+    #conformers                          = false                  # whether to consider conformers (read all the structures in molecule_filename)
+    #E_slab                              = 0.0                  # slab energy ***in eV !***
+    #E_mol                              = [0.0, 0.0]            # isolated molecule(s) energy ***in eV !***
     jobscript_path                      = "jobscript.sh"        # path of a jobscript for running the DFT code
     #jobscript_ml_path                  = "jobscript_ml.sh"     # path of a jobscript for running the machine learning model
     scheduler                           = "slurm"               # scheduler name (supported: slur, pbs, lsf, condor/htcondor, sge, toreue. If you use a different scheduler, please add it to the list in xsorb/io/scheduler.py)

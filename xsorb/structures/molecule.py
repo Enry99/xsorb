@@ -51,12 +51,13 @@ class Molecule:
                  atom_indexes: list[int],
                  molecule_axis_mode: str,
                  molecule_axis_values : list,
+                 conform_id: int = 0,
                  atoms_subset : list[int] | None = None,
                  break_bond_indices : list[int] | None = None,
                  fixed_indices_mol : list[int] | None = None,
                  fix_mol_xyz : list[bool] | None = None):
 
-
+        self.conform_id = conform_id
         self.mol_ase = mol.copy()
 
         #align axis to x axis
@@ -207,7 +208,8 @@ class Molecule:
                                                       str(x_angle),
                                                       str(y_angle),
                                                       str(z_angle),
-                                                      mol_atom=which_index))
+                                                      mol_atom=which_index,
+                                                      conform_id=self.conform_id))
 
         if verbose:
             logging.info('All molecular configurations generated.')

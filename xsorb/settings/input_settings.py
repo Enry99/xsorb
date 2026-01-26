@@ -11,6 +11,8 @@ from typing import Optional
 from ase.data import chemical_symbols
 
 from xsorb.io.scheduler import SCHEDULER_CONFIG
+from xsorb.io.filenames import CONFORMERS_FILENAME
+
 
 @dataclass
 class InputParams:
@@ -20,19 +22,19 @@ class InputParams:
     '''
 
     slab_filename: str
-    molecule_filename: str
-    scheduler: str
-    E_slab_mol : Optional[list[float]] # pylint: disable=invalid-name
+    E_slab : Optional[float] # pylint: disable=invalid-name
+    E_mol : Optional[float|list[float]] # pylint: disable=invalid-name
+    E_slab_ml : Optional[float] # pylint: disable=invalid-name
+    E_mol_ml : Optional[float|list[float]] # pylint: disable=invalid-name
     jobscript_path: Optional[str]
     jobscript_ml_path: Optional[str]
     submit_command_ml: Optional[str]
+    molecule_filename: str = CONFORMERS_FILENAME
+    scheduler: str = 'slurm'
+    conformers : bool = False
     jobname_prefix: str = ''
 
     def __post_init__(self):
-        if self.E_slab_mol is not None:
-            if len(self.E_slab_mol) != 2:
-                raise ValueError("E_slab_mol must be a list of two floats.")
-
         if self.scheduler not in SCHEDULER_CONFIG:
             raise ValueError(f"Scheduler {self.scheduler} is not supported. \
                                 Supported schedulers are: {', '.join(SCHEDULER_CONFIG.keys())}.")

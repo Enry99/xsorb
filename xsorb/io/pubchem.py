@@ -17,6 +17,7 @@ def download_pubchem_conformers(identifier_type: str, identifier: str) -> None:
         identifier_type (str): 'name' or 'cid' to specify the type of identifier
         identifier (str): the molecule name or PubChem CID to search for
     """
+    logging.info(f'Downloading conformers for {identifier_type}: {identifier} from PubChem...') # pylint: disable=logging-fstring-interpolation
     if identifier_type == 'name':
         conformers = pubchem_atoms_conformer_search(name=identifier)
     elif identifier_type == 'cid':
