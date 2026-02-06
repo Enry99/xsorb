@@ -17,7 +17,7 @@ SCHEDULER_CONFIG = {
         "id_regex": r"Submitted batch job (\d+)",
         "id_format": r"^\d+$",
         "test_cmd": "sbatch",
-        "list_active_jobs": ["squeue", "-h", "-u", "$USER", "-t", "RUNNING,PENDING"]  # Running + queued
+        "list_active_jobs": ["squeue", "-h", "-u", "$USER", "-t", "RUNNING,PENDING,CONFIGURING"]  # Running + queued
     },
     "pbs": {
         "submit": ["qsub"],
