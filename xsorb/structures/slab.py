@@ -375,8 +375,8 @@ class Slab:
         surf_sites_indices = []
         for atom in self.slab_ase:
             #find the max z of atoms within a circle of radius 2.5 A around the atom
-            max_z = np.max([atom.position[2] for atom in self.slab_ase \
-                    if np.linalg.norm(atom.position[:2] - atom.position[:2])  <circle_radius])
+            max_z = np.max([other.position[2] for other in self.slab_ase
+                            if np.linalg.norm(other.position[:2] - atom.position[:2]) < circle_radius])
             if atom.position[2] > max_z - self.surface_thickness:
                 surf_coords.append(atom.position)
                 surf_sites_indices.append(atom.index)
