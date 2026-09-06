@@ -3,7 +3,6 @@
 
 '''
 - Utility function to center the molecule
-- Utility function to read custom colors from a file
 
 '''
 
