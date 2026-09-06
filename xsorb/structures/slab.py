@@ -367,14 +367,14 @@ class Slab:
 
         #Select which sites belong to the surface. Sites whose z coordinate
         # is below self.surface_thickness from the maximum z of the atoms within
-        # a circle of radius 2.5 A around the atom are considered surface sites.
+        # a circle of radius 3.0 A around the atom are considered surface sites.
         # This allows to have a more accurate selection of the surface sites
         # in case of non-flat surfaces.
-        circle_radius = 2.5
+        circle_radius = 3.0
         surf_coords = []
         surf_sites_indices = []
         for atom in self.slab_ase:
-            #find the max z of atoms within a circle of radius 2.5 A around the atom
+            #find the max z of atoms within a circle of radius 3.0 A around the atom
             max_z = np.max([other.position[2] for other in self.slab_ase
                             if np.linalg.norm(other.position[:2] - atom.position[:2]) < circle_radius])
             if atom.position[2] > max_z - self.surface_thickness:
