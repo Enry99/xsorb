@@ -28,6 +28,7 @@ from xsorb.settings.input_settings import InputParams, StructureParams, Database
 from xsorb.dft_codes.input_settings import DFTParams
 from xsorb.dft_codes.definitions import OUT_FILE_PATHS
 from xsorb.ase_custom.io import ase_custom_read as read
+from xsorb.io.utils import check_old_lock_files
 
 
 @dataclass
@@ -115,6 +116,9 @@ class Settings:
             self.read_E_slab_mol(verbose)
         if read_energies_ml:
             self.read_E_slab_mol_ml(verbose)
+
+        # safety check to ensure writability to dbs
+        check_old_lock_files()
 
 
     def read_E_slab_mol(self, verbose : bool = True): # pylint: disable=invalid-name

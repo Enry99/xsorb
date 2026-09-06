@@ -10,6 +10,8 @@ Small utility functions for the io module
 from __future__ import annotations
 import time
 import math
+import os
+import glob
 
 
 def overwrite_question(file_path : str) -> str:
@@ -50,6 +52,24 @@ def yes_no_question(question : str) -> bool:
             return answer == 'yes'
         else:
             print('Value not recognized. Try again.')
+
+
+def check_old_lock_files():
+    '''
+    Checks if there are any old lock files in the current directory.
+    If there are, it asks the user if they want to remove them.
+    '''
+    lock_files = glob.glob('*.lock')
+    if len(lock_files) > 0:
+        print(f"Found {len(lock_files)} old lock files:")
+        for f in lock_files:
+            print(f" - {f}")
+        print("These may be from a previous interruped run, or another instance of xsorb currently running.")
+        do_remove = yes_no_question("Do you want to remove them?")
+        if do_remove:
+            for f in lock_files:
+                os.remove(f)
+            print("Old lock files removed.")
 
 
 def progressbar(it, prefix="", size=50, transparent=False):
