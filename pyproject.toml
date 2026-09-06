@@ -44,7 +44,7 @@ Issues = 'https://github.com/Enry99/xsorb/issues'
 
 [project.scripts]
 xsorb = 'xsorb.cli.xsorb_main:main'
-xsorb-ml-opt = 'xsorb.mlopt.xsorb_ml_opt:main'
+xsorb-optimize = 'xsorb.optimization.unified_optimize:main'
 
 
 [tool.setuptools.dynamic]

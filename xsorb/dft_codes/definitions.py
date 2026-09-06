@@ -26,7 +26,6 @@ HYBRID_SCREENING_THRESHOLDS = {
 
 
 # File paths #######################################################
-#use pwi also for ml since they retain constraint, while xyz does not
 
 IN_FILE_PATHS = {
     'screening': {
@@ -40,19 +39,19 @@ IN_FILE_PATHS = {
     },
 
     'mlopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.xyz'
+        'unified': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.xyz'
     },
 
     'slab': {
         'vasp': ISOLATED_OUTDIRS+'/DFT/slab/POSCAR',
         'espresso': ISOLATED_OUTDIRS+'/DFT/slab/slab.pwi',
-        'ml': ISOLATED_OUTDIRS+'/ML/slab/slab.xyz'
+        'unified': ISOLATED_OUTDIRS+'/ML/slab/slab.xyz'
     },
 
     'mol': {
         'vasp': ISOLATED_OUTDIRS+'/DFT/mol/{0}/POSCAR',
         'espresso': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.pwi',
-        'ml': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.xyz'
+        'unified': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.xyz'
     },
 
 }
@@ -61,27 +60,31 @@ OUT_FILE_PATHS = {
     'screening': {
         'vasp': SCREENING_OUTDIR+'/{0}/vasprun.xml',
         'espresso': SCREENING_OUTDIR+'/{0}/screening_{0}.pwo',
+        'unified': SCREENING_OUTDIR+'/{0}/screening_{0}.traj',
     },
 
     'relax': {
         'vasp': RELAX_OUTDIR+'/{0}/vasprun.xml',
         'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwo',
+        'unified': RELAX_OUTDIR+'/{0}/relax_{0}.traj',
     },
 
     'mlopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.traj'
+        'unified': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.traj'
     },
 
     'slab': {
         'vasp': ISOLATED_OUTDIRS+'/DFT/slab/vasprun.xml',
         'espresso': ISOLATED_OUTDIRS+'/DFT/slab/slab.pwo',
-        'ml': ISOLATED_OUTDIRS+'/ML/slab/slab.traj'
+        'unified': ISOLATED_OUTDIRS+'/DFT/slab/slab.traj',
+        'unified': ISOLATED_OUTDIRS+'/ML/slab/slab.traj'
     },
 
     'mol': {
         'vasp': ISOLATED_OUTDIRS+'/DFT/mol/{0}/vasprun.xml',
         'espresso': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.pwo',
-        'ml': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.traj'
+        'unified': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.traj',
+        'unified': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.traj'
     }
 }
 
@@ -89,37 +92,48 @@ LOG_FILE_PATHS = {
     'screening': {
         'vasp': SCREENING_OUTDIR+'/{0}/vasprun.xml',
         'espresso': SCREENING_OUTDIR+'/{0}/screening_{0}.pwo',
+        'unified': SCREENING_OUTDIR+'/{0}/screening_{0}.log',
     },
 
     'relax': {
         'vasp': RELAX_OUTDIR+'/{0}/vasprun.xml',
         'espresso': RELAX_OUTDIR+'/{0}/relax_{0}.pwo',
+        'unified': RELAX_OUTDIR+'/{0}/relax_{0}.log',
     },
 
     'mlopt': {
-        'ml': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.log'
+        'unified': ML_OPT_OUTDIR+'/{0}/mlopt_{0}.log'
     },
 
     'slab': {
         'vasp': ISOLATED_OUTDIRS+'/DFT/slab/vasprun.xml',
         'espresso': ISOLATED_OUTDIRS+'/DFT/slab/slab.pwo',
-        'ml': ISOLATED_OUTDIRS+'/ML/slab/slab.log'
+        'unified': ISOLATED_OUTDIRS+'/DFT/slab/slab.log',
+        'unified': ISOLATED_OUTDIRS+'/ML/slab/slab.log'
     },
 
     'mol': {
         'vasp': ISOLATED_OUTDIRS+'/DFT/mol/{0}/vasprun.xml',
         'espresso': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.pwo',
-        'ml': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.log'
+        'unified': ISOLATED_OUTDIRS+'/DFT/mol/{0}/mol.log',
+        'unified': ISOLATED_OUTDIRS+'/ML/mol/{0}/mol.log'
     }
 }
 
 # Completion checks #########################################
+# OPTIMIZATION_COMPLETED_STRINGS = {
+#     #'vasp' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
+#     'vasp' : 'finalpos', #in vasprun.xml
+#     'espresso': 'Begin final coordinates',
+#     'unified': 'Optimization converged.',
+#     'ml': 'Optimization converged.'
+# }
 OPTIMIZATION_COMPLETED_STRINGS = {
-    #'vasp' : 'reached required accuracy - stopping structural energy minimisation', #in OUTCAR
-    'vasp' : 'finalpos', #in vasprun.xml
-    'espresso': 'Begin final coordinates',
-    'ml': 'Optimization converged.'
+    'xml' : 'finalpos', #in vasprun.xml
+    'pwo': 'Begin final coordinates', # in espresso pwo
+    'log': 'Optimization converged.', # in ase log
 }
+
 
 SCF_NONCONVERGED_STRINGS = {
     'vasp': 'abcdefgxyz', #TODO: update
@@ -127,16 +141,16 @@ SCF_NONCONVERGED_STRINGS = {
 }
 
 SCF_CONVERGED_STRINGS = {
-    'vasp': 'abcdefgxyz', #TODO: update
+    'vasp': '', #TODO: update
     'espresso': '!'
 }
 
 
 #Job submission #############################################
-SBATCH_POSTFIX = {
+RUN_LINE_POSTFIX = {
     'vasp': '',
-    'espresso': '{in_file} {out_file}',
-    'ml': '{in_file} {out_file} {log_file} {main_dir}'
+    'espresso': '-in {in_file} >> {out_file}',
+    'unified': ''
 }
 
 #TODO: update these

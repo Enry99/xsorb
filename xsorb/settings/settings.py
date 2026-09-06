@@ -124,10 +124,13 @@ class Settings:
         If either file is not found, the corresponding energy will be set to 0.0.
         '''
 
+        program_interface = 'unified' if self.dft.use_unified_interface else self.dft.program
+
         if self.input.E_slab is None:
+            # first search in OUT_FILE_PATHS, otherwise try to read from slab input file
             try:
                 self.energies.E_slab = \
-                    read(OUT_FILE_PATHS['slab'][self.dft.program]).get_potential_energy()
+                    read(OUT_FILE_PATHS['slab'][program_interface]).get_potential_energy()
             except Exception: # pylint: disable=broad-except
                 try:
                     self.energies.E_slab = read(self.input.slab_filename).get_potential_energy()
@@ -136,16 +139,22 @@ class Settings:
                         logging.error(f"Error reading slab energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
         if self.input.E_mol is None:
             try:
-                n_conformers = len(glob(OUT_FILE_PATHS['mol'][self.dft.program].format('*')))
-                energies = [read(
-                    OUT_FILE_PATHS['mol'][self.dft.program].format(i)).get_potential_energy()
-                    for i in range(n_conformers)]
-                self.energies.E_mol = energies[0] if len(energies) == 1 else energies
+                if self.input.conformers:
+                    n_conformers = len(glob(OUT_FILE_PATHS['mol'][program_interface].format('*')))
+                    if n_conformers == 0:
+                        raise FileNotFoundError("No molecule output files found.")
+                    self.energies.E_mol = [read(
+                        OUT_FILE_PATHS['mol'][program_interface].format(i)).get_potential_energy()
+                        for i in range(n_conformers)]
+                else:
+                    self.energies.E_mol = read(OUT_FILE_PATHS['mol'][program_interface]).get_potential_energy()
             except Exception: # pylint: disable=broad-except
                 try:
-                    traj = read(self.input.molecule_filename, index=':')
-                    energies = [at.get_potential_energy() for at in traj]
-                    self.energies.E_mol = energies[0] if len(energies) == 1 else energies
+                    if self.input.conformers:
+                        traj = read(self.input.molecule_filename, index=':')
+                        self.energies.E_mol = [at.get_potential_energy() for at in traj]
+                    else:
+                        self.energies.E_mol = read(self.input.molecule_filename).get_potential_energy()
                 except Exception as e: # pylint: disable=broad-except
                     if verbose:
                         logging.error(f"Error reading molecule energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
@@ -163,15 +172,20 @@ class Settings:
         except Exception as e: # pylint: disable=broad-except
             if verbose:
                 logging.error(f"Error reading ML slab energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
+
         try:
-            n_conformers = len(glob(OUT_FILE_PATHS['mol']['ml'].format('*')))
-            #read preserving order
-            energies = [read(OUT_FILE_PATHS['mol']['ml'].format(i)).get_potential_energy()
-                            for i in range(n_conformers)]
-            self.energies.E_mol_ml = energies[0] if len(energies) == 1 else energies
+            if self.input.conformers:
+                n_conformers = len(glob(OUT_FILE_PATHS['mol']['ml'].format('*')))
+                if n_conformers == 0:
+                    raise FileNotFoundError("No molecule output files found.")
+                self.energies.E_mol_ml = [read(
+                    OUT_FILE_PATHS['mol']['ml'].format(i)).get_potential_energy()
+                    for i in range(n_conformers)]
+            else:
+                self.energies.E_mol_ml = read(OUT_FILE_PATHS['mol']['ml'].format(0)).get_potential_energy()
         except Exception as e: # pylint: disable=broad-except
             if verbose:
-                logging.error(f"Error reading ML molecule energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
+                logging.error(f"Error reading molecule energy: {e}. Setting to 0") # pylint: disable=logging-fstring-interpolation
 
     @staticmethod
     def _format_dataclass(obj, indent: int = 1) -> str:

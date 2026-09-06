@@ -17,7 +17,7 @@ import logging
 
 import xsorb.io.database
 from xsorb.settings import Settings
-from xsorb.dft_codes.definitions import SBATCH_POSTFIX
+from xsorb.dft_codes.definitions import RUN_LINE_POSTFIX
 from xsorb.dft_codes.calculator import edit_file_for_restart
 from xsorb.io.scheduler import JobScheduler
 from xsorb.io.filenames import JOBS_FILENAME
@@ -25,7 +25,8 @@ if TYPE_CHECKING:
     from xsorb.adsorptiondata.adsorptioncalculation import CalculationInfo
 
 
-def launch_jobs(*,program : str,
+def launch_jobs(*,program_interface : str,
+                run_command : str,
                 calc_type : str,
                 jobscript : str,
                 scheduler_name : str,
@@ -37,6 +38,7 @@ def launch_jobs(*,program : str,
 
     Args:
     - program: 'espresso', 'vasp' or 'ml'
+    - run_command: command to run the code, e.g. mpirun -np 1 vasp_std
     - calc_type: 'screening'/'relax'/'mlopt' or 'isolated'
     - jobscript: path of the jobscript file
     - scheduler_name: name of the scheduler, e.g. 'slurm'
@@ -45,7 +47,7 @@ def launch_jobs(*,program : str,
 
     '''
     if jobscript is None:
-        raise RuntimeError(f"jobscript path for {program} missing in settings file.")
+        raise RuntimeError(f"jobscript path missing in settings file.")
 
     scheduler = JobScheduler(scheduler_name)
 
@@ -61,6 +63,13 @@ def launch_jobs(*,program : str,
         shutil.copyfile(jobscript, f'{j_dir}/jobscript.sh')
 
         os.chdir(j_dir)   ####################
+
+        # edit the file to append the run command at the end
+        with open(f'jobscript.sh', 'a',encoding=sys.getfilesystemencoding()) as f:
+            postfix = RUN_LINE_POSTFIX[program_interface].format(
+                in_file=Path(system.in_file_path).name,
+                out_file=Path(system.out_file_path).name)
+            f.write(f'\n{run_command} {postfix}\n')
 
         #change job title (only for slumr jobscripts)
         if scheduler.scheduler_name == 'slurm':
@@ -79,13 +88,7 @@ def launch_jobs(*,program : str,
             with open('jobscript.sh', 'w',encoding=sys.getfilesystemencoding()) as f:
                 f.writelines(lines)
 
-        postfix = SBATCH_POSTFIX[program].format(
-            in_file=Path(system.in_file_path).name,
-            out_file=Path(system.out_file_path).name,
-            log_file=Path(system.log_file_path).name,
-            main_dir=main_dir)
-
-        jobid = scheduler.submit_job(script_path='jobscript.sh', script_args=postfix.split())
+        jobid = scheduler.submit_job(script_path='jobscript.sh')
         os.chdir(main_dir)
 
         if calc_type not in ('isolated'): #no database for slab/molecule

@@ -839,6 +839,6 @@ def read_espresso_out_custom(fileobj, index=-1, results_required=True,read_singl
 
 
 # Runtime patching
-#ase.io.espresso.write_espresso_in = write_espresso_in_custom
+ase.io.espresso.write_espresso_in = write_espresso_in_custom
 ase.io.espresso.read_espresso_in = read_espresso_in_custom
 ase.io.espresso.read_espresso_out = read_espresso_out_custom

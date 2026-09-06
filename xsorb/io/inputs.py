@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 import shutil
 import logging
 from pathlib import Path
+import json
+from dataclasses import asdict
 
 
 from xsorb.structures.utils import set_fixed_slab_constraints
@@ -22,7 +24,9 @@ from xsorb.ase_custom.io import write
 from xsorb.ase_custom import write_xyz_custom
 from xsorb.ase_custom.atoms import AtomsCustom
 from xsorb.dft_codes.definitions import IN_FILE_PATHS, OUT_FILE_PATHS, LOG_FILE_PATHS
+from xsorb.io.filenames import UNIFIED_OPTIMIZATION_PARAMS
 from xsorb.dft_codes.calculator import write_file_with_calculator
+from xsorb.optimization.unified_optimize import OptimizationParameters
 
 from xsorb.adsorptiondata import AdsorptionCalculation, CalculationInfo
 if TYPE_CHECKING:
@@ -53,7 +57,14 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
     - written_systems: list[CalculationInfo]
     '''
 
-    program = settings.dft.program if calc_type != 'mlopt' else 'ml'
+    MAIN_DIR = Path.cwd().absolute().as_posix()
+
+    if calc_type == 'mlopt':
+        program = 'ml'
+        program_interface = 'unified'
+    else:
+        program = settings.dft.program
+        program_interface = 'unified' if settings.dft.use_unified_interface else program
 
     if verbose: logging.info('Writing input files...') #pylint: disable=multiple-statements
 
@@ -75,9 +86,9 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             set_fixed_slab_constraints(ads_structure.atoms, ads_structure.slab_indices)
 
         file_label = f'{calc_type_for_writing.lower()}_{i}'  #e.g. screening_i or relax_i
-        in_file_path = IN_FILE_PATHS[calc_type_for_writing][program].format(i)
-        out_file_path = OUT_FILE_PATHS[calc_type_for_writing][program].format(i)
-        log_file_path = LOG_FILE_PATHS[calc_type_for_writing][program].format(i)
+        in_file_path = IN_FILE_PATHS[calc_type_for_writing][program_interface].format(i)
+        out_file_path = OUT_FILE_PATHS[calc_type_for_writing][program_interface].format(i)
+        log_file_path = LOG_FILE_PATHS[calc_type_for_writing][program_interface].format(i)
         file_dir = Path(in_file_path).parent.as_posix()
 
         # overwrite check block ##############
@@ -101,6 +112,25 @@ def write_inputs(*,adsorption_structures : list[AdsorptionStructure],
             label=file_label,
             directory=file_dir
         )
+
+        if program_interface == 'unified':
+            # write parameters file to file_dir
+            opt_params = OptimizationParameters(
+                code=program,
+                in_file=Path(in_file_path).absolute().as_posix(),
+                out_file=Path(out_file_path).absolute().as_posix(),
+                log_file=Path(log_file_path).absolute().as_posix(),
+                command=settings.dft.get_run_command(),
+                pseudo_dir=settings.dft.get_pseudo_dir(),
+                main_dir=MAIN_DIR,
+                calc_id=i,
+                fmax=settings.dft.get_force_threshold(calc_type=calc_type_for_writing),
+                maxsteps=settings.dft.get_maxsteps(calc_type=calc_type_for_writing),
+                optimizer=settings.dft.unified_interface_optimizer,
+            )
+
+            with open(Path(file_dir) / UNIFIED_OPTIMIZATION_PARAMS, 'w') as f:
+                json.dump(asdict(opt_params), f, indent=4)
 
         calc_info = CalculationInfo(
                 calc_id=str(i),
@@ -154,7 +184,14 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
     - written_systems: list[CalculationInfo]
     '''
 
-    program = 'ml' if ml else settings.dft.program
+    MAIN_DIR = Path.cwd().absolute().as_posix()
+
+    if ml:
+        program = 'ml'
+        program_interface = 'unified'
+    else:
+        program = settings.dft.program
+        program_interface = 'unified' if settings.dft.use_unified_interface else program
 
     structures : list[Atoms] = []
     names: list[str] = []
@@ -181,9 +218,9 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
             set_fixed_slab_constraints(atoms)
 
         file_label = name
-        in_file_path = IN_FILE_PATHS[name][program].format(ids_i)
-        out_file_path = OUT_FILE_PATHS[name][program].format(ids_i)
-        log_file_path = LOG_FILE_PATHS[name][program].format(ids_i)
+        in_file_path = IN_FILE_PATHS[name][program_interface].format(ids_i)
+        out_file_path = OUT_FILE_PATHS[name][program_interface].format(ids_i)
+        log_file_path = LOG_FILE_PATHS[name][program_interface].format(ids_i)
         file_dir = Path(in_file_path).parent.as_posix()
 
         # overwrite check block ##############
@@ -209,6 +246,25 @@ def write_slab_mol_inputs(*,slab : Atoms | None,
             label=file_label,
             directory=file_dir
         )
+
+        if program_interface == 'unified':
+            # write parameters file to file_dir
+            opt_params = OptimizationParameters(
+                code=program,
+                in_file=Path(in_file_path).absolute().as_posix(),
+                out_file=Path(out_file_path).absolute().as_posix(),
+                log_file=Path(log_file_path).absolute().as_posix(),
+                command=settings.dft.get_run_command(),
+                pseudo_dir=settings.dft.get_pseudo_dir(),
+                main_dir=MAIN_DIR,
+                calc_id=0,
+                fmax=settings.dft.get_force_threshold(calc_type='ml' if ml else 'relax'),
+                maxsteps=settings.dft.get_maxsteps(calc_type='ml' if ml else 'relax'),
+                optimizer=settings.dft.unified_interface_optimizer,
+            )
+
+            with open(Path(file_dir) / UNIFIED_OPTIMIZATION_PARAMS, 'w') as f:
+                json.dump(asdict(opt_params), f, indent=4)
 
         written_systems_calcinfos.append(
             CalculationInfo(

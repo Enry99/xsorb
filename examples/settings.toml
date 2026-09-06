@@ -63,9 +63,12 @@
 
 [Calculation_parameters]
     program                             = "vasp"                # vasp, espresso, ml (write ml only if you do not want to run DFT at all
-
+    #use_unified_interface               = false                # whether to use the unified ASE interface or launching DFT codes natively
+    #unified_interface_optimizer         = "bfgs_linesearch"    # optimizer to use with the unified interface (options: bfgs_linesearch, quasi_newton, gpmin)
+    #gpmin_calculator_prior               = false                  # whether to use a calculator for the prior of the GPMin optimizer (only if unified_interface_optimizer = gpmin)
 
     [Calculation_parameters.vasp]
+        run_command = "mpirun -np 1 vasp_std"                   # command to run VASP (e.g. with mpirun and path to the executable)
         vasp_pp_path                    = "path/to/pseudo"      # The pseudopotentials are expected to be in: LDA: VASP_PP_PATH/potpaw/, PBE: VASP_PP_PATH/potpaw_PBE/, PW91: $VASP_PP_PATH/potpaw_GGA/ (see https://wiki.fysik.dtu.dk/ase/ase/calculators/vasp.html)
         #vasp_xc_functional             = "PBE"                 # default: PBE
         #vasp_pseudo_setups             = {"base": "recommended", "6": "C_h", "C": "_s"}  # for the default versions (without subscripts) just remove/comment this line. Options for base are "minimal", "recommended", "materialsproject", "gw" (see ase.calculators.vasp.setups)
@@ -77,10 +80,15 @@
         ediffg_screening                = -0.5                  # convergence threshold for forces (eV/A, VASP units)
 
     #[Calculation_parameters.espresso]
+        #run_command                   = "mpirun -np 1 pw.x" # command to run Quantum Espresso (e.g. with mpirun and path to the executable, up to -in, as the input and output files will be specified by xsorb)
         #pwi_path                       = "template.pwi"        # path of the input file for Quantum Espresso (containing the settings, without the positions)
         #pwi_path_screening             = "template_screening.pwi"  # path of the input file for Quantum Espresso for screening calculations (e.g. with lowered cutoff/k-point mesh)
         #etot_conv_thr_screening        = 5e-3                  # convergence threshold for energy (Ry, QE units)
         #forc_conv_thr_screening        = 5e-2                  # convergence threshold for forces (Ry/bohr, QE units)
+
+    [Calculation_parameters.ml]
+        force_conv_thr                  = 0.01                   # convergence threshold for forces (eV/A)
+        #max_steps                      = 500                    # maximum number of optimization steps (for first attempt)
 
 [Database]
     store_full_trajectories            = false                  # store the full trajectories in the database

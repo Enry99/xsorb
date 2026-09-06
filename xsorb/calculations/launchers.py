@@ -93,7 +93,10 @@ def launch_screening(from_ml_opt : bool = False, save_image : bool = False,):
                                    calc_type='screening',
                                    calc_ids=calc_ids)
 
-    launch_jobs(program=settings.dft.program,
+    interface = 'unified' if settings.dft.use_unified_interface else settings.dft.program
+    run_command = 'xsorb-optimize' if interface == 'unified' else settings.dft.get_run_command()
+    launch_jobs(program_interface=interface,
+                run_command=run_command,
                 calc_type='screening',
                 jobscript=settings.input.jobscript_path,
                 scheduler_name=settings.input.scheduler,
@@ -129,7 +132,8 @@ def launch_ml_opt(save_image : bool = False,):
         raise ValueError('jobscript_ml_path is not defined in the settings file. '\
                          'Please define it to launch the machine learning optimization.')
 
-    launch_jobs(program='ml',
+    launch_jobs(program_interface='unified',
+                run_command='xsorb-optimize',
                 calc_type='mlopt',
                 jobscript=settings.input.jobscript_ml_path,
                 scheduler_name=settings.input.scheduler,
@@ -221,7 +225,10 @@ def launch_final_relax(*,
                                    calc_type='relax',
                                    calc_ids=calc_ids)
 
-    launch_jobs(program=settings.dft.program,
+    interface = 'unified' if settings.dft.use_unified_interface else settings.dft.program
+    run_command = 'xsorb-optimize' if interface == 'unified' else settings.dft.get_run_command()
+    launch_jobs(program_interface=interface,
+                run_command=run_command,
                 calc_type='relax',
                 jobscript=settings.input.jobscript_path,
                 scheduler_name=settings.input.scheduler,
@@ -304,9 +311,12 @@ def launch_isolated_slab_and_molecule(*,
         program = settings.dft.program
         jobscript = settings.input.jobscript_path
 
-    launch_jobs(program=program,
+    interface = 'unified' if settings.dft.use_unified_interface else settings.dft.program
+    run_command = 'xsorb-optimize' if interface == 'unified' else settings.dft.get_run_command()
+    launch_jobs(program_interface=interface,
+                run_command=run_command,
                 calc_type='isolated',
-                jobscript=jobscript,
+                jobscript=settings.input.jobscript_path,
                 scheduler_name=settings.input.scheduler,
                 systems_calcinfos=written_systems,
                 jobname_prefix=settings.input.jobname_prefix)

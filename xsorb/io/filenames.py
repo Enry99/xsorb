@@ -20,6 +20,8 @@ ISOLATED_OUTDIRS            = 'isolated_outdirs'
 
 CONFORMERS_FILENAME         = 'molecule_conformers.xyz'
 
+UNIFIED_OPTIMIZATION_PARAMS = 'parameters.json'
+
 
 ######## for convenience in check and cleanup ########
 ALL_DB_NAMES = list(CALC_DB_NAMES.values()) + [STRUCTURES_DB_NAME]

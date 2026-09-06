@@ -33,7 +33,7 @@ def is_optimization_completed(filename : str, program : str):
     True or False
     '''
 
-    searchfor = OPTIMIZATION_COMPLETED_STRINGS[program]
+    searchfor = OPTIMIZATION_COMPLETED_STRINGS[Path(filename).suffix.lstrip('.')]
 
     with open(filename, 'r',encoding=sys.getfilesystemencoding()) as f:
         file_content = f.readlines()
